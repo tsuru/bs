@@ -11,13 +11,15 @@ import (
 var config struct {
 	DockerEndpoint string
 	TsuruEndpoint  string
+	TsuruToken     string
 	SentinelEnvVar string
 }
 
 func loadConfig() {
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
-	config.SentinelEnvVar = os.Getenv("TSURU_SENTINEL_ENV_VAR")
+	config.TsuruToken = os.Getenv("TSURU_TOKEN")
+	config.SentinelEnvVar = os.Getenv("TSURU_SENTINEL_ENV_VAR") + "="
 }
 
 func main() {

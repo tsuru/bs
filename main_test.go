@@ -23,8 +23,10 @@ func (S) TestLoadConfig(c *check.C) {
 	os.Setenv("DOCKER_ENDPOINT", "http://192.168.50.4:2375")
 	os.Setenv("TSURU_ENDPOINT", "http://192.168.50.4:8080")
 	os.Setenv("TSURU_SENTINEL_ENV_VAR", "TSURU_APP_NAME")
+	os.Setenv("TSURU_TOKEN", "sometoken")
 	loadConfig()
 	c.Check(config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
 	c.Check(config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
-	c.Check(config.SentinelEnvVar, check.Equals, "TSURU_APP_NAME")
+	c.Check(config.TsuruToken, check.Equals, "sometoken")
+	c.Check(config.SentinelEnvVar, check.Equals, "TSURU_APP_NAME=")
 }
