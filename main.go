@@ -4,9 +4,7 @@
 
 package main
 
-import (
-	"os"
-)
+import "os"
 
 var config struct {
 	DockerEndpoint string
