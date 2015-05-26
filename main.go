@@ -47,7 +47,7 @@ func statusReporter() (chan<- struct{}, <-chan struct{}) {
 				close(exit)
 				return
 			case <-time.After(config.StatusInterval):
-				collectStatus()
+				reportStatus()
 			}
 		}
 	}(abort)

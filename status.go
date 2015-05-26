@@ -26,7 +26,7 @@ type respUnit struct {
 	Found bool
 }
 
-func collectStatus() {
+func reportStatus() {
 	client, err := docker.NewClient(config.DockerEndpoint)
 	if err != nil {
 		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)

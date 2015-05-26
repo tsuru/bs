@@ -18,7 +18,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func (s S) TestCollectStatus(c *check.C) {
+func (s S) TestReportStatus(c *check.C) {
 	bogusContainers := []bogusContainer{
 		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: true}},
 		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
@@ -40,7 +40,7 @@ func (s S) TestCollectStatus(c *check.C) {
 	config.TsuruEndpoint = tsuruServer.URL
 	config.SentinelEnvVar = "TSURU_APP_NAME="
 	config.TsuruToken = "some-token"
-	collectStatus()
+	reportStatus()
 	req := <-requests
 	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
 	c.Assert(req.request.URL.Path, check.Equals, "/units/status")
