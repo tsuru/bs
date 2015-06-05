@@ -5,22 +5,28 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
+
+	bsLog "github.com/tsuru/bs/log"
 )
 
 const defaultInterval = 60
 
 var config struct {
-	DockerEndpoint string
-	TsuruEndpoint  string
-	TsuruToken     string
-	SentinelEnvVar string
-	StatusInterval time.Duration
+	DockerEndpoint         string
+	TsuruEndpoint          string
+	TsuruToken             string
+	SentinelEnvVar         string
+	StatusInterval         time.Duration
+	SyslogListenAddress    string
+	SyslogForwardAddresses []string
 }
 
 func loadConfig() {
@@ -35,6 +41,8 @@ func loadConfig() {
 		parsedInterval = defaultInterval
 	}
 	config.StatusInterval = time.Duration(parsedInterval) * time.Second
+	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
+	config.SyslogForwardAddresses = strings.Split(os.Getenv("SYSLOG_FORWARD_ADDRESSES"), ",")
 }
 
 func statusReporter() (chan<- struct{}, <-chan struct{}) {
@@ -66,6 +74,15 @@ func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 
 func main() {
 	loadConfig()
+	lf := bsLog.LogForwarder{
+		BindAddress:      config.SyslogListenAddress,
+		ForwardAddresses: config.SyslogForwardAddresses,
+	}
+	err := lf.Start()
+	if err != nil {
+		fmt.Printf("Unable to initialize log forwarder: %s\n", err)
+		os.Exit(1)
+	}
 	abortReporter, reporterEnded := statusReporter()
 	startSignalHandler(func(signal os.Signal) {
 		close(abortReporter)
