@@ -60,3 +60,15 @@ func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	c.Check(config.StatusInterval, check.Equals, time.Duration(60e9))
 	c.Assert(buf.String(), check.Matches, `(?m).*\[WARNING\] invalid interval "four"\. Using the default value of 60 seconds$`)
 }
+
+func (S) TestLoadConfigNoForwarder(c *check.C) {
+	os.Setenv("DOCKER_ENDPOINT", "http://192.168.50.4:2375")
+	os.Setenv("TSURU_ENDPOINT", "http://192.168.50.4:8080")
+	os.Setenv("TSURU_SENTINEL_ENV_VAR", "TSURU_APP_NAME")
+	os.Setenv("TSURU_TOKEN", "sometoken")
+	os.Setenv("STATUS_INTERVAL", "45")
+	os.Setenv("SYSLOG_LISTEN_ADDRESS", "udp://0.0.0.0:1514")
+	os.Unsetenv("SYSLOG_FORWARD_ADDRESSES")
+	loadConfig()
+	c.Assert(config.SyslogForwardAddresses, check.HasLen, 0)
+}

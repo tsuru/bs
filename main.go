@@ -42,7 +42,11 @@ func loadConfig() {
 	}
 	config.StatusInterval = time.Duration(parsedInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
-	config.SyslogForwardAddresses = strings.Split(os.Getenv("SYSLOG_FORWARD_ADDRESSES"), ",")
+	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
+		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
+	} else {
+		config.SyslogForwardAddresses = nil
+	}
 }
 
 func statusReporter() (chan<- struct{}, <-chan struct{}) {
