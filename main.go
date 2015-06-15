@@ -81,6 +81,8 @@ func main() {
 	lf := bsLog.LogForwarder{
 		BindAddress:      config.SyslogListenAddress,
 		ForwardAddresses: config.SyslogForwardAddresses,
+		DockerEndpoint:   config.DockerEndpoint,
+		AppNameEnvVar:    config.SentinelEnvVar,
 	}
 	err := lf.Start()
 	if err != nil {
