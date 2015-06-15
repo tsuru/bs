@@ -25,30 +25,32 @@ func (S) TestLenientFormatGetSplitFunc(c *check.C) {
 func (S) TestLenientParserParse(c *check.C) {
 	examples := []string{
 		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey",
-		"<31>Dec 26 05:08:46 hostname tag[296]: content",
+		"<31>Dec 26 05:08:46 hostname tag/my_id[296]: content",
 		"<165>1 2003-08-24T05:14:15.000003Z 192.0.2.1 myproc 8710 - - content",
 	}
 	expected := []syslogparser.LogParts{
 		{
-			"priority":  30,
-			"facility":  3,
-			"severity":  6,
-			"timestamp": time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
-			"hostname":  "vagrant-ubuntu-trusty-64",
-			"tag":       "docker/00dfa98fe8e0",
-			"proc_id":   "4843",
-			"content":   "hey",
-			"rawmsg":    []byte(examples[0]),
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+			"hostname":     "vagrant-ubuntu-trusty-64",
+			"tag":          "docker/00dfa98fe8e0",
+			"proc_id":      "4843",
+			"content":      "hey",
+			"rawmsg":       []byte(examples[0]),
+			"container_id": "00dfa98fe8e0",
 		},
 		{
-			"priority":  31,
-			"facility":  3,
-			"severity":  7,
-			"timestamp": time.Date(2015, 12, 26, 5, 8, 46, 0, time.UTC),
-			"hostname":  "hostname",
-			"tag":       "tag",
-			"content":   "content",
-			"rawmsg":    []byte(examples[1]),
+			"priority":     31,
+			"facility":     3,
+			"severity":     7,
+			"timestamp":    time.Date(2015, 12, 26, 5, 8, 46, 0, time.UTC),
+			"hostname":     "hostname",
+			"tag":          "tag/my_id",
+			"content":      "content",
+			"rawmsg":       []byte(examples[1]),
+			"container_id": "my_id",
 		},
 		{
 			"priority":        165,
@@ -72,6 +74,6 @@ func (S) TestLenientParserParse(c *check.C) {
 		err := lp.Parse()
 		c.Assert(err, check.IsNil)
 		parts := lp.Dump()
-		c.Assert(parts, check.DeepEquals, expected[i])
+		c.Check(parts, check.DeepEquals, expected[i])
 	}
 }

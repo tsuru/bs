@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jeromer/syslogparser"
@@ -75,6 +76,12 @@ func (p *LenientParser) Dump() syslogparser.LogParts {
 	}
 	if _, ok := p.logParts["message"]; ok {
 		p.logParts["content"] = p.logParts["message"]
+	}
+	if tag, ok := p.logParts["tag"].(string); ok {
+		parts := strings.SplitN(tag, "/", 2)
+		if len(parts) == 2 {
+			p.logParts["container_id"] = parts[1]
+		}
 	}
 	return p.logParts
 }
