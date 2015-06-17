@@ -83,6 +83,8 @@ func main() {
 		ForwardAddresses: config.SyslogForwardAddresses,
 		DockerEndpoint:   config.DockerEndpoint,
 		AppNameEnvVar:    config.SentinelEnvVar,
+		TsuruEndpoint:    config.TsuruEndpoint,
+		TsuruToken:       config.TsuruToken,
 	}
 	err := lf.Start()
 	if err != nil {

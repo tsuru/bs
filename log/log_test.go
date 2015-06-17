@@ -4,13 +4,20 @@
 package log
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/tsuru/tsuru/app"
+	"io"
 	"net"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
+	"golang.org/x/net/websocket"
 	"gopkg.in/check.v1"
 )
 
@@ -35,15 +42,7 @@ func (S) TestLogForwarderStartCachedAppName(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	defer func() {
-		func() {
-			defer func() {
-				recover()
-			}()
-			lf.server.Kill()
-		}()
-		lf.server.Wait()
-	}()
+	defer lf.stop()
 	lf.appNameCache.Add("contid1", "myappname")
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
@@ -73,15 +72,7 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	defer func() {
-		func() {
-			defer func() {
-				recover()
-			}()
-			lf.server.Kill()
-		}()
-		lf.server.Wait()
-	}()
+	defer lf.stop()
 	dockerClient, err := docker.NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
@@ -110,6 +101,56 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 	c.Assert(ok, check.Equals, true)
 	c.Assert(cached.(string), check.Equals, "coolappname")
 }
+
+func (S) TestLogForwarderWSForwarder(c *check.C) {
+	var body bytes.Buffer
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(&body, ws)
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BindAddress:   "udp://0.0.0.0:59317",
+		TsuruEndpoint: srv.URL,
+		TsuruToken:    "mytoken",
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	lf.appNameCache.Add("contid1", "myappname")
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	baseTime, err := time.Parse(time.RFC3339, "2015-06-05T16:13:47Z")
+	c.Assert(err, check.IsNil)
+	msg := []byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg2\n")
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+	time.Sleep(2 * time.Second)
+	lf.stop()
+	parts := strings.Split(body.String(), "\n")
+	c.Assert(parts, check.HasLen, 3)
+	c.Assert(parts[2], check.Equals, "")
+	var logLine app.Applog
+	err = json.Unmarshal([]byte(parts[0]), &logLine)
+	c.Assert(err, check.IsNil)
+	c.Assert(logLine, check.DeepEquals, app.Applog{
+		Date:    baseTime,
+		Message: "mymsg",
+		Source:  "TODO process name",
+		AppName: "myappname",
+		Unit:    "contid1",
+	})
+	err = json.Unmarshal([]byte(parts[1]), &logLine)
+	c.Assert(err, check.IsNil)
+	c.Assert(logLine, check.DeepEquals, app.Applog{
+		Date:    baseTime,
+		Message: "mymsg2",
+		Source:  "TODO process name",
+		AppName: "myappname",
+		Unit:    "contid1",
+	})
+}
+
+// TODO(cezarsa): ws forwarder test with lost ws connection
 
 func (S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{

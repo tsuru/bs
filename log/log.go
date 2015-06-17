@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -11,6 +12,8 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/hashicorp/golang-lru"
 	"github.com/jeromer/syslogparser"
+	"github.com/tsuru/tsuru/app"
+	"golang.org/x/net/websocket"
 	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
@@ -19,9 +22,13 @@ type LogForwarder struct {
 	ForwardAddresses []string
 	DockerEndpoint   string
 	AppNameEnvVar    string
+	TsuruEndpoint    string
+	TsuruToken       string
 	server           *syslog.Server
 	forwardConns     []net.Conn
 	appNameCache     *lru.Cache
+	wsConn           *websocket.Conn
+	wsJsonEncoder    *json.Encoder
 }
 
 func (l *LogForwarder) initForwardConnections() error {
@@ -40,8 +47,29 @@ func (l *LogForwarder) initForwardConnections() error {
 	return nil
 }
 
+func (l *LogForwarder) initWSConnection() error {
+	if l.TsuruEndpoint == "" {
+		return nil
+	}
+	tsuruUrl, err := url.Parse(l.TsuruEndpoint)
+	if err != nil {
+		return err
+	}
+	wsUrl := fmt.Sprintf("ws://%s/logs", tsuruUrl.Host)
+	l.wsConn, err = websocket.Dial(wsUrl, "", "ws://localhost/")
+	if err != nil {
+		return err
+	}
+	l.wsJsonEncoder = json.NewEncoder(l.wsConn)
+	return nil
+}
+
 func (l *LogForwarder) Start() error {
-	err := l.initForwardConnections()
+	err := l.initWSConnection()
+	if err != nil {
+		return err
+	}
+	err = l.initForwardConnections()
 	if err != nil {
 		return err
 	}
@@ -67,6 +95,22 @@ func (l *LogForwarder) Start() error {
 		return err
 	}
 	return l.server.Boot()
+}
+
+func (l *LogForwarder) stop() {
+	func() {
+		defer func() {
+			recover()
+		}()
+		l.server.Kill()
+	}()
+	l.server.Wait()
+	if l.wsConn != nil {
+		l.wsConn.Close()
+	}
+	for _, c := range l.forwardConns {
+		c.Close()
+	}
 }
 
 func (l *LogForwarder) appName(containerId string) (string, error) {
@@ -115,7 +159,25 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		appName,
 		content,
 	))
+	// TODO(cezarsa): Add process name as source, read from env var with
+	// appname
+	tsrMessage := app.Applog{
+		Date:    ts,
+		AppName: appName,
+		Message: content,
+		Source:  "TODO process name",
+		Unit:    contId,
+	}
+	for retries := 2; l.wsJsonEncoder != nil && retries > 0; retries-- {
+		err = l.wsJsonEncoder.Encode(tsrMessage)
+		if err == nil {
+			break
+		}
+		log.Printf("[log forwarder] error encoding message: %s", err)
+		l.initWSConnection()
+	}
 	for _, c := range l.forwardConns {
+		// TODO(cezarsa): One goroutine for each conn, only put to channel here
 		go func(c net.Conn) {
 			n, err := c.Write(msg)
 			if err != nil {
