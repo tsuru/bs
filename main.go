@@ -23,17 +23,19 @@ var config struct {
 	DockerEndpoint         string
 	TsuruEndpoint          string
 	TsuruToken             string
-	SentinelEnvVar         string
+	AppNameEnvVar          string
+	ProcessNameEnvVar      string
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
 	SyslogForwardAddresses []string
 }
 
 func loadConfig() {
+	config.AppNameEnvVar = "TSURU_APPNAME="
+	config.ProcessNameEnvVar = "TSURU_PROCESSNAME="
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	config.TsuruToken = os.Getenv("TSURU_TOKEN")
-	config.SentinelEnvVar = os.Getenv("TSURU_SENTINEL_ENV_VAR") + "="
 	statusInterval := os.Getenv("STATUS_INTERVAL")
 	parsedInterval, err := strconv.Atoi(statusInterval)
 	if err != nil {
@@ -79,12 +81,13 @@ func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 func main() {
 	loadConfig()
 	lf := bsLog.LogForwarder{
-		BindAddress:      config.SyslogListenAddress,
-		ForwardAddresses: config.SyslogForwardAddresses,
-		DockerEndpoint:   config.DockerEndpoint,
-		AppNameEnvVar:    config.SentinelEnvVar,
-		TsuruEndpoint:    config.TsuruEndpoint,
-		TsuruToken:       config.TsuruToken,
+		BindAddress:       config.SyslogListenAddress,
+		ForwardAddresses:  config.SyslogForwardAddresses,
+		DockerEndpoint:    config.DockerEndpoint,
+		AppNameEnvVar:     config.AppNameEnvVar,
+		ProcessNameEnvVar: config.ProcessNameEnvVar,
+		TsuruEndpoint:     config.TsuruEndpoint,
+		TsuruToken:        config.TsuruToken,
 	}
 	err := lf.Start()
 	if err != nil {

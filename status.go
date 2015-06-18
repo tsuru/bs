@@ -121,7 +121,7 @@ func handleTsuruResponse(resp []respUnit) error {
 			continue
 		}
 		for _, env := range container.Config.Env {
-			if strings.HasPrefix(env, config.SentinelEnvVar) {
+			if strings.HasPrefix(env, config.AppNameEnvVar) {
 				opts := docker.RemoveContainerOptions{ID: id, Force: true}
 				err = client.RemoveContainer(opts)
 				if err != nil {

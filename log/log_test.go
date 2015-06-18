@@ -43,7 +43,7 @@ func (S) TestLogForwarderStartCachedAppName(c *check.C) {
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
 	defer lf.stop()
-	lf.appNameCache.Add("contid1", "myappname")
+	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -54,7 +54,7 @@ func (S) TestLogForwarderStartCachedAppName(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(buffer[:n], check.DeepEquals, []byte("<30>2015-06-05T16:13:47Z contid1 myappname: mymsg\n"))
+	c.Assert(buffer[:n], check.DeepEquals, []byte("<30>2015-06-05T16:13:47Z contid1 myappname[proc1]: mymsg\n"))
 }
 
 func (S) TestLogForwarderStartDockerAppName(c *check.C) {
@@ -65,10 +65,11 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
 	lf := LogForwarder{
-		BindAddress:      "udp://0.0.0.0:59317",
-		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
-		DockerEndpoint:   dockerServer.URL(),
-		AppNameEnvVar:    "APPNAMEVAR=",
+		BindAddress:       "udp://0.0.0.0:59317",
+		ForwardAddresses:  []string{"udp://" + udpConn.LocalAddr().String()},
+		DockerEndpoint:    dockerServer.URL(),
+		AppNameEnvVar:     "APPNAMEVAR=",
+		ProcessNameEnvVar: "PROCESSNAMEVAR=",
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -80,7 +81,7 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 	config := docker.Config{
 		Image: "myimg",
 		Cmd:   []string{"mycmd"},
-		Env:   []string{"ENV1=val1", "APPNAMEVAR=coolappname"},
+		Env:   []string{"ENV1=val1", "PROCESSNAMEVAR=procx", "APPNAMEVAR=coolappname"},
 	}
 	opts := docker.CreateContainerOptions{Name: "myContName", Config: &config}
 	cont, err := dockerClient.CreateContainer(opts)
@@ -95,11 +96,11 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	expected := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname: mymsg\n", cont.ID))
+	expected := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", cont.ID))
 	c.Assert(buffer[:n], check.DeepEquals, expected)
-	cached, ok := lf.appNameCache.Get(cont.ID)
+	cached, ok := lf.containerDataCache.Get(cont.ID)
 	c.Assert(ok, check.Equals, true)
-	c.Assert(cached.(string), check.Equals, "coolappname")
+	c.Assert(cached.(*containerData), check.DeepEquals, &containerData{appName: "coolappname", processName: "procx"})
 }
 
 func (S) TestLogForwarderWSForwarder(c *check.C) {
@@ -115,7 +116,7 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	lf.appNameCache.Add("contid1", "myappname")
+	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -135,7 +136,7 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
 		Message: "mymsg",
-		Source:  "TODO process name",
+		Source:  "proc1",
 		AppName: "myappname",
 		Unit:    "contid1",
 	})
@@ -144,7 +145,7 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
 		Message: "mymsg2",
-		Source:  "TODO process name",
+		Source:  "proc1",
 		AppName: "myappname",
 		Unit:    "contid1",
 	})

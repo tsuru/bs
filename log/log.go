@@ -18,17 +18,23 @@ import (
 )
 
 type LogForwarder struct {
-	BindAddress      string
-	ForwardAddresses []string
-	DockerEndpoint   string
-	AppNameEnvVar    string
-	TsuruEndpoint    string
-	TsuruToken       string
-	server           *syslog.Server
-	forwardConns     []net.Conn
-	appNameCache     *lru.Cache
-	wsConn           *websocket.Conn
-	wsJsonEncoder    *json.Encoder
+	BindAddress        string
+	ForwardAddresses   []string
+	DockerEndpoint     string
+	AppNameEnvVar      string
+	ProcessNameEnvVar  string
+	TsuruEndpoint      string
+	TsuruToken         string
+	server             *syslog.Server
+	forwardConns       []net.Conn
+	containerDataCache *lru.Cache
+	wsConn             *websocket.Conn
+	wsJsonEncoder      *json.Encoder
+}
+
+type containerData struct {
+	appName     string
+	processName string
 }
 
 func (l *LogForwarder) initForwardConnections() error {
@@ -73,7 +79,7 @@ func (l *LogForwarder) Start() error {
 	if err != nil {
 		return err
 	}
-	l.appNameCache, err = lru.New(100)
+	l.containerDataCache, err = lru.New(100)
 	if err != nil {
 		return err
 	}
@@ -113,26 +119,33 @@ func (l *LogForwarder) stop() {
 	}
 }
 
-func (l *LogForwarder) appName(containerId string) (string, error) {
-	if val, ok := l.appNameCache.Get(containerId); ok {
-		return val.(string), nil
+func (l *LogForwarder) getContainerData(containerId string) (*containerData, error) {
+	if val, ok := l.containerDataCache.Get(containerId); ok {
+		return val.(*containerData), nil
 	}
 	client, err := docker.NewClient(l.DockerEndpoint)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	cont, err := client.InspectContainer(containerId)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	var app, process string
 	for _, val := range cont.Config.Env {
-		if strings.HasPrefix(val, l.AppNameEnvVar) {
-			appName := val[len(l.AppNameEnvVar):]
-			l.appNameCache.Add(containerId, appName)
-			return appName, nil
+		if app == "" && strings.HasPrefix(val, l.AppNameEnvVar) {
+			app = val[len(l.AppNameEnvVar):]
+		}
+		if process == "" && strings.HasPrefix(val, l.ProcessNameEnvVar) {
+			process = val[len(l.ProcessNameEnvVar):]
+		}
+		if app != "" && process != "" {
+			data := containerData{appName: app, processName: process}
+			l.containerDataCache.Add(containerId, &data)
+			return &data, nil
 		}
 	}
-	return "", fmt.Errorf("could not find app name env in %s", containerId)
+	return nil, fmt.Errorf("could not find app name env in %s", containerId)
 }
 
 func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
@@ -140,7 +153,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
 	}
-	appName, err := l.appName(contId)
+	contData, err := l.getContainerData(contId)
 	if err != nil {
 		log.Printf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
 		return
@@ -152,20 +165,19 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		fmt.Printf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
-	msg := []byte(fmt.Sprintf("<%d>%s %s %s: %s\n",
+	msg := []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
 		priority,
 		ts.Format(time.RFC3339),
 		contId,
-		appName,
+		contData.appName,
+		contData.processName,
 		content,
 	))
-	// TODO(cezarsa): Add process name as source, read from env var with
-	// appname
 	tsrMessage := app.Applog{
 		Date:    ts,
-		AppName: appName,
+		AppName: contData.appName,
 		Message: content,
-		Source:  "TODO process name",
+		Source:  contData.processName,
 		Unit:    contId,
 	}
 	for retries := 2; l.wsJsonEncoder != nil && retries > 0; retries-- {

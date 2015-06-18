@@ -20,10 +20,10 @@ import (
 
 func (s S) TestReportStatus(c *check.C) {
 	bogusContainers := []bogusContainer{
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: true}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APP_NAME=someapp"}}, state: docker.State{Running: true}},
+		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
+		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
+		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
@@ -38,7 +38,6 @@ func (s S) TestReportStatus(c *check.C) {
 	defer tsuruServer.Close()
 	config.DockerEndpoint = dockerServer.URL()
 	config.TsuruEndpoint = tsuruServer.URL
-	config.SentinelEnvVar = "TSURU_APP_NAME="
 	config.TsuruToken = "some-token"
 	reportStatus()
 	req := <-requests
