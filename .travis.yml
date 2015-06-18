@@ -6,6 +6,6 @@ env:
   - GOARCH=amd64
   - GOARCH=386
 install:
-  - go get -d -t -u -f -x
+  - go get -d -t -u -f -x || true
 script:
   - go test -x
