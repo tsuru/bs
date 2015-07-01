@@ -25,8 +25,9 @@ type LogForwarder struct {
 	ProcessNameEnvVar  string
 	TsuruEndpoint      string
 	TsuruToken         string
+	forwardChans       []chan<- []byte
+	forwardQuitChans   []chan<- bool
 	server             *syslog.Server
-	forwardConns       []net.Conn
 	containerDataCache *lru.Cache
 	wsConn             *websocket.Conn
 	wsJsonEncoder      *json.Encoder
@@ -37,20 +38,81 @@ type containerData struct {
 	processName string
 }
 
-func (l *LogForwarder) initForwardConnections() error {
-	l.forwardConns = make([]net.Conn, len(l.ForwardAddresses))
-	for i, addr := range l.ForwardAddresses {
-		forwardUrl, err := url.Parse(addr)
-		if err != nil {
-			return fmt.Errorf("unable to parse %q: %s", addr, err)
-		}
-		conn, err := net.Dial(forwardUrl.Scheme, forwardUrl.Host)
-		if err != nil {
-			return fmt.Errorf("unable to connect to %q: %s", addr, err)
-		}
-		l.forwardConns[i] = conn
+const forwardConnTimeout = time.Second
+
+func connWriter(addr string) (chan<- []byte, chan<- bool, error) {
+	ch := make(chan []byte, 100)
+	quit := make(chan bool)
+	forwardUrl, err := url.Parse(addr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to parse %q: %s", addr, err)
 	}
-	return nil
+	conn, err := net.DialTimeout(forwardUrl.Scheme, forwardUrl.Host, forwardConnTimeout)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to connect to %q: %s", addr, err)
+	}
+	go func(conn net.Conn) {
+		var err error
+		for {
+			select {
+			case <-quit:
+				break
+			default:
+			}
+			if conn == nil {
+				time.Sleep(100 * time.Millisecond)
+				conn, err = net.DialTimeout(forwardUrl.Scheme, forwardUrl.Host, forwardConnTimeout)
+				if err != nil {
+					log.Printf("[log forwarder] unable to connect to %q: %s", addr, err)
+					continue
+				}
+			}
+			for msg := range ch {
+				var n int
+				n, err = conn.Write(msg)
+				if err != nil {
+					err = fmt.Errorf("[log forwarder] error trying to write log to %q: %s", conn.RemoteAddr(), err)
+					break
+				}
+				if n < len(msg) {
+					err = fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
+					break
+				}
+			}
+			conn.Close()
+			if err == nil {
+				break
+			}
+			log.Print(err.Error())
+			conn = nil
+		}
+	}(conn)
+	return ch, quit, nil
+}
+
+func (l *LogForwarder) initForwardConnections() error {
+	l.forwardChans = make([]chan<- []byte, len(l.ForwardAddresses))
+	l.forwardQuitChans = make([]chan<- bool, len(l.ForwardAddresses))
+	var err error
+	for i, addr := range l.ForwardAddresses {
+		l.forwardChans[i], l.forwardQuitChans[i], err = connWriter(addr)
+		if err != nil {
+			break
+		}
+	}
+	if err != nil {
+		for _, ch := range l.forwardChans {
+			if ch != nil {
+				close(ch)
+			}
+		}
+		for _, ch := range l.forwardQuitChans {
+			if ch != nil {
+				close(ch)
+			}
+		}
+	}
+	return err
 }
 
 func (l *LogForwarder) initWSConnection() error {
@@ -114,8 +176,11 @@ func (l *LogForwarder) stop() {
 	if l.wsConn != nil {
 		l.wsConn.Close()
 	}
-	for _, c := range l.forwardConns {
-		c.Close()
+	for _, ch := range l.forwardQuitChans {
+		close(ch)
+	}
+	for _, ch := range l.forwardChans {
+		close(ch)
 	}
 }
 
@@ -165,14 +230,6 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		fmt.Printf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
-	msg := []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
-		priority,
-		ts.Format(time.RFC3339),
-		contId,
-		contData.appName,
-		contData.processName,
-		content,
-	))
 	tsrMessage := app.Applog{
 		Date:    ts,
 		AppName: contData.appName,
@@ -188,16 +245,17 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		log.Printf("[log forwarder] error encoding message: %s", err)
 		l.initWSConnection()
 	}
-	for _, c := range l.forwardConns {
-		// TODO(cezarsa): One goroutine for each conn, only put to channel here
-		go func(c net.Conn) {
-			n, err := c.Write(msg)
-			if err != nil {
-				log.Printf("[log forwarder] error trying to write log to %q: %s", c.RemoteAddr(), err)
-			}
-			if n < len(msg) {
-				log.Printf("[log forwarder] short write trying to write log to %q", c.RemoteAddr())
-			}
-		}(c)
+	if len(l.forwardChans) > 0 {
+		msg := []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
+			priority,
+			ts.Format(time.RFC3339),
+			contId,
+			contData.appName,
+			contData.processName,
+			content,
+		))
+		for _, ch := range l.forwardChans {
+			ch <- msg
+		}
 	}
 }

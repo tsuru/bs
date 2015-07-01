@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,7 +106,10 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 
 func (S) TestLogForwarderWSForwarder(c *check.C) {
 	var body bytes.Buffer
+	var serverMut sync.Mutex
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		serverMut.Lock()
+		defer serverMut.Unlock()
 		io.Copy(&body, ws)
 	}))
 	defer srv.Close()
@@ -127,7 +131,9 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	c.Assert(err, check.IsNil)
 	time.Sleep(2 * time.Second)
 	lf.stop()
+	serverMut.Lock()
 	parts := strings.Split(body.String(), "\n")
+	serverMut.Unlock()
 	c.Assert(parts, check.HasLen, 3)
 	c.Assert(parts[2], check.Equals, "")
 	var logLine app.Applog
