@@ -6,6 +6,7 @@ package metric
 
 import (
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
@@ -48,6 +49,11 @@ func reportMetrics() {
 }
 
 func metricsEnabled(container *docker.Container) bool {
+	for _, val := range container.Config.Env {
+		if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {
+			return true
+		}
+	}
 	return false
 }
 

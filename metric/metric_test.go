@@ -29,3 +29,17 @@ func (S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
 	getMetrics(containers)
 }
+
+func (S) TestMetricsEnabled(c *check.C) {
+	var cont docker.Container
+	config := docker.Config{}
+	cont.Config = &config
+	enabled := metricsEnabled(&cont)
+	c.Assert(enabled, check.Equals, false)
+	config = docker.Config{
+		Env: []string{"TSURU_METRICS_BACKEND=logstash"},
+	}
+	cont.Config = &config
+	enabled = metricsEnabled(&cont)
+	c.Assert(enabled, check.Equals, true)
+}
