@@ -18,6 +18,12 @@ type statter interface {
 	Send(key, value string) error
 }
 
+type fake struct{}
+
+func (s *fake) Send(key, value string) error {
+	return nil
+}
+
 type statsd struct{}
 
 func (s *statsd) Send(key, value string) error {
@@ -31,7 +37,22 @@ func (s *logStash) Send(key, value string) error {
 }
 
 func getStatter(container *docker.Container) statter {
-	return &logStash{}
+	statters := map[string]statter{
+		"statsd":   &statsd{},
+		"logstash": &logStash{},
+	}
+	if container.Config != nil {
+		for _, val := range container.Config.Env {
+			if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {
+				statterName := strings.Replace(val, "TSURU_METRICS_BACKEND=", "", -1)
+				st, ok := statters[statterName]
+				if ok {
+					return st
+				}
+			}
+		}
+	}
+	return &fake{}
 }
 
 func reportMetrics() {
