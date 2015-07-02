@@ -17,6 +17,11 @@ import (
 	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
+type LogMessage struct {
+	logEntry  *app.Applog
+	syslogMsg []byte
+}
+
 type LogForwarder struct {
 	BindAddress        string
 	ForwardAddresses   []string
@@ -25,12 +30,10 @@ type LogForwarder struct {
 	ProcessNameEnvVar  string
 	TsuruEndpoint      string
 	TsuruToken         string
-	forwardChans       []chan<- []byte
+	forwardChans       []chan<- *LogMessage
 	forwardQuitChans   []chan<- bool
 	server             *syslog.Server
 	containerDataCache *lru.Cache
-	wsConn             *websocket.Conn
-	wsJsonEncoder      *json.Encoder
 }
 
 type containerData struct {
@@ -38,20 +41,32 @@ type containerData struct {
 	processName string
 }
 
-const forwardConnTimeout = time.Second
+const (
+	forwardConnTimeout    = time.Second
+	messageChanBufferSize = 100
+)
 
-func connWriter(addr string) (chan<- []byte, chan<- bool, error) {
-	ch := make(chan []byte, 100)
+type processable interface {
+	connect() (net.Conn, error)
+	process(conn net.Conn, msg *LogMessage) error
+}
+
+type syslogForwarder struct {
+	url *url.URL
+}
+
+type wsForwarder struct {
+	url string
+}
+
+func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, error) {
+	ch := make(chan *LogMessage, messageChanBufferSize)
 	quit := make(chan bool)
-	forwardUrl, err := url.Parse(addr)
+	conn, err := processInfo.connect()
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse %q: %s", addr, err)
+		return nil, nil, err
 	}
-	conn, err := net.DialTimeout(forwardUrl.Scheme, forwardUrl.Host, forwardConnTimeout)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to connect to %q: %s", addr, err)
-	}
-	go func(conn net.Conn) {
+	go func() {
 		var err error
 		for {
 			select {
@@ -60,22 +75,15 @@ func connWriter(addr string) (chan<- []byte, chan<- bool, error) {
 			default:
 			}
 			if conn == nil {
-				time.Sleep(100 * time.Millisecond)
-				conn, err = net.DialTimeout(forwardUrl.Scheme, forwardUrl.Host, forwardConnTimeout)
+				conn, err = processInfo.connect()
 				if err != nil {
-					log.Printf("[log forwarder] unable to connect to %q: %s", addr, err)
+					time.Sleep(100 * time.Millisecond)
 					continue
 				}
 			}
 			for msg := range ch {
-				var n int
-				n, err = conn.Write(msg)
+				err = processInfo.process(conn, msg)
 				if err != nil {
-					err = fmt.Errorf("[log forwarder] error trying to write log to %q: %s", conn.RemoteAddr(), err)
-					break
-				}
-				if n < len(msg) {
-					err = fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
 					break
 				}
 			}
@@ -86,33 +94,65 @@ func connWriter(addr string) (chan<- []byte, chan<- bool, error) {
 			log.Print(err.Error())
 			conn = nil
 		}
-	}(conn)
+	}()
 	return ch, quit, nil
 }
 
-func (l *LogForwarder) initForwardConnections() error {
-	l.forwardChans = make([]chan<- []byte, len(l.ForwardAddresses))
-	l.forwardQuitChans = make([]chan<- bool, len(l.ForwardAddresses))
-	var err error
-	for i, addr := range l.ForwardAddresses {
-		l.forwardChans[i], l.forwardQuitChans[i], err = connWriter(addr)
-		if err != nil {
-			break
-		}
-	}
+func (f *syslogForwarder) connect() (net.Conn, error) {
+	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnTimeout)
 	if err != nil {
-		for _, ch := range l.forwardChans {
-			if ch != nil {
-				close(ch)
-			}
-		}
-		for _, ch := range l.forwardQuitChans {
-			if ch != nil {
-				close(ch)
-			}
-		}
+		return nil, fmt.Errorf("unable to connect to %q: %s", f.url, err)
 	}
-	return err
+	return conn, nil
+}
+
+func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
+	n, err := conn.Write(msg.syslogMsg)
+	if err != nil {
+		return err
+	}
+	if n < len(msg.syslogMsg) {
+		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
+	}
+	return nil
+}
+
+func (f *wsForwarder) connect() (net.Conn, error) {
+	return websocket.Dial(f.url, "", "ws://localhost/")
+}
+
+func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
+	data, err := json.Marshal(msg.logEntry)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	n, err := conn.Write(data)
+	if err != nil {
+		return err
+	}
+	if n < len(data) {
+		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
+	}
+	return nil
+}
+
+func (l *LogForwarder) initForwardConnections() error {
+	for _, addr := range l.ForwardAddresses {
+		forwardUrl, err := url.Parse(addr)
+		if err != nil {
+			return fmt.Errorf("unable to parse %q: %s", addr, err)
+		}
+		forwardChan, quitChan, err := processMessages(&syslogForwarder{
+			url: forwardUrl,
+		})
+		if err != nil {
+			return err
+		}
+		l.forwardChans = append(l.forwardChans, forwardChan)
+		l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
+	}
+	return nil
 }
 
 func (l *LogForwarder) initWSConnection() error {
@@ -124,43 +164,51 @@ func (l *LogForwarder) initWSConnection() error {
 		return err
 	}
 	wsUrl := fmt.Sprintf("ws://%s/logs", tsuruUrl.Host)
-	l.wsConn, err = websocket.Dial(wsUrl, "", "ws://localhost/")
+	forwardChan, quitChan, err := processMessages(&wsForwarder{
+		url: wsUrl,
+	})
 	if err != nil {
 		return err
 	}
-	l.wsJsonEncoder = json.NewEncoder(l.wsConn)
+	l.forwardChans = append(l.forwardChans, forwardChan)
+	l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
 	return nil
 }
 
-func (l *LogForwarder) Start() error {
-	err := l.initWSConnection()
+func (l *LogForwarder) Start() (err error) {
+	defer func() {
+		if err != nil {
+			l.stop()
+		}
+	}()
+	err = l.initWSConnection()
 	if err != nil {
-		return err
+		return
 	}
 	err = l.initForwardConnections()
 	if err != nil {
-		return err
+		return
 	}
 	l.containerDataCache, err = lru.New(100)
 	if err != nil {
-		return err
+		return
 	}
 	l.server = syslog.NewServer()
 	l.server.SetHandler(l)
 	l.server.SetFormat(LenientFormat{})
 	url, err := url.Parse(l.BindAddress)
 	if err != nil {
-		return err
+		return
 	}
 	if url.Scheme == "tcp" {
 		err = l.server.ListenTCP(url.Host)
 	} else if url.Scheme == "udp" {
 		err = l.server.ListenUDP(url.Host)
 	} else {
-		return fmt.Errorf("invalid protocol %q, expected tcp or udp", url.Scheme)
+		err = fmt.Errorf("invalid protocol %q, expected tcp or udp", url.Scheme)
 	}
 	if err != nil {
-		return err
+		return
 	}
 	return l.server.Boot()
 }
@@ -170,11 +218,12 @@ func (l *LogForwarder) stop() {
 		defer func() {
 			recover()
 		}()
-		l.server.Kill()
+		if l.server != nil {
+			l.server.Kill()
+		}
 	}()
-	l.server.Wait()
-	if l.wsConn != nil {
-		l.wsConn.Close()
+	if l.server != nil {
+		l.server.Wait()
 	}
 	for _, ch := range l.forwardQuitChans {
 		close(ch)
@@ -230,32 +279,24 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		fmt.Printf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
-	tsrMessage := app.Applog{
-		Date:    ts,
-		AppName: contData.appName,
-		Message: content,
-		Source:  contData.processName,
-		Unit:    contId,
-	}
-	for retries := 2; l.wsJsonEncoder != nil && retries > 0; retries-- {
-		err = l.wsJsonEncoder.Encode(tsrMessage)
-		if err == nil {
-			break
-		}
-		log.Printf("[log forwarder] error encoding message: %s", err)
-		l.initWSConnection()
-	}
-	if len(l.forwardChans) > 0 {
-		msg := []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
+	msg := &LogMessage{
+		logEntry: &app.Applog{
+			Date:    ts,
+			AppName: contData.appName,
+			Message: content,
+			Source:  contData.processName,
+			Unit:    contId,
+		},
+		syslogMsg: []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
 			priority,
 			ts.Format(time.RFC3339),
 			contId,
 			contData.appName,
 			contData.processName,
 			content,
-		))
-		for _, ch := range l.forwardChans {
-			ch <- msg
-		}
+		)),
+	}
+	for _, ch := range l.forwardChans {
+		ch <- msg
 	}
 }
