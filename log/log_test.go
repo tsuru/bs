@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"github.com/tsuru/tsuru/app"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -157,8 +160,6 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	})
 }
 
-// TODO(cezarsa): ws forwarder test with lost ws connection
-
 func (S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{
 		BindAddress: "xudp://0.0.0.0:59317",
@@ -180,4 +181,60 @@ func (S) TestLogForwarderForwardConnError(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.ErrorMatches, `unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
+}
+
+func (S) BenchmarkMessagesBroadcast(c *check.C) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
+	startReceiver := func() net.Conn {
+		addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+		c.Assert(err, check.IsNil)
+		udpConn, err := net.ListenUDP("udp", addr)
+		c.Assert(err, check.IsNil)
+		return udpConn
+	}
+	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(ioutil.Discard, ws)
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BindAddress: "tcp://0.0.0.0:59317",
+		ForwardAddresses: []string{
+			"udp://" + forwardedConns[0].LocalAddr().String(),
+			"udp://" + forwardedConns[1].LocalAddr().String(),
+		},
+		TsuruEndpoint: srv.URL,
+		TsuruToken:    "mytoken",
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
+	sender := func(n int) {
+		conn, err := net.Dial("tcp", "127.0.0.1:59317")
+		c.Assert(err, check.IsNil)
+		defer conn.Close()
+		msg := []byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n")
+		for i := 0; i < n; i++ {
+			_, err = conn.Write(msg)
+			c.Assert(err, check.IsNil)
+		}
+	}
+	c.ResetTimer()
+	goroutines := 4
+	iterations := c.N
+	for i := 0; i < goroutines; i++ {
+		n := iterations / goroutines
+		if i == 0 {
+			n += iterations % goroutines
+		}
+		go sender(n)
+	}
+	for {
+		val := atomic.LoadInt64(&lf.messagesCounter)
+		if val == int64(iterations) {
+			break
+		}
+		time.Sleep(10 * time.Microsecond)
+	}
+	lf.stop()
 }

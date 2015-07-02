@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -15,6 +16,11 @@ import (
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 	"gopkg.in/mcuadros/go-syslog.v2"
+)
+
+const (
+	forwardConnTimeout    = time.Second
+	messageChanBufferSize = 1000
 )
 
 type LogMessage struct {
@@ -34,17 +40,13 @@ type LogForwarder struct {
 	forwardQuitChans   []chan<- bool
 	server             *syslog.Server
 	containerDataCache *lru.Cache
+	messagesCounter    int64
 }
 
 type containerData struct {
 	appName     string
 	processName string
 }
-
-const (
-	forwardConnTimeout    = time.Second
-	messageChanBufferSize = 100
-)
 
 type processable interface {
 	connect() (net.Conn, error)
@@ -77,6 +79,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 			if conn == nil {
 				conn, err = processInfo.connect()
 				if err != nil {
+					conn = nil
 					time.Sleep(100 * time.Millisecond)
 					continue
 				}
@@ -91,7 +94,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 			if err == nil {
 				break
 			}
-			log.Print(err.Error())
+			log.Printf("[log forwarder] error writing to %#v: %s", processInfo, err)
 			conn = nil
 		}
 	}()
@@ -101,7 +104,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 func (f *syslogForwarder) connect() (net.Conn, error) {
 	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to %q: %s", f.url, err)
+		return nil, fmt.Errorf("[log forwarder] unable to connect to %q: %s", f.url, err)
 	}
 	return conn, nil
 }
@@ -299,4 +302,5 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	for _, ch := range l.forwardChans {
 		ch <- msg
 	}
+	atomic.AddInt64(&l.messagesCounter, int64(1))
 }
