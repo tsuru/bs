@@ -30,12 +30,6 @@ func (s *statsd) Send(key, value string) error {
 	return nil
 }
 
-type logStash struct{}
-
-func (s *logStash) Send(key, value string) error {
-	return nil
-}
-
 func getStatter(container *docker.Container) statter {
 	statters := map[string]statter{
 		"statsd":   &statsd{},
