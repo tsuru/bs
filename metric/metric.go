@@ -24,12 +24,6 @@ func (s *fake) Send(key, value string) error {
 	return nil
 }
 
-type statsd struct{}
-
-func (s *statsd) Send(key, value string) error {
-	return nil
-}
-
 func getStatter(container *docker.Container) statter {
 	statters := map[string]statter{
 		"statsd":   &statsd{},
