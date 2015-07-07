@@ -18,12 +18,6 @@ type statter interface {
 	Send(key, value string) error
 }
 
-type fake struct{}
-
-func (s *fake) Send(key, value string) error {
-	return nil
-}
-
 func getStatter(container *docker.Container) statter {
 	statters := map[string]statter{
 		"statsd":   &statsd{},
