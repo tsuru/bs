@@ -4,17 +4,13 @@
 
 package metric
 
-import (
-	"strings"
-
-	"github.com/fsouza/go-dockerclient"
-)
+import "strings"
 
 type statter interface {
 	Send(key, value string) error
 }
 
-func getStatter(container *docker.Container) statter {
+func getStatter(container *container) statter {
 	statters := map[string]statter{
 		"statsd":   &statsd{},
 		"logstash": &logStash{},

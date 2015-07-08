@@ -10,7 +10,7 @@ import (
 )
 
 func (S) TestGetStatter(c *check.C) {
-	var cont docker.Container
+	var cont container
 	config := docker.Config{}
 	cont.Config = &config
 	st := getStatter(&cont)
