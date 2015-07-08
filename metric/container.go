@@ -17,6 +17,19 @@ type container struct {
 	ID     string
 }
 
+func getContainer(dockerEndpoint, ID string) (*container, error) {
+	client, err := docker.NewClient(dockerEndpoint)
+	if err != nil {
+		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
+		return nil, err
+	}
+	cont, err := client.InspectContainer(ID)
+	return &container{
+		ID:     cont.ID,
+		Config: cont.Config,
+	}, nil
+}
+
 func (c *container) metricEnabled() bool {
 	for _, val := range c.Config.Env {
 		if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {

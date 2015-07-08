@@ -142,3 +142,14 @@ func (S) TestContainerMetric(c *check.C) {
 	c.Assert(stats, check.DeepEquals, expected)
 	c.Assert(err, check.IsNil)
 }
+
+func (s S) TestGetContainer(c *check.C) {
+	bogusContainers := []bogusContainer{
+		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+	}
+	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
+	defer dockerServer.Stop()
+	cont, err := getContainer(dockerServer.URL(), containers[0].ID)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, containers[0].ID)
+}
