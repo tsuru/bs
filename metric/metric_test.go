@@ -46,30 +46,6 @@ func (S) TestMetricsEnabled(c *check.C) {
 	c.Assert(enabled, check.Equals, true)
 }
 
-func (S) TestGetStatter(c *check.C) {
-	var cont docker.Container
-	config := docker.Config{}
-	cont.Config = &config
-	st := getStatter(&cont)
-	var s statter
-	c.Assert(st, check.Implements, &s)
-	c.Assert(st, check.FitsTypeOf, &fake{})
-	config = docker.Config{
-		Env: []string{"TSURU_METRICS_BACKEND=logstash"},
-	}
-	cont.Config = &config
-	st = getStatter(&cont)
-	c.Assert(st, check.Implements, &s)
-	c.Assert(st, check.FitsTypeOf, &logStash{})
-	config = docker.Config{
-		Env: []string{"TSURU_METRICS_BACKEND=statsd"},
-	}
-	cont.Config = &config
-	st = getStatter(&cont)
-	c.Assert(st, check.Implements, &s)
-	c.Assert(st, check.FitsTypeOf, &statsd{})
-}
-
 func (S) TestGetMetricFromContainer(c *check.C) {
 	jsonStats := `{
        "read" : "2015-01-08T22:57:31.547920715Z",
