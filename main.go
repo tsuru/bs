@@ -15,6 +15,7 @@ import (
 	"time"
 
 	bsLog "github.com/tsuru/bs/log"
+	"github.com/tsuru/bs/metric"
 )
 
 const defaultInterval = 60
@@ -94,9 +95,15 @@ func main() {
 		fmt.Printf("Unable to initialize log forwarder: %s\n", err)
 		os.Exit(1)
 	}
+	mRunner := &metric.Runner{
+		DockerEndpoint: config.DockerEndpoint,
+		Interval:       defaultInterval,
+	}
+	mRunner.Start()
 	abortReporter, reporterEnded := statusReporter()
 	startSignalHandler(func(signal os.Signal) {
 		close(abortReporter)
+		mRunner.Stop()
 	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	<-reporterEnded
 }
