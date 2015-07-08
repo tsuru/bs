@@ -13,8 +13,6 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-var DockerEndpoint string
-
 type statter interface {
 	Send(key, value string) error
 }
@@ -38,18 +36,18 @@ func getStatter(container *docker.Container) statter {
 	return &fake{}
 }
 
-func reportMetrics() {
-	client, err := docker.NewClient(DockerEndpoint)
+func reportMetrics(dockerEndpoint string) {
+	client, err := docker.NewClient(dockerEndpoint)
 	if err != nil {
 		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
 		return
 	}
 	containers, err := client.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", DockerEndpoint, err)
+		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", dockerEndpoint, err)
 		return
 	}
-	getMetrics(containers)
+	getMetrics(dockerEndpoint, containers)
 }
 
 func metricsEnabled(container *docker.Container) bool {
@@ -61,13 +59,13 @@ func metricsEnabled(container *docker.Container) bool {
 	return false
 }
 
-func getMetrics(containers []docker.APIContainers) {
+func getMetrics(dockerEndpoint string, containers []docker.APIContainers) {
 	var wg sync.WaitGroup
 	for _, container := range containers {
 		wg.Add(1)
 		go func(c docker.APIContainers) {
 			defer wg.Done()
-			client, err := docker.NewClient(DockerEndpoint)
+			client, err := docker.NewClient(dockerEndpoint)
 			if err != nil {
 				log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
 				return
@@ -81,9 +79,9 @@ func getMetrics(containers []docker.APIContainers) {
 				log.Printf("[INFO] metrics not enabled for container %q. Skipping.", container.ID)
 				return
 			}
-			metrics, err := getMetricFromContainer(container)
+			metrics, err := getMetricFromContainer(dockerEndpoint, container)
 			if err != nil {
-				log.Printf("[ERROR] failed to get metrics for container %q in the Docker server at %q: %s", container, DockerEndpoint, err)
+				log.Printf("[ERROR] failed to get metrics for container %q in the Docker server at %q: %s", container, dockerEndpoint, err)
 				return
 			}
 			err = sendMetrics(container, metrics)
@@ -95,8 +93,8 @@ func getMetrics(containers []docker.APIContainers) {
 	wg.Wait()
 }
 
-func getMetricFromContainer(container *docker.Container) (map[string]string, error) {
-	client, err := docker.NewClient(DockerEndpoint)
+func getMetricFromContainer(dockerEndpoint string, container *docker.Container) (map[string]string, error) {
+	client, err := docker.NewClient(dockerEndpoint)
 	if err != nil {
 		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
 		return nil, err

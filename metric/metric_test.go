@@ -29,7 +29,7 @@ func (S) TestSendMetrics(c *check.C) {
 
 func (S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
-	getMetrics(containers)
+	getMetrics("", containers)
 }
 
 func (S) TestMetricsEnabled(c *check.C) {
@@ -175,10 +175,9 @@ func (S) TestGetMetricFromContainer(c *check.C) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(jsonStats))
 	}))
-	DockerEndpoint = server.URL
 	defer server.Close()
 	var cont docker.Container
-	stats, err := getMetricFromContainer(&cont)
+	stats, err := getMetricFromContainer(server.URL, &cont)
 	expected := map[string]string{
 		"mem_pct_max": "9.74",
 		"cpu_max":     "0.00",
