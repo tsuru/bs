@@ -7,32 +7,26 @@ package metric
 import (
 	"net/http"
 	"net/http/httptest"
-	"testing"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/check.v1"
 )
 
-var _ = check.Suite(S{})
-
-func Test(t *testing.T) {
-	check.TestingT(t)
+func (S) TestMetricsEnabled(c *check.C) {
+	var cont container
+	config := docker.Config{}
+	cont.Config = &config
+	enabled := cont.metricEnabled()
+	c.Assert(enabled, check.Equals, false)
+	config = docker.Config{
+		Env: []string{"TSURU_METRICS_BACKEND=logstash"},
+	}
+	cont.Config = &config
+	enabled = cont.metricEnabled()
+	c.Assert(enabled, check.Equals, true)
 }
 
-type S struct{}
-
-func (S) TestSendMetrics(c *check.C) {
-	var cont docker.Container
-	err := sendMetrics(&cont, nil)
-	c.Assert(err, check.IsNil)
-}
-
-func (S) TestGetMetrics(c *check.C) {
-	var containers []docker.APIContainers
-	getMetrics("", containers)
-}
-
-func (S) TestGetMetricFromContainer(c *check.C) {
+func (S) TestContainerMetric(c *check.C) {
 	jsonStats := `{
        "read" : "2015-01-08T22:57:31.547920715Z",
        "network" : {
@@ -138,8 +132,8 @@ func (S) TestGetMetricFromContainer(c *check.C) {
 		w.Write([]byte(jsonStats))
 	}))
 	defer server.Close()
-	var cont docker.Container
-	stats, err := getMetricFromContainer(server.URL, &cont)
+	var cont container
+	stats, err := cont.metrics(server.URL)
 	expected := map[string]string{
 		"mem_pct_max": "9.74",
 		"cpu_max":     "0.00",

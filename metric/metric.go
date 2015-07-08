@@ -102,20 +102,6 @@ func getMetricFromContainer(dockerEndpoint string, container *docker.Container) 
 	return stats, nil
 }
 
-func calculateCPUPercent(previousCPU, previousSystem uint64, s *docker.Stats) float64 {
-	var (
-		cpuPercent = 0.0
-		// calculate the change for the cpu usage of the container in between readings
-		cpuDelta = float64(s.CPUStats.CPUUsage.TotalUsage - previousCPU)
-		// calculate the change for the entire system between readings
-		systemDelta = float64(s.CPUStats.SystemCPUUsage - previousSystem)
-	)
-	if systemDelta > 0.0 && cpuDelta > 0.0 {
-		cpuPercent = (cpuDelta / systemDelta) * float64(len(s.CPUStats.CPUUsage.PercpuUsage)) * 100.0
-	}
-	return cpuPercent
-}
-
 func sendMetrics(container *docker.Container, metrics map[string]string) error {
 	st := getStatter(container)
 	for key, value := range metrics {
