@@ -11,27 +11,34 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func reportMetrics(dockerEndpoint string) {
-	client, err := docker.NewClient(dockerEndpoint)
-	if err != nil {
-		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
-		return
-	}
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
-	if err != nil {
-		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", dockerEndpoint, err)
-		return
-	}
-	getMetrics(dockerEndpoint, containers)
+type Reporter struct {
+	DockerEndpoint string
 }
 
-func getMetrics(dockerEndpoint string, containers []docker.APIContainers) {
+func (r *Reporter) Do() {
+	containers, err := r.listContainers()
+	if err != nil {
+		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", r.DockerEndpoint, err)
+	}
+	r.getMetrics(containers)
+}
+
+func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
+	client, err := docker.NewClient(r.DockerEndpoint)
+	if err != nil {
+		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
+		return nil, err
+	}
+	return client.ListContainers(docker.ListContainersOptions{})
+}
+
+func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	var wg sync.WaitGroup
 	for _, container := range containers {
 		wg.Add(1)
 		go func(c docker.APIContainers) {
 			defer wg.Done()
-			container, err := getContainer(dockerEndpoint, c.ID)
+			container, err := getContainer(r.DockerEndpoint, c.ID)
 			if err != nil {
 				log.Printf("[ERROR] cannot inspect container %q dockerclient instance: %s", container, err)
 				return
@@ -40,12 +47,12 @@ func getMetrics(dockerEndpoint string, containers []docker.APIContainers) {
 				log.Printf("[INFO] metrics not enabled for container %q. Skipping.", container.ID)
 				return
 			}
-			metrics, err := container.metrics(dockerEndpoint)
+			metrics, err := container.metrics(r.DockerEndpoint)
 			if err != nil {
-				log.Printf("[ERROR] failed to get metrics for container %q in the Docker server at %q: %s", container, dockerEndpoint, err)
+				log.Printf("[ERROR] failed to get metrics for container %q in the Docker server at %q: %s", container, r.DockerEndpoint, err)
 				return
 			}
-			err = sendMetrics(container, metrics)
+			err = r.sendMetrics(container, metrics)
 			if err != nil {
 				log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
 			}
@@ -54,7 +61,7 @@ func getMetrics(dockerEndpoint string, containers []docker.APIContainers) {
 	wg.Wait()
 }
 
-func sendMetrics(container *container, metrics map[string]string) error {
+func (r *Reporter) sendMetrics(container *container, metrics map[string]string) error {
 	st := getStatter(container)
 	for key, value := range metrics {
 		err := st.Send(key, value)

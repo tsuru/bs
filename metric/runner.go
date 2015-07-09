@@ -15,7 +15,10 @@ type Runner struct {
 func (r *Runner) Start() {
 	go func() {
 		for {
-			reportMetrics(r.DockerEndpoint)
+			reporter := &Reporter{
+				DockerEndpoint: r.DockerEndpoint,
+			}
+			reporter.Do()
 			select {
 			case <-r.finish:
 				return

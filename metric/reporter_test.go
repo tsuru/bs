@@ -21,11 +21,13 @@ type S struct{}
 
 func (S) TestSendMetrics(c *check.C) {
 	var cont container
-	err := sendMetrics(&cont, nil)
+	r := &Reporter{}
+	err := r.sendMetrics(&cont, nil)
 	c.Assert(err, check.IsNil)
 }
 
 func (S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
-	getMetrics("", containers)
+	r := &Reporter{}
+	r.getMetrics(containers)
 }
