@@ -1,0 +1,146 @@
+{
+	"ImportPath": "github.com/tsuru/bs",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/fsouza/go-dockerclient",
+			"Comment": "0.2.1-601-geeaf154",
+			"Rev": "eeaf15461b1f9d4ed2ffbd1ae1afde4b66527fd4"
+		},
+		{
+			"ImportPath": "github.com/garyburd/redigo/redis",
+			"Rev": "6628c86d6a89ce7983c7c9b5e98c1df795fbd256"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/golang-lru",
+			"Rev": "995efda3e073b6946b175ed93901d729ad47466a"
+		},
+		{
+			"ImportPath": "github.com/howeyc/fsnotify",
+			"Comment": "v0.8.13",
+			"Rev": "5102fde921d31f59c6e45d835aa01f0213aade0f"
+		},
+		{
+			"ImportPath": "github.com/jeromer/syslogparser",
+			"Rev": "812866d0389ae7e1f5a0110d47dea20224fc776f"
+		},
+		{
+			"ImportPath": "github.com/quipo/statsd",
+			"Rev": "b16c3be8a03e3c39a2d9c669b8f13f8876de61cd"
+		},
+		{
+			"ImportPath": "github.com/tsuru/config",
+			"Rev": "1fb3132fcee97c39e8894cb8aa8e90abdeaf98c7"
+		},
+		{
+			"ImportPath": "github.com/tsuru/monsterqueue",
+			"Rev": "f741e61a6c0c428ebf36ccad904c21bfdebd299c"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/action",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/api/shutdown",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/app",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/auth",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/db",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/errors",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/hc",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/log",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/provision",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/queue",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/quota",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/rec",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/repository",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/router",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/service",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "github.com/tsuru/tsuru/validation",
+			"Comment": "0.11.1-306-g92c6fdd",
+			"Rev": "92c6fddab78e772851d8b71aa709d8f421b7cd2a"
+		},
+		{
+			"ImportPath": "golang.org/x/net/websocket",
+			"Comment": "null-240",
+			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
+		},
+		{
+			"ImportPath": "gopkg.in/check.v1",
+			"Rev": "64131543e7896d5bcc6bd5a76287eb75ea96c673"
+		},
+		{
+			"ImportPath": "gopkg.in/mcuadros/go-syslog.v2",
+			"Comment": "v2.0.0",
+			"Rev": "f22fa4cce7e718c50fe7adc6e98d703f39e285e0"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2",
+			"Comment": "r2015.06.03-3-g3569c88",
+			"Rev": "3569c88678d88179dcbd68d02ab081cbca3cd4d0"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v1",
+			"Rev": "4914593b9558e85597f08346c798aea8f6fb899f"
+		}
+	]
+}
