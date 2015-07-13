@@ -4,7 +4,10 @@
 
 package metric
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 type Runner struct {
 	DockerEndpoint string
@@ -17,6 +20,7 @@ func (r *Runner) Start() {
 		for {
 			reporter := &Reporter{
 				DockerEndpoint: r.DockerEndpoint,
+				Backend:        os.Getenv("METRICS_BACKEND"),
 			}
 			reporter.Do()
 			select {

@@ -13,6 +13,7 @@ import (
 
 type Reporter struct {
 	DockerEndpoint string
+	Backend        string
 }
 
 func (r *Reporter) Do() {
@@ -62,13 +63,24 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 }
 
 func (r *Reporter) sendMetrics(container *container, metrics map[string]string) error {
-	st := getStatter(container)
 	for key, value := range metrics {
-		err := st.Send(key, value)
+		err := r.statter().Send(key, value)
 		if err != nil {
 			log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
 			return err
 		}
 	}
 	return nil
+}
+
+func (r *Reporter) statter() statter {
+	statters := map[string]statter{
+		"statsd":   &statsd{},
+		"logstash": &logStash{},
+	}
+	st, ok := statters[r.Backend]
+	if ok {
+		return st
+	}
+	return &fake{}
 }
