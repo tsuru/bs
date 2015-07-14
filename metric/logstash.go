@@ -42,7 +42,7 @@ type logStash struct {
 	Client string
 }
 
-func (s *logStash) Send(key, value string) error {
+func (s *logStash) Send(app, hostname, key, value string) error {
 	conn, err := net.Dial("udp", net.JoinHostPort(s.Host, s.Port))
 	if err != nil {
 		return err

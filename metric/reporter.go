@@ -64,7 +64,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 
 func (r *Reporter) sendMetrics(container *container, metrics map[string]string) error {
 	for key, value := range metrics {
-		err := r.statter().Send(key, value)
+		err := r.statter().Send("", container.Config.Hostname, key, value)
 		if err != nil {
 			log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
 			return err
