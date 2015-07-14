@@ -58,7 +58,8 @@ type syslogForwarder struct {
 }
 
 type wsForwarder struct {
-	url string
+	url   string
+	token string
 }
 
 func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, error) {
@@ -121,7 +122,13 @@ func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
 }
 
 func (f *wsForwarder) connect() (net.Conn, error) {
-	return websocket.Dial(f.url, "", "ws://localhost/")
+	config, err := websocket.NewConfig(f.url, "ws://localhost/")
+	if err != nil {
+		return nil, err
+	}
+	config.Header.Add("Authorization", "bearer "+f.token)
+	conn, err := websocket.DialConfig(config)
+	return conn, err
 }
 
 func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
@@ -168,7 +175,8 @@ func (l *LogForwarder) initWSConnection() error {
 	}
 	wsUrl := fmt.Sprintf("ws://%s/logs", tsuruUrl.Host)
 	forwardChan, quitChan, err := processMessages(&wsForwarder{
-		url: wsUrl,
+		url:   wsUrl,
+		token: l.TsuruToken,
 	})
 	if err != nil {
 		return err

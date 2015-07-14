@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"runtime"
 	"strings"
@@ -110,9 +111,11 @@ func (S) TestLogForwarderStartDockerAppName(c *check.C) {
 func (S) TestLogForwarderWSForwarder(c *check.C) {
 	var body bytes.Buffer
 	var serverMut sync.Mutex
+	var req *http.Request
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
 		serverMut.Lock()
 		defer serverMut.Unlock()
+		req = ws.Request()
 		io.Copy(&body, ws)
 	}))
 	defer srv.Close()
@@ -137,6 +140,8 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	lf.stop()
 	serverMut.Lock()
 	parts := strings.Split(body.String(), "\n")
+	c.Assert(req, check.NotNil)
+	c.Assert(req.Header.Get("Authorization"), check.Equals, "bearer mytoken")
 	serverMut.Unlock()
 	c.Assert(parts, check.HasLen, 3)
 	c.Assert(parts[2], check.Equals, "")
