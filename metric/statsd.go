@@ -7,15 +7,41 @@ package metric
 import (
 	"log"
 	"net"
+	"os"
 	"time"
 
 	statsdClient "github.com/quipo/statsd"
 )
 
+func newStatsd() statter {
+	var (
+		defaultPrefix string = ""
+		defaultPort   string = "8125"
+		defaultHost   string = "localhost"
+	)
+	prefix := os.Getenv("METRICS_STATSD_CLIENT")
+	if prefix == "" {
+		prefix = defaultPrefix
+	}
+	port := os.Getenv("METRICS_STATSD_PORT")
+	if port == "" {
+		port = defaultPort
+	}
+	host := os.Getenv("METRICS_STATSD_HOST")
+	if host == "" {
+		host = defaultHost
+	}
+	return &statsd{
+		Host:   host,
+		Port:   port,
+		Prefix: prefix,
+	}
+}
+
 type statsd struct {
 	Host   string
 	Port   string
-	Client string
+	Prefix string
 }
 
 func (s *statsd) Send(key, value string) error {

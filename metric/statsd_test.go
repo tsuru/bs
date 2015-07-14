@@ -21,9 +21,8 @@ func (S) TestStatsdSend(c *check.C) {
 	host, port, err := net.SplitHostPort(conn.LocalAddr().String())
 	c.Assert(err, check.IsNil)
 	st := statsd{
-		Client: "teste",
-		Host:   host,
-		Port:   port,
+		Host: host,
+		Port: port,
 	}
 	err = st.Send("key", "value")
 	c.Assert(err, check.IsNil)

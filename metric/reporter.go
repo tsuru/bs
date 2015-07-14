@@ -75,7 +75,7 @@ func (r *Reporter) sendMetrics(container *container, metrics map[string]string) 
 
 func (r *Reporter) statter() statter {
 	statters := map[string]statter{
-		"statsd":   &statsd{},
+		"statsd":   newStatsd(),
 		"logstash": newLogStash(),
 	}
 	st, ok := statters[r.Backend]
