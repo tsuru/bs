@@ -1,6 +1,7 @@
 package log
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -127,8 +128,38 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		return nil, err
 	}
 	config.Header.Add("Authorization", "bearer "+f.token)
-	conn, err := websocket.DialConfig(config)
-	return conn, err
+	var client net.Conn
+	host, port, _ := net.SplitHostPort(config.Location.Host)
+	if host == "" {
+		host = config.Location.Host
+	}
+	dialer := &net.Dialer{
+		Timeout:   forwardConnTimeout,
+		KeepAlive: 30 * time.Second,
+	}
+	switch config.Location.Scheme {
+	case "ws":
+		if port == "" {
+			port = "80"
+		}
+		client, err = dialer.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
+	case "wss":
+		if port == "" {
+			port = "443"
+		}
+		client, err = tls.DialWithDialer(dialer, "tcp", fmt.Sprintf("%s:%s", host, port), config.TlsConfig)
+	default:
+		err = websocket.ErrBadScheme
+	}
+	if err != nil {
+		return nil, err
+	}
+	ws, err := websocket.NewClient(config, client)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	return ws, nil
 }
 
 func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
