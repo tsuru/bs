@@ -121,8 +121,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/websocket",
-			"Comment": "null-240",
-			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
+			"Rev": "d9558e5c97f85372afee28cf2b6059d7d3818919"
 		},
 		{
 			"ImportPath": "gopkg.in/check.v1",
