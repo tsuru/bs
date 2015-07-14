@@ -5,6 +5,7 @@
 package metric
 
 import (
+    "fmt"
 	"log"
 	"net"
 	"os"
@@ -45,7 +46,7 @@ type statsd struct {
 }
 
 func (s *statsd) Send(key, value string) error {
-	prefix := "myproject."
+	prefix := fmt.Sprintf("%stsuru.app.host", s.Prefix)
 	client := statsdClient.NewStatsdClient(net.JoinHostPort(s.Host, s.Port), prefix)
 	client.CreateSocket()
 	interval := time.Second * 2
