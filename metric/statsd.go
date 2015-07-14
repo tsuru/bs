@@ -5,7 +5,7 @@
 package metric
 
 import (
-    "fmt"
+	"fmt"
 	"log"
 	"net"
 	"os"

@@ -58,12 +58,12 @@ func (s *logStash) Send(key, value string) error {
 	}
 	data, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("[ERROR] unable to marshal metrics data json. Wrhote %d bytes before error: %s", err)
+		log.Printf("[ERROR] unable to marshal metrics data json. Wrote %d bytes before error: %s", err)
 		return err
 	}
 	bytesWritten, err := conn.Write(data)
 	if err != nil {
-		log.Printf("[ERROR] unable to send metrics to logstash via UDP. Wrhote %d bytes before error: %s", bytesWritten, err)
+		log.Printf("[ERROR] unable to send metrics to logstash via UDP. Wrote %d bytes before error: %s", bytesWritten, err)
 		return err
 	}
 	return nil
