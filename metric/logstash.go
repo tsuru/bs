@@ -8,7 +8,33 @@ import (
 	"encoding/json"
 	"log"
 	"net"
+	"os"
 )
+
+func newLogStash() statter {
+	var (
+		defaultClient string = "tsuru"
+		defaultPort   string = "1984"
+		defaultHost   string = "localhost"
+	)
+	client := os.Getenv("METRICS_LOGSTASH_CLIENT")
+	if client == "" {
+		client = defaultClient
+	}
+	port := os.Getenv("METRICS_LOGSTASH_PORT")
+	if port == "" {
+		port = defaultPort
+	}
+	host := os.Getenv("METRICS_LOGSTASH_HOST")
+	if host == "" {
+		host = defaultHost
+	}
+	return &logStash{
+		Client: client,
+		Host:   host,
+		Port:   port,
+	}
+}
 
 type logStash struct {
 	Host   string
