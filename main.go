@@ -97,7 +97,7 @@ func main() {
 	}
 	mRunner := &metric.Runner{
 		DockerEndpoint: config.DockerEndpoint,
-		Interval:       defaultInterval,
+		Interval:       defaultInterval * time.Second,
 	}
 	mRunner.Start()
 	abortReporter, reporterEnded := statusReporter()
