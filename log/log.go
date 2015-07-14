@@ -287,7 +287,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	priority, _ := logParts["priority"].(int)
 	content, _ := logParts["content"].(string)
 	if ts.IsZero() || priority == 0 || content == "" {
-		fmt.Printf("[log forwarder] invalid message %#v", logParts)
+		log.Printf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
 	msg := &LogMessage{
