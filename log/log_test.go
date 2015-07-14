@@ -129,8 +129,9 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	defer conn.Close()
 	baseTime, err := time.Parse(time.RFC3339, "2015-06-05T16:13:47Z")
 	c.Assert(err, check.IsNil)
-	msg := []byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg2\n")
-	_, err = conn.Write(msg)
+	_, err = conn.Write([]byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n"))
+	c.Assert(err, check.IsNil)
+	_, err = conn.Write([]byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg2\n"))
 	c.Assert(err, check.IsNil)
 	time.Sleep(2 * time.Second)
 	lf.stop()
@@ -174,13 +175,13 @@ func (S) TestLogForwarderForwardConnError(c *check.C) {
 		ForwardAddresses: []string{"xudp://127.0.0.1:1234"},
 	}
 	err := lf.Start()
-	c.Assert(err, check.ErrorMatches, `unable to connect to "xudp://127.0.0.1:1234": dial xudp: unknown network xudp`)
+	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "xudp://127.0.0.1:1234": dial xudp: unknown network xudp`)
 	lf = LogForwarder{
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"tcp://localhost:99999"},
 	}
 	err = lf.Start()
-	c.Assert(err, check.ErrorMatches, `unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
+	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
 }
 
 func (S) BenchmarkMessagesBroadcast(c *check.C) {

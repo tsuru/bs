@@ -13,9 +13,9 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/hashicorp/golang-lru"
 	"github.com/jeromer/syslogparser"
+	"github.com/mcuadros/go-syslog"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
-	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
 const (
