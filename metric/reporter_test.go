@@ -21,6 +21,8 @@ type S struct{}
 
 func (S) TestSendMetrics(c *check.C) {
 	var cont container
+	config := docker.Config{}
+	cont.Config = &config
 	r := &Reporter{}
 	err := r.sendMetrics(&cont, nil)
 	c.Assert(err, check.IsNil)

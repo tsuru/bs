@@ -153,3 +153,17 @@ func (s S) TestGetContainer(c *check.C) {
 	c.Assert(err, check.IsNil)
 	c.Assert(cont.ID, check.Equals, containers[0].ID)
 }
+
+func (S) TestContainerAppName(c *check.C) {
+	var cont container
+	config := docker.Config{}
+	cont.Config = &config
+	appName := cont.appName()
+	c.Assert(appName, check.Equals, "")
+	config = docker.Config{
+		Env: []string{"TSURU_APPNAME=appz"},
+	}
+	cont.Config = &config
+	appName = cont.appName()
+	c.Assert(appName, check.Equals, "appz")
+}

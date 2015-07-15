@@ -30,6 +30,16 @@ func getContainer(dockerEndpoint, ID string) (*container, error) {
 	}, nil
 }
 
+func (c *container) appName() string {
+	appNameEnvVar := "TSURU_APPNAME="
+	for _, val := range c.Config.Env {
+		if strings.HasPrefix(val, appNameEnvVar) {
+			return val[len(appNameEnvVar):]
+		}
+	}
+	return ""
+}
+
 func (c *container) metricEnabled() bool {
 	for _, val := range c.Config.Env {
 		if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {
