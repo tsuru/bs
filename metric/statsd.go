@@ -20,7 +20,7 @@ func newStatsd() statter {
 		defaultPort   string = "8125"
 		defaultHost   string = "localhost"
 	)
-	prefix := os.Getenv("METRICS_STATSD_CLIENT")
+	prefix := os.Getenv("METRICS_STATSD_PREFIX")
 	if prefix == "" {
 		prefix = defaultPrefix
 	}
