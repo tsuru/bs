@@ -15,8 +15,8 @@ from sibling containers. bs will then send these log entries to tsuru API and is
 also capable of forwarding log entries to multiple remote syslog endpoints.
 
 The sections below describe in details all the features of bs. The
-:ref:`configuration <config_bs>` reference contains more information on
-settings that control the way bs behaves.
+[configuration](https://github.com/tsuru/tsuru/blob/master/docs/reference/config.rst#dockerbsimage)
+reference contains more information on settings that control the way bs behaves.
 
 ## Status Reporting
 
@@ -26,7 +26,7 @@ the status reporter (or simply reporter).
 
 The status reporter can connect to the Docker API through TCP or Unix Socket.
 It's recommended to use Unix socket, so application containers can't talk to
-the Docker API. In order to do that, the ``docker:bs:socket`` configuration
+the Docker API. In order to do that, the `docker:bs:socket` configuration
 entry must be defined to the path of Docker socket in the Docker node. If this
 setting is not defined, bs will use the TCP endpoint.
 
@@ -41,15 +41,15 @@ bs is also a syslog server, that listens to logs from containers and multiplexes
 them among other syslog servers and the tsuru API.
 
 Whenever starting an application container, tsuru will configure Docker to send
-the logs of the containers to bs using the `syslog logging driver
-<https://docs.docker.com/reference/run/#logging-driver-syslog>`_, having bs as
-the destination daemon.
+the logs of the containers to bs using the
+[syslog logging driver](https://docs.docker.com/reference/run/#logging-driver-syslog),
+having bs as the destination daemon.
 
 When receiving the logs, bs will forward them to the tsuru API, so users can
 check their logs using the command ``tsuru app-log``. It can also forward the
 logs to other syslog servers, using the ``docker:bs:syslog-forward-addresses``
-config entry. For more detail, check the :ref:`bs configuration reference
-<config_bs>`.
+config entry. For more detail, check the
+[bs configuration reference](https://github.com/tsuru/tsuru/blob/master/docs/reference/config.rst#dockerbsimage).
 
 ## Metrics
 
@@ -62,13 +62,13 @@ The collected metrics are:
 * mem_max
 * mem_pct_max
 
-For more details about how to configure the metric backend check the :ref:`bs configuration reference
-<config_bs>`.
+The metric backend is configured by setting some enviroment variables in the *bs* container.
+For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables). 
 
 ## Environment Variables
 
 It's possible to set environment variables in started bs containers. This can be
-done using the ``tsuru-admin bs-env-set`` command.
+done using the `tsuru-admin bs-env-set` command.
 
 Some variables can be used to configure how the default bs application will
 behave. A custom bs image can also make use of set variables to change their
@@ -76,12 +76,12 @@ behavior.
 
 ### STATUS_INTERVAL
 
-``STATUS_INTERVAL`` is the interval in seconds between status collecting and
+`STATUS_INTERVAL` is the interval in seconds between status collecting and
 reporting from bs to the tsuru API. The default value is 60 seconds.
 
 ### SYSLOG_FORWARD_ADDRESSES
 
-``SYSLOG_FORWARD_ADDRESSES`` is a comma separated list of SysLog endpoints to
+`SYSLOG_FORWARD_ADDRESSES` is a comma separated list of SysLog endpoints to
 which bs will forward the logs from Docker containers. Log entries will be
 rewritten to properly identify the application and process responsible for the
 entry. The default value is an empty string, which means that bs will not
@@ -89,30 +89,30 @@ forward logs to any syslog server, only to tsuru API.
 
 ### METRICS_BACKEND
 
-``METRICS_BACKEND`` is the metric backend. Supported backends are `logstash` and `statsd`.
+`METRICS_BACKEND` is the metric backend. Supported backends are `logstash` and `statsd`.
 
 ### METRICS_LOGSTASH_CLIENT
 
-``METRICS_LOGSTASH_CLIENT`` is the client name used to identify who is sending the metric.
+`METRICS_LOGSTASH_CLIENT` is the client name used to identify who is sending the metric.
 The default value is `tsuru`.
 
 ### METRICS_LOGSTASH_PORT
 
-``METRICS_LOGSTASH_PORT`` is the `Logstash` port. The default value is `1984`.
+`METRICS_LOGSTASH_PORT` is the `Logstash` port. The default value is `1984`.
 
 ### METRICS_LOGSTASH_HOST
 
-``METRICS_LOGSTASH_HOST`` is the `Logstash` host. The default value is `localhost`.
+`METRICS_LOGSTASH_HOST` is the `Logstash` host. The default value is `localhost`.
 
 ### METRICS_STATSD_PREFIX
 
-``METRICS_STATSD_PREFIX`` is the prefix for the `Statsd` key. The key is composed by
+`METRICS_STATSD_PREFIX` is the prefix for the `Statsd` key. The key is composed by
 `{prefix}tsuru.{appname}.{hostname}`. The default value is an empty string `""`.
 
 ### METRICS_STATSD_PORT
 
-``METRICS_STATSD_PORT`` is the `Statsd` port. The default value is `8125`.
+`METRICS_STATSD_PORT` is the `Statsd` port. The default value is `8125`.
 
 ### METRICS_STATSD_HOST
 
-``METRICS_STATSD_HOST`` is the `Statsd` host. The default value is `localhost`.
+`METRICS_STATSD_HOST` is the `Statsd` host. The default value is `localhost`.
