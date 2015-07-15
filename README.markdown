@@ -87,6 +87,11 @@ rewritten to properly identify the application and process responsible for the
 entry. The default value is an empty string, which means that bs will not
 forward logs to any syslog server, only to tsuru API.
 
+### METRICS_INTERVAL
+
+`METRICS_INTERVAL` is the interval in seconds between metrics collecting and
+reporting from bs to the metric backend. The default value is 60 seconds.
+
 ### METRICS_BACKEND
 
 `METRICS_BACKEND` is the metric backend. Supported backends are `logstash` and `statsd`.

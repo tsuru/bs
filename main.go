@@ -26,6 +26,7 @@ var config struct {
 	TsuruToken             string
 	AppNameEnvVar          string
 	ProcessNameEnvVar      string
+	MetricsInterval        time.Duration
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
 	SyslogForwardAddresses []string
@@ -44,6 +45,13 @@ func loadConfig() {
 		parsedInterval = defaultInterval
 	}
 	config.StatusInterval = time.Duration(parsedInterval) * time.Second
+	metricsInterval := os.Getenv("METRICS_INTERVAL")
+    parsedMetricsInterval, err := strconv.Atoi(metricsInterval)
+	if err != nil {
+		log.Printf("[WARNING] invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
+		parsedMetricsInterval = defaultInterval
+	}
+    config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
 	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
 		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
@@ -97,7 +105,7 @@ func main() {
 	}
 	mRunner := &metric.Runner{
 		DockerEndpoint: config.DockerEndpoint,
-		Interval:       defaultInterval * time.Second,
+		Interval:       config.MetricsInterval,
 	}
 	mRunner.Start()
 	abortReporter, reporterEnded := statusReporter()
