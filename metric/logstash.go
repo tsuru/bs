@@ -53,8 +53,8 @@ func (s *logStash) Send(app, hostname, key, value string) error {
 		"count":  "1",
 		"metric": key,
 		"value":  value,
-		"app":    "app",
-		"host":   "host",
+		"app":    app,
+		"host":   hostname,
 	}
 	data, err := json.Marshal(message)
 	if err != nil {
