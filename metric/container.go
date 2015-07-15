@@ -40,6 +40,16 @@ func (c *container) appName() string {
 	return ""
 }
 
+func (c *container) process() string {
+	processEnvVar := "TSURU_PROCESSNAME="
+	for _, val := range c.Config.Env {
+		if strings.HasPrefix(val, processEnvVar) {
+			return val[len(processEnvVar):]
+		}
+	}
+	return ""
+}
+
 func (c *container) metricEnabled() bool {
 	for _, val := range c.Config.Env {
 		if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {

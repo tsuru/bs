@@ -42,19 +42,20 @@ type logStash struct {
 	Client string
 }
 
-func (s *logStash) Send(app, hostname, key, value string) error {
+func (s *logStash) Send(app, hostname, process, key, value string) error {
 	conn, err := net.Dial("udp", net.JoinHostPort(s.Host, s.Port))
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	message := map[string]string{
-		"client": s.Client,
-		"count":  "1",
-		"metric": key,
-		"value":  value,
-		"app":    app,
-		"host":   hostname,
+		"client":  s.Client,
+		"count":   "1",
+		"metric":  key,
+		"value":   value,
+		"app":     app,
+		"host":    hostname,
+		"process": process,
 	}
 	data, err := json.Marshal(message)
 	if err != nil {

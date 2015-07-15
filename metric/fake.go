@@ -6,6 +6,6 @@ package metric
 
 type fake struct{}
 
-func (s *fake) Send(app, hostname, key, value string) error {
+func (s *fake) Send(app, hostname, process, key, value string) error {
 	return nil
 }

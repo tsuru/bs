@@ -24,6 +24,6 @@ func (S) TestStatsdSend(c *check.C) {
 		Host: host,
 		Port: port,
 	}
-	err = st.Send("appname", "hostname", "key", "value")
+	err = st.Send("appname", "hostname", "process", "key", "value")
 	c.Assert(err, check.IsNil)
 }

@@ -167,3 +167,17 @@ func (S) TestContainerAppName(c *check.C) {
 	appName = cont.appName()
 	c.Assert(appName, check.Equals, "appz")
 }
+
+func (S) TestContainerProcess(c *check.C) {
+	var cont container
+	config := docker.Config{}
+	cont.Config = &config
+	process := cont.process()
+	c.Assert(process, check.Equals, "")
+	config = docker.Config{
+		Env: []string{"TSURU_PROCESSNAME=web"},
+	}
+	cont.Config = &config
+	process = cont.process()
+	c.Assert(process, check.Equals, "web")
+}
