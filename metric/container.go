@@ -50,15 +50,6 @@ func (c *container) process() string {
 	return ""
 }
 
-func (c *container) metricEnabled() bool {
-	for _, val := range c.Config.Env {
-		if strings.HasPrefix(val, "TSURU_METRICS_BACKEND") {
-			return true
-		}
-	}
-	return false
-}
-
 func (c *container) metrics(dockerEndpoint string) (map[string]string, error) {
 	client, err := docker.NewClient(dockerEndpoint)
 	if err != nil {

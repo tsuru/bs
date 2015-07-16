@@ -12,20 +12,6 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func (S) TestMetricsEnabled(c *check.C) {
-	var cont container
-	config := docker.Config{}
-	cont.Config = &config
-	enabled := cont.metricEnabled()
-	c.Assert(enabled, check.Equals, false)
-	config = docker.Config{
-		Env: []string{"TSURU_METRICS_BACKEND=logstash"},
-	}
-	cont.Config = &config
-	enabled = cont.metricEnabled()
-	c.Assert(enabled, check.Equals, true)
-}
-
 func (S) TestContainerMetric(c *check.C) {
 	jsonStats := `{
        "read" : "2015-01-08T22:57:31.547920715Z",

@@ -6,6 +6,7 @@ package metric
 
 import (
 	"log"
+	"reflect"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
@@ -17,6 +18,11 @@ type Reporter struct {
 }
 
 func (r *Reporter) Do() {
+	st := r.statter()
+	// don't run reporter when the statter is the fake statter
+	if reflect.ValueOf(st).Type().AssignableTo(reflect.ValueOf(fake{}).Type()) {
+		return
+	}
 	containers, err := r.listContainers()
 	if err != nil {
 		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", r.DockerEndpoint, err)
@@ -42,10 +48,6 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			container, err := getContainer(r.DockerEndpoint, c.ID)
 			if err != nil {
 				log.Printf("[ERROR] cannot inspect container %q dockerclient instance: %s", container, err)
-				return
-			}
-			if !container.metricEnabled() {
-				log.Printf("[INFO] metrics not enabled for container %q. Skipping.", container.ID)
 				return
 			}
 			metrics, err := container.metrics(r.DockerEndpoint)
