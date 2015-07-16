@@ -5,14 +5,13 @@
 package metric
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"encoding/json"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/check.v1"
 )
 
-func (S) TestContainerMetric(c *check.C) {
+func (S) TestStatsToMetricsMap(c *check.C) {
 	jsonStats := `{
        "read" : "2015-01-08T22:57:31.547920715Z",
        "network" : {
@@ -113,57 +112,16 @@ func (S) TestContainerMetric(c *check.C) {
           "system_cpu_usage" : 20091722000000000
        }
     }`
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(jsonStats))
-	}))
-	defer server.Close()
-	var cont container
-	stats, err := cont.metrics(server.URL)
+	var stats docker.Stats
+	err := json.Unmarshal([]byte(jsonStats), &stats)
+	c.Assert(err, check.IsNil)
+	metricsMap, err := statsToMetricsMap(&stats)
+	c.Assert(err, check.IsNil)
 	expected := map[string]string{
 		"mem_pct_max": "9.74",
 		"cpu_max":     "0.00",
 		"mem_max":     "6537216",
 	}
-	c.Assert(stats, check.DeepEquals, expected)
+	c.Assert(metricsMap, check.DeepEquals, expected)
 	c.Assert(err, check.IsNil)
-}
-
-func (s S) TestGetContainer(c *check.C) {
-	bogusContainers := []bogusContainer{
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
-	}
-	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
-	defer dockerServer.Stop()
-	cont, err := getContainer(dockerServer.URL(), containers[0].ID)
-	c.Assert(err, check.IsNil)
-	c.Assert(cont.ID, check.Equals, containers[0].ID)
-}
-
-func (S) TestContainerAppName(c *check.C) {
-	var cont container
-	config := docker.Config{}
-	cont.Config = &config
-	appName := cont.appName()
-	c.Assert(appName, check.Equals, "")
-	config = docker.Config{
-		Env: []string{"TSURU_APPNAME=appz"},
-	}
-	cont.Config = &config
-	appName = cont.appName()
-	c.Assert(appName, check.Equals, "appz")
-}
-
-func (S) TestContainerProcess(c *check.C) {
-	var cont container
-	config := docker.Config{}
-	cont.Config = &config
-	process := cont.process()
-	c.Assert(process, check.Equals, "")
-	config = docker.Config{
-		Env: []string{"TSURU_PROCESSNAME=web"},
-	}
-	cont.Config = &config
-	process = cont.process()
-	c.Assert(process, check.Equals, "web")
 }

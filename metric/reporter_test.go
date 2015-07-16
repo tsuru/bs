@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 )
 
@@ -20,7 +21,7 @@ func Test(t *testing.T) {
 type S struct{}
 
 func (S) TestSendMetrics(c *check.C) {
-	var cont container
+	var cont container.Container
 	config := docker.Config{}
 	cont.Config = &config
 	r := &Reporter{}
@@ -41,7 +42,7 @@ func (S) TestReporterStatter(c *check.C) {
 		"statsd":   &statsd{},
 	}
 	for b, st := range backends {
-		r := &Reporter{Backend: b}
+		r := &Reporter{backend: b}
 		c.Check(r.statter(), check.FitsTypeOf, st)
 	}
 }

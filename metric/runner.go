@@ -7,6 +7,8 @@ package metric
 import (
 	"os"
 	"time"
+
+	"github.com/tsuru/bs/container"
 )
 
 type Runner struct {
@@ -18,16 +20,20 @@ type Runner struct {
 func (r *Runner) Start() {
 	go func() {
 		for {
-			reporter := &Reporter{
-				DockerEndpoint: r.DockerEndpoint,
-				Backend:        os.Getenv("METRICS_BACKEND"),
+			client, err := container.NewClient(r.DockerEndpoint)
+			if err == nil {
+				reporter := &Reporter{
+					backend:    os.Getenv("METRICS_BACKEND"),
+					infoClient: client,
+				}
+				reporter.Do()
 			}
-			reporter.Do()
 			select {
 			case <-r.finish:
 				return
 			case <-time.After(r.Interval):
 			}
+
 		}
 	}()
 }

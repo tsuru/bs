@@ -19,7 +19,8 @@ type InfoClient struct {
 }
 
 type Container struct {
-	*docker.Container
+	docker.Container
+	client      *InfoClient
 	AppName     string
 	ProcessName string
 }
@@ -38,6 +39,10 @@ func NewClient(endpoint string) (*InfoClient, error) {
 	return &c, nil
 }
 
+func (c *InfoClient) GetClient() *docker.Client {
+	return c.client
+}
+
 func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 	if val, ok := c.containerCache.Get(containerId); ok {
 		return val.(*Container), nil
@@ -46,7 +51,7 @@ func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	contData := Container{Container: cont}
+	contData := Container{Container: *cont, client: c}
 	wanted := []string{
 		"TSURU_APPNAME=",
 		"TSURU_PROCESSNAME=",
@@ -72,4 +77,26 @@ func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 		}
 	}
 	return nil, fmt.Errorf("could not find wanted envs in %s", containerId)
+}
+
+func (c *Container) Stats() (*docker.Stats, error) {
+	statsCh := make(chan *docker.Stats)
+	errCh := make(chan error)
+	opts := docker.StatsOptions{
+		ID:     c.ID,
+		Stream: false,
+		Stats:  statsCh,
+	}
+	go func() {
+		defer close(errCh)
+		err := c.client.client.Stats(opts)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+	err := <-errCh
+	if err != nil {
+		return nil, err
+	}
+	return <-statsCh, nil
 }

@@ -5,71 +5,12 @@
 package metric
 
 import (
-	"log"
 	"strconv"
-	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 )
 
-type container struct {
-	Config *docker.Config
-	ID     string
-}
-
-func getContainer(dockerEndpoint, ID string) (*container, error) {
-	client, err := docker.NewClient(dockerEndpoint)
-	if err != nil {
-		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
-		return nil, err
-	}
-	cont, err := client.InspectContainer(ID)
-	return &container{
-		ID:     cont.ID,
-		Config: cont.Config,
-	}, nil
-}
-
-func (c *container) appName() string {
-	appNameEnvVar := "TSURU_APPNAME="
-	for _, val := range c.Config.Env {
-		if strings.HasPrefix(val, appNameEnvVar) {
-			return val[len(appNameEnvVar):]
-		}
-	}
-	return ""
-}
-
-func (c *container) process() string {
-	processEnvVar := "TSURU_PROCESSNAME="
-	for _, val := range c.Config.Env {
-		if strings.HasPrefix(val, processEnvVar) {
-			return val[len(processEnvVar):]
-		}
-	}
-	return ""
-}
-
-func (c *container) metrics(dockerEndpoint string) (map[string]string, error) {
-	client, err := docker.NewClient(dockerEndpoint)
-	if err != nil {
-		log.Printf("[ERROR] cannot create dockerclient instance: %s", err)
-		return nil, err
-	}
-	statsC := make(chan *docker.Stats)
-	opts := docker.StatsOptions{
-		ID:     c.ID,
-		Stream: false,
-		Stats:  statsC,
-	}
-	go func() {
-		err := client.Stats(opts)
-		if err != nil {
-			log.Printf("[ERROR] cannot get stats for container %q: %s", c, err)
-			return
-		}
-	}()
-	s := <-statsC
+func statsToMetricsMap(s *docker.Stats) (map[string]string, error) {
 	previousCPU := s.PreCPUStats.CPUUsage.TotalUsage
 	previousSystem := s.PreCPUStats.SystemCPUUsage
 	cpuPercent := calculateCPUPercent(previousCPU, previousSystem, s)
