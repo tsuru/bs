@@ -1,6 +1,7 @@
 // Copyright 2015 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
 package log
 
 import (
@@ -26,15 +27,41 @@ import (
 	"gopkg.in/check.v1"
 )
 
-var _ = check.Suite(S{})
+var _ = check.Suite(&S{})
 
 func Test(t *testing.T) {
 	check.TestingT(t)
 }
 
-type S struct{}
+type S struct {
+	dockerServer *dTesting.DockerServer
+	id           string
+}
 
-func (S) TestLogForwarderStartCachedAppName(c *check.C) {
+func (s *S) SetUpTest(c *check.C) {
+	var err error
+	s.dockerServer, err = dTesting.NewServer("127.0.0.1:0", nil, nil)
+	c.Assert(err, check.IsNil)
+	dockerClient, err := docker.NewClient(s.dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
+	c.Assert(err, check.IsNil)
+	config := docker.Config{
+		Image: "myimg",
+		Cmd:   []string{"mycmd"},
+		Env:   []string{"ENV1=val1", "TSURU_PROCESSNAME=procx", "TSURU_APPNAME=coolappname"},
+	}
+	opts := docker.CreateContainerOptions{Name: "myContName", Config: &config}
+	cont, err := dockerClient.CreateContainer(opts)
+	c.Assert(err, check.IsNil)
+	s.id = cont.ID
+}
+
+func (s *S) TearDownTest(c *check.C) {
+	s.dockerServer.Stop()
+}
+
+func (s *S) TestLogForwarderStartCachedAppName(c *check.C) {
 	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
@@ -42,73 +69,52 @@ func (S) TestLogForwarderStartCachedAppName(c *check.C) {
 	lf := LogForwarder{
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
-		DockerEndpoint:   "",
-		AppNameEnvVar:    "",
+		DockerEndpoint:   s.dockerServer.URL(),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
 	defer lf.stop()
-	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
-	msg := []byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n")
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(buffer[:n], check.DeepEquals, []byte("<30>2015-06-05T16:13:47Z contid1 myappname[proc1]: mymsg\n"))
+	c.Assert(buffer[:n], check.DeepEquals, []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", s.id)))
 }
 
-func (S) TestLogForwarderStartDockerAppName(c *check.C) {
+func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
 	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
-	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
-	c.Assert(err, check.IsNil)
 	lf := LogForwarder{
-		BindAddress:       "udp://0.0.0.0:59317",
-		ForwardAddresses:  []string{"udp://" + udpConn.LocalAddr().String()},
-		DockerEndpoint:    dockerServer.URL(),
-		AppNameEnvVar:     "APPNAMEVAR=",
-		ProcessNameEnvVar: "PROCESSNAMEVAR=",
+		BindAddress:      "udp://0.0.0.0:59317",
+		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
+		DockerEndpoint:   s.dockerServer.URL(),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
 	defer lf.stop()
-	dockerClient, err := docker.NewClient(dockerServer.URL())
-	c.Assert(err, check.IsNil)
-	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
-	c.Assert(err, check.IsNil)
-	config := docker.Config{
-		Image: "myimg",
-		Cmd:   []string{"mycmd"},
-		Env:   []string{"ENV1=val1", "PROCESSNAMEVAR=procx", "APPNAMEVAR=coolappname"},
-	}
-	opts := docker.CreateContainerOptions{Name: "myContName", Config: &config}
-	cont, err := dockerClient.CreateContainer(opts)
-	c.Assert(err, check.IsNil)
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
-	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", cont.ID))
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	expected := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", cont.ID))
+	expected := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", s.id))
 	c.Assert(buffer[:n], check.DeepEquals, expected)
-	cached, ok := lf.containerDataCache.Get(cont.ID)
-	c.Assert(ok, check.Equals, true)
-	c.Assert(cached.(*containerData), check.DeepEquals, &containerData{appName: "coolappname", processName: "procx"})
 }
 
-func (S) TestLogForwarderWSForwarder(c *check.C) {
+func (s *S) TestLogForwarderWSForwarder(c *check.C) {
 	var body bytes.Buffer
 	var serverMut sync.Mutex
 	var req *http.Request
@@ -120,21 +126,21 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
-		BindAddress:   "udp://0.0.0.0:59317",
-		TsuruEndpoint: srv.URL,
-		TsuruToken:    "mytoken",
+		BindAddress:    "udp://0.0.0.0:59317",
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+		DockerEndpoint: s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
 	baseTime, err := time.Parse(time.RFC3339, "2015-06-05T16:13:47Z")
 	c.Assert(err, check.IsNil)
-	_, err = conn.Write([]byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n"))
+	_, err = conn.Write([]byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id)))
 	c.Assert(err, check.IsNil)
-	_, err = conn.Write([]byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg2\n"))
+	_, err = conn.Write([]byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg2\n", s.id)))
 	c.Assert(err, check.IsNil)
 	time.Sleep(2 * time.Second)
 	lf.stop()
@@ -151,30 +157,31 @@ func (S) TestLogForwarderWSForwarder(c *check.C) {
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
 		Message: "mymsg",
-		Source:  "proc1",
-		AppName: "myappname",
-		Unit:    "contid1",
+		Source:  "procx",
+		AppName: "coolappname",
+		Unit:    s.id,
 	})
 	err = json.Unmarshal([]byte(parts[1]), &logLine)
 	c.Assert(err, check.IsNil)
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
 		Message: "mymsg2",
-		Source:  "proc1",
-		AppName: "myappname",
-		Unit:    "contid1",
+		Source:  "procx",
+		AppName: "coolappname",
+		Unit:    s.id,
 	})
 }
 
-func (S) TestLogForwarderStartBindError(c *check.C) {
+func (s *S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{
-		BindAddress: "xudp://0.0.0.0:59317",
+		BindAddress:    "xudp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.ErrorMatches, `invalid protocol "xudp", expected tcp or udp`)
 }
 
-func (S) TestLogForwarderForwardConnError(c *check.C) {
+func (s *S) TestLogForwarderForwardConnError(c *check.C) {
 	lf := LogForwarder{
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"xudp://127.0.0.1:1234"},
@@ -189,7 +196,7 @@ func (S) TestLogForwarderForwardConnError(c *check.C) {
 	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
 }
 
-func (S) BenchmarkMessagesBroadcast(c *check.C) {
+func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
 	startReceiver := func() net.Conn {
 		addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
@@ -209,17 +216,17 @@ func (S) BenchmarkMessagesBroadcast(c *check.C) {
 			"udp://" + forwardedConns[0].LocalAddr().String(),
 			"udp://" + forwardedConns[1].LocalAddr().String(),
 		},
-		TsuruEndpoint: srv.URL,
-		TsuruToken:    "mytoken",
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+		DockerEndpoint: s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	lf.containerDataCache.Add("contid1", &containerData{appName: "myappname", processName: "proc1"})
 	sender := func(n int) {
 		conn, err := net.Dial("tcp", "127.0.0.1:59317")
 		c.Assert(err, check.IsNil)
 		defer conn.Close()
-		msg := []byte("<30>2015-06-05T16:13:47Z myhost docker/contid1: mymsg\n")
+		msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
 		for i := 0; i < n; i++ {
 			_, err = conn.Write(msg)
 			c.Assert(err, check.IsNil)

@@ -1,3 +1,7 @@
+// Copyright 2015 bs authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package log
 
 import (
@@ -7,14 +11,12 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/fsouza/go-dockerclient"
-	"github.com/hashicorp/golang-lru"
 	"github.com/jeromer/syslogparser"
 	"github.com/mcuadros/go-syslog"
+	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 )
@@ -30,23 +32,16 @@ type LogMessage struct {
 }
 
 type LogForwarder struct {
-	BindAddress        string
-	ForwardAddresses   []string
-	DockerEndpoint     string
-	AppNameEnvVar      string
-	ProcessNameEnvVar  string
-	TsuruEndpoint      string
-	TsuruToken         string
-	forwardChans       []chan<- *LogMessage
-	forwardQuitChans   []chan<- bool
-	server             *syslog.Server
-	containerDataCache *lru.Cache
-	messagesCounter    int64
-}
-
-type containerData struct {
-	appName     string
-	processName string
+	BindAddress      string
+	ForwardAddresses []string
+	DockerEndpoint   string
+	TsuruEndpoint    string
+	TsuruToken       string
+	infoClient       *container.InfoClient
+	forwardChans     []chan<- *LogMessage
+	forwardQuitChans []chan<- bool
+	server           *syslog.Server
+	messagesCounter  int64
 }
 
 type processable interface {
@@ -231,7 +226,7 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
-	l.containerDataCache, err = lru.New(100)
+	l.infoClient, err = container.NewClient(l.DockerEndpoint)
 	if err != nil {
 		return
 	}
@@ -275,41 +270,12 @@ func (l *LogForwarder) stop() {
 	}
 }
 
-func (l *LogForwarder) getContainerData(containerId string) (*containerData, error) {
-	if val, ok := l.containerDataCache.Get(containerId); ok {
-		return val.(*containerData), nil
-	}
-	client, err := docker.NewClient(l.DockerEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	cont, err := client.InspectContainer(containerId)
-	if err != nil {
-		return nil, err
-	}
-	var app, process string
-	for _, val := range cont.Config.Env {
-		if app == "" && strings.HasPrefix(val, l.AppNameEnvVar) {
-			app = val[len(l.AppNameEnvVar):]
-		}
-		if process == "" && strings.HasPrefix(val, l.ProcessNameEnvVar) {
-			process = val[len(l.ProcessNameEnvVar):]
-		}
-		if app != "" && process != "" {
-			data := containerData{appName: app, processName: process}
-			l.containerDataCache.Add(containerId, &data)
-			return &data, nil
-		}
-	}
-	return nil, fmt.Errorf("could not find app name env in %s", containerId)
-}
-
 func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
 	contId, _ := logParts["container_id"].(string)
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
 	}
-	contData, err := l.getContainerData(contId)
+	contData, err := l.infoClient.GetContainer(contId)
 	if err != nil {
 		log.Printf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
 		return
@@ -324,17 +290,17 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	msg := &LogMessage{
 		logEntry: &app.Applog{
 			Date:    ts,
-			AppName: contData.appName,
+			AppName: contData.AppName,
 			Message: content,
-			Source:  contData.processName,
+			Source:  contData.ProcessName,
 			Unit:    contId,
 		},
 		syslogMsg: []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
 			priority,
 			ts.Format(time.RFC3339),
 			contId,
-			contData.appName,
-			contData.processName,
+			contData.AppName,
+			contData.ProcessName,
 			content,
 		)),
 	}

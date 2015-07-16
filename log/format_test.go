@@ -1,6 +1,7 @@
 // Copyright 2015 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
 package log
 
 import (
@@ -9,20 +10,20 @@ import (
 	"time"
 )
 
-func (S) TestLenientFormatGetParser(c *check.C) {
+func (s *S) TestLenientFormatGetParser(c *check.C) {
 	lf := LenientFormat{}
 	line := []byte("abc")
 	parser := lf.GetParser(line)
 	c.Assert(parser, check.DeepEquals, &LenientParser{line: line})
 }
 
-func (S) TestLenientFormatGetSplitFunc(c *check.C) {
+func (s *S) TestLenientFormatGetSplitFunc(c *check.C) {
 	lf := LenientFormat{}
 	splitFunc := lf.GetSplitFunc()
 	c.Assert(splitFunc, check.IsNil)
 }
 
-func (S) TestLenientParserParse(c *check.C) {
+func (s *S) TestLenientParserParse(c *check.C) {
 	examples := []string{
 		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey",
 		"<31>Dec 26 05:08:46 hostname tag/my_id[296]: content",
