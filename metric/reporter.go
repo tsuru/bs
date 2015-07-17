@@ -31,6 +31,10 @@ func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
 
 func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	var wg sync.WaitGroup
+	conns, err := conntrack()
+	if err != nil {
+		log.Printf("[ERROR] failed to execute conntrack: %s", err)
+	}
 	for _, container := range containers {
 		wg.Add(1)
 		go func(contID string) {
@@ -53,6 +57,10 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			err = r.sendMetrics(container, metrics)
 			if err != nil {
 				log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
+			}
+			err = r.sendConnMetrics(container, conns)
+			if err != nil {
+				log.Printf("[ERROR] failed to send conn metrics for container %q: %s", contID, err)
 			}
 		}(container.ID)
 	}
