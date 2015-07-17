@@ -69,3 +69,23 @@ func (r *Reporter) sendMetrics(container *container.Container, metrics map[strin
 	}
 	return nil
 }
+
+func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn) error {
+	for _, conn := range conns {
+		var value string
+		switch container.NetworkSettings.IPAddress {
+		case conn.SourceIP:
+			value = conn.DestinationIP + ":" + conn.DestinationPort
+		case conn.DestinationIP:
+			value = conn.SourceIP + ":" + conn.SourcePort
+		}
+		if value != "" {
+			err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, "connection", value)
+			if err != nil {
+				log.Printf("[ERROR] failed to send connection metrics for container %q: %s", container, err)
+				return err
+			}
+		}
+	}
+	return nil
+}

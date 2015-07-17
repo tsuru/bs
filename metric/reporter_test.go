@@ -5,6 +5,7 @@
 package metric
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/fsouza/go-dockerclient"
@@ -25,12 +26,69 @@ func (s *S) SetUpTest(c *check.C) {
 }
 
 func (s *S) TestSendMetrics(c *check.C) {
-	var cont container.Container
-	config := docker.Config{}
-	cont.Config = &config
-	r := &Reporter{}
-	err := r.sendMetrics(&cont, nil)
+	cont := container.Container{
+		Container:   docker.Container{Config: &docker.Config{Hostname: "afdb3737ff"}},
+		AppName:     "myapp",
+		ProcessName: "myprocess",
+	}
+	r := Reporter{backend: &fakeStatter}
+	metrics := map[string]string{"cpu": "900", "mem": "512"}
+	err := r.sendMetrics(&cont, metrics)
 	c.Assert(err, check.IsNil)
+	expected := []fakeStat{
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "cpu", value: "900"},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "mem", value: "512"},
+	}
+	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
+}
+
+func (s *S) TestSendMetricsFailure(c *check.C) {
+	cont := container.Container{
+		Container:   docker.Container{Config: &docker.Config{Hostname: "afdb3737ff"}},
+		AppName:     "myapp",
+		ProcessName: "myprocess",
+	}
+	r := Reporter{backend: &fakeStatter}
+	prepErr := errors.New("something went wrong")
+	fakeStatter.prepareFailre(prepErr)
+	err := r.sendMetrics(&cont, map[string]string{"cpu": "256"})
+	c.Assert(err, check.Equals, prepErr)
+}
+
+func (s *S) TestSendConnMetrics(c *check.C) {
+	cont := container.Container{
+		Container: docker.Container{
+			Config:          &docker.Config{Hostname: "afdb3737ff"},
+			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.27"},
+		},
+		AppName:     "myapp",
+		ProcessName: "myprocess",
+	}
+	conns := []conn{
+		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "172.17.42.1", SourcePort: "42418", DestinationIP: "172.17.0.27", DestinationPort: "4001"},
+		{SourceIP: "172.17.42.1", SourcePort: "42428", DestinationIP: "172.17.0.27", DestinationPort: "4001"},
+		{SourceIP: "192.168.50.4", SourcePort: "53922", DestinationIP: "192.168.50.4", DestinationPort: "5000"},
+		{SourceIP: "192.168.50.4", SourcePort: "43227", DestinationIP: "192.168.50.4", DestinationPort: "8080"},
+		{SourceIP: "172.17.0.27", SourcePort: "39502", DestinationIP: "172.17.42.1", DestinationPort: "4001"},
+		{SourceIP: "192.168.50.4", SourcePort: "33496", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "192.168.50.4", SourcePort: "33495", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "10.211.55.2", SourcePort: "51388", DestinationIP: "10.211.55.184", DestinationPort: "22"},
+		{SourceIP: "172.17.0.27", SourcePort: "39492", DestinationIP: "172.17.42.1", DestinationPort: "4001"},
+		{SourceIP: "172.17.0.27", SourcePort: "39492", DestinationIP: "192.168.50.4", DestinationPort: "8080"},
+		{SourceIP: "10.211.55.2", SourcePort: "51370", DestinationIP: "10.211.55.184", DestinationPort: "22"},
+	}
+	r := Reporter{backend: &fakeStatter}
+	err := r.sendConnMetrics(&cont, conns)
+	c.Assert(err, check.IsNil)
+	expected := []fakeStat{
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "172.17.42.1:42418"},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "172.17.42.1:42428"},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "172.17.42.1:4001"},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "172.17.42.1:4001"},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "192.168.50.4:8080"},
+	}
+	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
 }
 
 func (s *S) TestGetMetrics(c *check.C) {
