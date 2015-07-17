@@ -80,8 +80,8 @@ func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {
-	statsCh := make(chan *docker.Stats)
-	errCh := make(chan error)
+	statsCh := make(chan *docker.Stats, 1)
+	errCh := make(chan error, 1)
 	opts := docker.StatsOptions{
 		ID:     c.ID,
 		Stream: false,
