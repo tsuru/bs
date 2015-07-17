@@ -17,17 +17,18 @@ type Runner struct {
 	finish         chan bool
 }
 
-func (r *Runner) Start() {
+func (r *Runner) Start() error {
+	client, err := container.NewClient(r.DockerEndpoint)
+	if err != nil {
+		return err
+	}
+	reporter := &Reporter{
+		backend:    os.Getenv("METRICS_BACKEND"),
+		infoClient: client,
+	}
 	go func() {
 		for {
-			client, err := container.NewClient(r.DockerEndpoint)
-			if err == nil {
-				reporter := &Reporter{
-					backend:    os.Getenv("METRICS_BACKEND"),
-					infoClient: client,
-				}
-				reporter.Do()
-			}
+			reporter.Do()
 			select {
 			case <-r.finish:
 				return
@@ -36,6 +37,7 @@ func (r *Runner) Start() {
 
 		}
 	}()
+	return nil
 }
 
 func (r *Runner) Stop() {

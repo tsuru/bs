@@ -105,7 +105,11 @@ func main() {
 		DockerEndpoint: config.DockerEndpoint,
 		Interval:       config.MetricsInterval,
 	}
-	mRunner.Start()
+	err = mRunner.Start()
+	if err != nil {
+		fmt.Printf("Unable to initialize metrics runner: %s\n", err)
+		os.Exit(1)
+	}
 	abortReporter, reporterEnded := statusReporter()
 	startSignalHandler(func(signal os.Signal) {
 		close(abortReporter)

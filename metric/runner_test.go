@@ -28,7 +28,8 @@ func (s *S) TestRunner(c *check.C) {
 		DockerEndpoint: dockerServer.URL(),
 	}
 	go func() {
-		r.Start()
+		err := r.Start()
+		c.Assert(err, check.IsNil)
 	}()
 	r.Stop()
 }
