@@ -17,7 +17,7 @@ func (S) TestConntrack(c *check.C) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)
-	err = conntrack()
+	conns, err := conntrack()
 	c.Assert(err, check.IsNil)
 	expected := []conn{
 		{Source: "192.168.50.4:33404", Destination: "192.168.50.4:2375"},
@@ -32,7 +32,7 @@ func (S) TestConntrack(c *check.C) {
 		{Source: "172.17.0.27:39492", Destination: "172.17.42.1:4001"},
 		{Source: "10.211.55.2:51370", Destination: "10.211.55.184:22"},
 	}
-	c.Assert(data.conns(), check.DeepEquals, expected)
+	c.Assert(conns, check.DeepEquals, expected)
 }
 
 func (S) TestConntrackCommandFailure(c *check.C) {
@@ -42,8 +42,9 @@ func (S) TestConntrackCommandFailure(c *check.C) {
 	dir, err := commandmocker.Error("conntrack", "something went wrong", 120)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)
-	err = conntrack()
+	conns, err := conntrack()
 	c.Assert(err, check.NotNil)
 	c.Assert(err.Error(), check.Equals, "exit status 120")
 	c.Assert(buf.String(), check.Matches, "(?m).* conntrack failed: exit status 120. Output: something went wrong$")
+	c.Assert(conns, check.IsNil)
 }

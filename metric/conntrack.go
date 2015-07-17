@@ -10,24 +10,12 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"sync/atomic"
 )
 
 type conn struct {
 	Source      string
 	Destination string
 }
-
-type connData struct {
-	atomic.Value
-}
-
-func (d *connData) conns() []conn {
-	conns := d.Load()
-	return conns.([]conn)
-}
-
-var data connData
 
 type conntrackResult struct {
 	Items []struct {
@@ -41,7 +29,7 @@ type conntrackResult struct {
 	} `xml:"flow"`
 }
 
-func conntrack() error {
+func conntrack() ([]conn, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command("conntrack", "-p", "tcp", "-L", "--state", "ESTABLISHED", "-o", "xml")
 	cmd.Stdout = &stdout
@@ -49,12 +37,12 @@ func conntrack() error {
 	err := cmd.Run()
 	if err != nil {
 		log.Printf("[ERROR] conntrack failed: %s. Output: %s", err, stderr.String())
-		return err
+		return nil, err
 	}
 	var result conntrackResult
 	err = xml.Unmarshal(stdout.Bytes(), &result)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var conns []conn
 	for _, item := range result.Items {
@@ -66,6 +54,5 @@ func conntrack() error {
 			}
 		}
 	}
-	data.Store(conns)
-	return nil
+	return conns, nil
 }
