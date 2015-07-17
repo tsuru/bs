@@ -13,7 +13,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func (S) TestConntrack(c *check.C) {
+func (*S) TestConntrack(c *check.C) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)
@@ -35,7 +35,7 @@ func (S) TestConntrack(c *check.C) {
 	c.Assert(conns, check.DeepEquals, expected)
 }
 
-func (S) TestConntrackCommandFailure(c *check.C) {
+func (*S) TestConntrackCommandFailure(c *check.C) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
 	defer log.SetOutput(os.Stderr)
