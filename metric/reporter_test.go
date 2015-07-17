@@ -91,6 +91,23 @@ func (s *S) TestSendConnMetrics(c *check.C) {
 	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
 }
 
+func (s *S) TestSendConnMetricsFailure(c *check.C) {
+	cont := container.Container{
+		Container: docker.Container{
+			Config:          &docker.Config{Hostname: "afdb3737ff"},
+			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.3"},
+		},
+		AppName:     "myapp",
+		ProcessName: "myprocess",
+	}
+	r := Reporter{backend: &fakeStatter}
+	prepErr := errors.New("something went wrong")
+	fakeStatter.prepareFailure(prepErr)
+	conns := []conn{{SourceIP: "172.17.0.3"}}
+	err := r.sendConnMetrics(&cont, conns)
+	c.Assert(err, check.Equals, prepErr)
+}
+
 func (s *S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
 	r := &Reporter{}
