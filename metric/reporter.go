@@ -46,21 +46,21 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			}
 			stats, err := container.Stats()
 			if err != nil {
-				log.Printf("[ERROR] cannot get stats for container %q: %s", container, err)
+				log.Printf("[ERROR] cannot get stats for container %v: %s", container, err)
 				return
 			}
 			metrics, err := statsToMetricsMap(stats)
 			if err != nil {
-				log.Printf("[ERROR] failed to get metrics for container %q: %s", container, err)
+				log.Printf("[ERROR] failed to get metrics for container %v: %s", container, err)
 				return
 			}
 			err = r.sendMetrics(container, metrics)
 			if err != nil {
-				log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
+				log.Printf("[ERROR] failed to send metrics for container %v: %s", container, err)
 			}
 			err = r.sendConnMetrics(container, conns)
 			if err != nil {
-				log.Printf("[ERROR] failed to send conn metrics for container %q: %s", contID, err)
+				log.Printf("[ERROR] failed to send conn metrics for container %v: %s", container, err)
 			}
 		}(container.ID)
 	}
