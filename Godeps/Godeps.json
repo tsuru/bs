@@ -7,8 +7,7 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Comment": "0.2.1-601-geeaf154",
-			"Rev": "eeaf15461b1f9d4ed2ffbd1ae1afde4b66527fd4"
+			"Rev": "f6e9f5396e0e8f34472efe443d0cb7f9af162b88"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/redis",
