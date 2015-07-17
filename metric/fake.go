@@ -6,6 +6,10 @@ package metric
 
 type fake struct{}
 
+func newFakeStats() (statter, error) {
+	return &fake{}, nil
+}
+
 func (s *fake) Send(app, hostname, process, key, value string) error {
 	return nil
 }

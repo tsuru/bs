@@ -14,7 +14,7 @@ import (
 	statsdClient "github.com/quipo/statsd"
 )
 
-func newStatsd() statter {
+func newStatsd() (statter, error) {
 	var (
 		defaultPrefix string = ""
 		defaultPort   string = "8125"
@@ -36,7 +36,7 @@ func newStatsd() statter {
 		Host:   host,
 		Port:   port,
 		Prefix: prefix,
-	}
+	}, nil
 }
 
 type statsd struct {

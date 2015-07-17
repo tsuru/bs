@@ -6,7 +6,6 @@ package metric
 
 import (
 	"log"
-	"reflect"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
@@ -14,16 +13,11 @@ import (
 )
 
 type Reporter struct {
-	backend    string
+	backend    statter
 	infoClient *container.InfoClient
 }
 
 func (r *Reporter) Do() {
-	st := r.statter()
-	// don't run reporter when the statter is the fake statter
-	if reflect.ValueOf(st).Type().AssignableTo(reflect.ValueOf(fake{}).Type()) {
-		return
-	}
 	containers, err := r.listContainers()
 	if err != nil {
 		log.Printf("[ERROR] failed to list containers: %s", err)
@@ -39,11 +33,11 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	var wg sync.WaitGroup
 	for _, container := range containers {
 		wg.Add(1)
-		go func(c docker.APIContainers) {
+		go func(contID string) {
 			defer wg.Done()
-			container, err := r.infoClient.GetContainer(c.ID)
+			container, err := r.infoClient.GetContainer(contID)
 			if err != nil {
-				log.Printf("[ERROR] cannot inspect container %q: %s", c.ID, err)
+				log.Printf("[ERROR] cannot inspect container %q: %s", contID, err)
 				return
 			}
 			stats, err := container.Stats()
@@ -60,30 +54,18 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			if err != nil {
 				log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
 			}
-		}(container)
+		}(container.ID)
 	}
 	wg.Wait()
 }
 
 func (r *Reporter) sendMetrics(container *container.Container, metrics map[string]string) error {
 	for key, value := range metrics {
-		err := r.statter().Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
+		err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
 		if err != nil {
 			log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
 			return err
 		}
 	}
 	return nil
-}
-
-func (r *Reporter) statter() statter {
-	statters := map[string]statter{
-		"statsd":   newStatsd(),
-		"logstash": newLogStash(),
-	}
-	st, ok := statters[r.backend]
-	if ok {
-		return st
-	}
-	return &fake{}
 }

@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-func newLogStash() statter {
+func newLogStash() (statter, error) {
 	var (
 		defaultClient string = "tsuru"
 		defaultPort   string = "1984"
@@ -33,7 +33,7 @@ func newLogStash() statter {
 		Client: client,
 		Host:   host,
 		Port:   port,
-	}
+	}, nil
 }
 
 type logStash struct {

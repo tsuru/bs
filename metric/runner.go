@@ -5,6 +5,7 @@
 package metric
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -15,6 +16,12 @@ type runner struct {
 	dockerEndpoint string
 	interval       time.Duration
 	finish         chan bool
+}
+
+var statters = map[string]func() (statter, error){
+	"statsd":   newStatsd,
+	"logstash": newLogStash,
+	"fake":     newFakeStats,
 }
 
 func NewRunner(dockerEndpoint string, interval time.Duration) *runner {
@@ -30,8 +37,17 @@ func (r *runner) Start() error {
 	if err != nil {
 		return err
 	}
+	backendName := os.Getenv("METRICS_BACKEND")
+	constructor := statters[backendName]
+	if constructor == nil {
+		return fmt.Errorf("no metrics backend found with name %q", backendName)
+	}
+	backend, err := constructor()
+	if err != nil {
+		return err
+	}
 	reporter := &Reporter{
-		backend:    os.Getenv("METRICS_BACKEND"),
+		backend:    backend,
 		infoClient: client,
 	}
 	go func() {

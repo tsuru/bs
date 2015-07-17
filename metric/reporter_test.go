@@ -34,15 +34,3 @@ func (s *S) TestGetMetrics(c *check.C) {
 	r := &Reporter{}
 	r.getMetrics(containers)
 }
-
-func (s *S) TestReporterStatter(c *check.C) {
-	backends := map[string]statter{
-		"fake":     &fake{},
-		"logstash": &logStash{},
-		"statsd":   &statsd{},
-	}
-	for b, st := range backends {
-		r := &Reporter{backend: b}
-		c.Check(r.statter(), check.FitsTypeOf, st)
-	}
-}
