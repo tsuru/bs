@@ -20,17 +20,17 @@ func (*S) TestConntrack(c *check.C) {
 	conns, err := conntrack()
 	c.Assert(err, check.IsNil)
 	expected := []conn{
-		{Source: "192.168.50.4:33404", Destination: "192.168.50.4:2375"},
-		{Source: "172.17.42.1:42418", Destination: "172.17.0.2:4001"},
-		{Source: "172.17.42.1:42428", Destination: "172.17.0.2:4001"},
-		{Source: "192.168.50.4:53922", Destination: "192.168.50.4:5000"},
-		{Source: "192.168.50.4:43227", Destination: "192.168.50.4:8080"},
-		{Source: "172.17.0.27:39502", Destination: "172.17.42.1:4001"},
-		{Source: "192.168.50.4:33496", Destination: "192.168.50.4:2375"},
-		{Source: "192.168.50.4:33495", Destination: "192.168.50.4:2375"},
-		{Source: "10.211.55.2:51388", Destination: "10.211.55.184:22"},
-		{Source: "172.17.0.27:39492", Destination: "172.17.42.1:4001"},
-		{Source: "10.211.55.2:51370", Destination: "10.211.55.184:22"},
+		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "172.17.42.1", SourcePort: "42418", DestinationIP: "172.17.0.2", DestinationPort: "4001"},
+		{SourceIP: "172.17.42.1", SourcePort: "42428", DestinationIP: "172.17.0.2", DestinationPort: "4001"},
+		{SourceIP: "192.168.50.4", SourcePort: "53922", DestinationIP: "192.168.50.4", DestinationPort: "5000"},
+		{SourceIP: "192.168.50.4", SourcePort: "43227", DestinationIP: "192.168.50.4", DestinationPort: "8080"},
+		{SourceIP: "172.17.0.27", SourcePort: "39502", DestinationIP: "172.17.42.1", DestinationPort: "4001"},
+		{SourceIP: "192.168.50.4", SourcePort: "33496", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "192.168.50.4", SourcePort: "33495", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
+		{SourceIP: "10.211.55.2", SourcePort: "51388", DestinationIP: "10.211.55.184", DestinationPort: "22"},
+		{SourceIP: "172.17.0.27", SourcePort: "39492", DestinationIP: "172.17.42.1", DestinationPort: "4001"},
+		{SourceIP: "10.211.55.2", SourcePort: "51370", DestinationIP: "10.211.55.184", DestinationPort: "22"},
 	}
 	c.Assert(conns, check.DeepEquals, expected)
 }

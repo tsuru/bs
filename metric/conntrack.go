@@ -7,14 +7,15 @@ package metric
 import (
 	"bytes"
 	"encoding/xml"
-	"fmt"
 	"log"
 	"os/exec"
 )
 
 type conn struct {
-	Source      string
-	Destination string
+	SourceIP        string
+	DestinationIP   string
+	SourcePort      string
+	DestinationPort string
 }
 
 type conntrackResult struct {
@@ -48,9 +49,12 @@ func conntrack() ([]conn, error) {
 	for _, item := range result.Items {
 		if len(item.Metas) > 0 {
 			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
-				source := fmt.Sprintf("%s:%s", item.Metas[0].SourceIP, item.Metas[0].SourcePort)
-				destination := fmt.Sprintf("%s:%s", item.Metas[0].DestIP, item.Metas[0].DestPort)
-				conns = append(conns, conn{Source: source, Destination: destination})
+				conns = append(conns, conn{
+					SourceIP:        item.Metas[0].SourceIP,
+					SourcePort:      item.Metas[0].SourcePort,
+					DestinationIP:   item.Metas[0].DestIP,
+					DestinationPort: item.Metas[0].DestPort,
+				})
 			}
 		}
 	}
