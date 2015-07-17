@@ -7,6 +7,7 @@ package metric
 import (
 	"bytes"
 	"log"
+	"os"
 
 	"github.com/tsuru/commandmocker"
 	"gopkg.in/check.v1"
@@ -37,7 +38,7 @@ func (S) TestConntrack(c *check.C) {
 func (S) TestConntrackCommandFailure(c *check.C) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
-	defer log.SetOutput(nil)
+	defer log.SetOutput(os.Stderr)
 	dir, err := commandmocker.Error("conntrack", "something went wrong", 120)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)

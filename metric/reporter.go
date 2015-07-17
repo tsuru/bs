@@ -43,7 +43,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			defer wg.Done()
 			container, err := r.infoClient.GetContainer(c.ID)
 			if err != nil {
-				log.Printf("[ERROR] cannot inspect container %q: %s", container, err)
+				log.Printf("[ERROR] cannot inspect container %q: %s", c.ID, err)
 				return
 			}
 			stats, err := container.Stats()
