@@ -42,7 +42,7 @@ func (s *fake) Send(app, hostname, process, key, value string) error {
 	}
 }
 
-func (s *fake) prepareFailre(err error) {
+func (s *fake) prepareFailure(err error) {
 	s.failures <- err
 }
 

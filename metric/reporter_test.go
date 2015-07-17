@@ -50,7 +50,7 @@ func (s *S) TestSendMetricsFailure(c *check.C) {
 	}
 	r := Reporter{backend: &fakeStatter}
 	prepErr := errors.New("something went wrong")
-	fakeStatter.prepareFailre(prepErr)
+	fakeStatter.prepareFailure(prepErr)
 	err := r.sendMetrics(&cont, map[string]string{"cpu": "256"})
 	c.Assert(err, check.Equals, prepErr)
 }
