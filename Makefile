@@ -5,6 +5,7 @@
 TAG ?= tsuru/bs
 
 docker_image:
+	godep restore ./...
 	go build
 	docker build -t $(TAG) .
 	rm bs
