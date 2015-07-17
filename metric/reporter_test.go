@@ -20,6 +20,10 @@ func Test(t *testing.T) {
 
 type S struct{}
 
+func (s *S) SetUpTest(c *check.C) {
+	fakeStatter.reset()
+}
+
 func (s *S) TestSendMetrics(c *check.C) {
 	var cont container.Container
 	config := docker.Config{}
