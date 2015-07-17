@@ -5,14 +5,15 @@
 package metric
 
 import (
-	"encoding/json"
+	"net/http"
 
-	"github.com/fsouza/go-dockerclient"
+	"github.com/fsouza/go-dockerclient/testing"
+	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 )
 
 func (s *S) TestStatsToMetricsMap(c *check.C) {
-	jsonStats := `{
+	const jsonStats = `{
        "read" : "2015-01-08T22:57:31.547920715Z",
        "network" : {
           "rx_dropped" : 0,
@@ -112,10 +113,21 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
           "system_cpu_usage" : 20091722000000000
        }
     }`
-	var stats docker.Stats
-	err := json.Unmarshal([]byte(jsonStats), &stats)
+	server, err := testing.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
-	metricsMap, err := statsToMetricsMap(&stats)
+	defer server.Stop()
+	server.CustomHandler("/containers/containerid/json", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ID":"containerid","Config":{"Env":["TSURU_APPNAME=someapp","TSURU_PROCESSNAME=somep"]}}`))
+	}))
+	server.CustomHandler("/containers/containerid/stats", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(jsonStats))
+	}))
+	client, err := container.NewClient(server.URL())
+	c.Assert(err, check.IsNil)
+	cont, err := client.GetContainer("containerid")
+	c.Assert(err, check.IsNil)
+	metricsMap, err := statsToMetricsMap(cont, nil)
 	c.Assert(err, check.IsNil)
 	expected := map[string]string{
 		"mem_pct_max": "9.74",

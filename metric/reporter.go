@@ -37,6 +37,10 @@ func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
 
 func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	var wg sync.WaitGroup
+	conns, err := conntrack()
+	if err != nil {
+		log.Printf("[ERROR] failed to run collect conntrack information: %s", err)
+	}
 	for _, container := range containers {
 		wg.Add(1)
 		go func(c docker.APIContainers) {
@@ -46,12 +50,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 				log.Printf("[ERROR] cannot inspect container %q: %s", c.ID, err)
 				return
 			}
-			stats, err := container.Stats()
-			if err != nil {
-				log.Printf("[ERROR] cannot get stats for container %q: %s", container, err)
-				return
-			}
-			metrics, err := statsToMetricsMap(stats)
+			metrics, err := statsToMetricsMap(container, conns)
 			if err != nil {
 				log.Printf("[ERROR] failed to get metrics for container %q: %s", container, err)
 				return
