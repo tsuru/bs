@@ -39,6 +39,9 @@ func (s *S) TestSendMetrics(c *check.C) {
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "cpu", value: "900"},
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "mem", value: "512"},
 	}
+	if fakeStatter.stats[0].key != "cpu" {
+		expected[0], expected[1] = expected[1], expected[0]
+	}
 	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
 }
 
