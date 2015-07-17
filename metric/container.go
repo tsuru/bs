@@ -8,14 +8,9 @@ import (
 	"strconv"
 
 	"github.com/fsouza/go-dockerclient"
-	"github.com/tsuru/bs/container"
 )
 
-func statsToMetricsMap(c *container.Container, conns []conn) (map[string]string, error) {
-	s, err := c.Stats()
-	if err != nil {
-		return nil, err
-	}
+func statsToMetricsMap(s *docker.Stats) (map[string]string, error) {
 	previousCPU := s.PreCPUStats.CPUUsage.TotalUsage
 	previousSystem := s.PreCPUStats.SystemCPUUsage
 	cpuPercent := calculateCPUPercent(previousCPU, previousSystem, s)
