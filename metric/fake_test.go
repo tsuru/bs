@@ -4,11 +4,15 @@
 
 package metric
 
-type fake struct{}
+var fakeStatter fake
 
-func newFakeStats() (statter, error) {
-	return &fake{}, nil
+func init() {
+	statters["fake"] = func() (statter, error) {
+		return &fakeStatter, nil
+	}
 }
+
+type fake struct{}
 
 func (s *fake) Send(app, hostname, process, key, value string) error {
 	return nil

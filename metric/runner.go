@@ -21,7 +21,6 @@ type runner struct {
 var statters = map[string]func() (statter, error){
 	"statsd":   newStatsd,
 	"logstash": newLogStash,
-	"fake":     newFakeStats,
 }
 
 func NewRunner(dockerEndpoint string, interval time.Duration) *runner {
