@@ -10,7 +10,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func (S) TestStatsdSend(c *check.C) {
+func (s *S) TestStatsdSend(c *check.C) {
 	addr := net.UDPAddr{
 		Port: 0,
 		IP:   net.ParseIP("127.0.0.1"),

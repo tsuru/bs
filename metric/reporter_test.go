@@ -12,7 +12,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-var _ = check.Suite(S{})
+var _ = check.Suite(&S{})
 
 func Test(t *testing.T) {
 	check.TestingT(t)
@@ -20,7 +20,7 @@ func Test(t *testing.T) {
 
 type S struct{}
 
-func (S) TestSendMetrics(c *check.C) {
+func (s *S) TestSendMetrics(c *check.C) {
 	var cont container.Container
 	config := docker.Config{}
 	cont.Config = &config
@@ -29,13 +29,13 @@ func (S) TestSendMetrics(c *check.C) {
 	c.Assert(err, check.IsNil)
 }
 
-func (S) TestGetMetrics(c *check.C) {
+func (s *S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
 	r := &Reporter{}
 	r.getMetrics(containers)
 }
 
-func (S) TestReporterStatter(c *check.C) {
+func (s *S) TestReporterStatter(c *check.C) {
 	backends := map[string]statter{
 		"fake":     &fake{},
 		"logstash": &logStash{},

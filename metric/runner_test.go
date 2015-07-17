@@ -6,6 +6,7 @@ package metric
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/fsouza/go-dockerclient/testing"
@@ -24,9 +25,7 @@ func (s *S) TestRunner(c *check.C) {
 	}
 	dockerServer, _ := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
-	r := &Runner{
-		DockerEndpoint: dockerServer.URL(),
-	}
+	r := NewRunner(dockerServer.URL(), time.Second)
 	go func() {
 		err := r.Start()
 		c.Assert(err, check.IsNil)
@@ -34,7 +33,7 @@ func (s *S) TestRunner(c *check.C) {
 	r.Stop()
 }
 
-func (S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*testing.DockerServer, []docker.Container) {
+func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*testing.DockerServer, []docker.Container) {
 	server, err := testing.NewServer("127.0.0.1:0", nil, hook)
 	c.Assert(err, check.IsNil)
 	client, err := docker.NewClient(server.URL())

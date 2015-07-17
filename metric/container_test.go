@@ -11,7 +11,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func (S) TestStatsToMetricsMap(c *check.C) {
+func (s *S) TestStatsToMetricsMap(c *check.C) {
 	jsonStats := `{
        "read" : "2015-01-08T22:57:31.547920715Z",
        "network" : {

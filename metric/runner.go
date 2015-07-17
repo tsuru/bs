@@ -11,14 +11,22 @@ import (
 	"github.com/tsuru/bs/container"
 )
 
-type Runner struct {
-	DockerEndpoint string
-	Interval       time.Duration
+type runner struct {
+	dockerEndpoint string
+	interval       time.Duration
 	finish         chan bool
 }
 
-func (r *Runner) Start() error {
-	client, err := container.NewClient(r.DockerEndpoint)
+func NewRunner(dockerEndpoint string, interval time.Duration) *runner {
+	return &runner{
+		finish:         make(chan bool),
+		dockerEndpoint: dockerEndpoint,
+		interval:       interval,
+	}
+}
+
+func (r *runner) Start() error {
+	client, err := container.NewClient(r.dockerEndpoint)
 	if err != nil {
 		return err
 	}
@@ -32,7 +40,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.finish:
 				return
-			case <-time.After(r.Interval):
+			case <-time.After(r.interval):
 			}
 
 		}
@@ -40,6 +48,6 @@ func (r *Runner) Start() error {
 	return nil
 }
 
-func (r *Runner) Stop() {
+func (r *runner) Stop() {
 	r.finish <- true
 }
