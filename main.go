@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -98,14 +97,12 @@ func main() {
 	}
 	err := lf.Start()
 	if err != nil {
-		fmt.Printf("Unable to initialize log forwarder: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
 	mRunner := metric.NewRunner(config.DockerEndpoint, config.MetricsInterval)
 	err = mRunner.Start()
 	if err != nil {
-		fmt.Printf("Unable to initialize metrics runner: %s\n", err)
-		os.Exit(1)
+		log.Printf("Unable to initialize metrics runner: %s\n", err)
 	}
 	abortReporter, reporterEnded := statusReporter()
 	startSignalHandler(func(signal os.Signal) {
