@@ -114,11 +114,18 @@ func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
 	c.Assert(buffer[:n], check.DeepEquals, expected)
 }
 
-func (s *S) TestLogForwarderWSForwarder(c *check.C) {
+func (s *S) TestLogForwarderWSForwarderHTTP(c *check.C) {
+	testLogForwarderWSForwarder(s, c, httptest.NewServer)
+}
+
+func testLogForwarderWSForwarder(
+	s *S, c *check.C,
+	serverFunc func(handler http.Handler) *httptest.Server,
+) {
 	var body bytes.Buffer
 	var serverMut sync.Mutex
 	var req *http.Request
-	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+	srv := serverFunc(websocket.Handler(func(ws *websocket.Conn) {
 		serverMut.Lock()
 		defer serverMut.Unlock()
 		req = ws.Request()
