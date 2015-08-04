@@ -6,6 +6,8 @@ package log
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/tsuru/tsuru/app"
@@ -114,22 +116,43 @@ func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
 	c.Assert(buffer[:n], check.DeepEquals, expected)
 }
 
-func (s *S) TestLogForwarderWSForwarder(c *check.C) {
+func (s *S) TestLogForwarderWSForwarderHTTP(c *check.C) {
+	testLogForwarderWSForwarder(s, c, httptest.NewServer)
+}
+
+func (s *S) TestLogForwarderWSForwarderHTTPS(c *check.C) {
+	testLogForwarderWSForwarder(s, c, httptest.NewTLSServer)
+}
+
+func testLogForwarderWSForwarder(
+	s *S, c *check.C,
+	serverFunc func(handler http.Handler) *httptest.Server,
+) {
 	var body bytes.Buffer
 	var serverMut sync.Mutex
 	var req *http.Request
-	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+	srv := serverFunc(websocket.Handler(func(ws *websocket.Conn) {
 		serverMut.Lock()
 		defer serverMut.Unlock()
 		req = ws.Request()
 		io.Copy(&body, ws)
 	}))
 	defer srv.Close()
+	srvCerts := x509.NewCertPool()
+	if srv.TLS != nil {
+		for _, c := range srv.TLS.Certificates {
+			roots, _ := x509.ParseCertificates(c.Certificate[len(c.Certificate)-1])
+			for _, root := range roots {
+				srvCerts.AddCert(root)
+			}
+		}
+	}
 	lf := LogForwarder{
 		BindAddress:    "udp://0.0.0.0:59317",
 		TsuruEndpoint:  srv.URL,
 		TsuruToken:     "mytoken",
 		DockerEndpoint: s.dockerServer.URL(),
+		TlsConfig:      &tls.Config{RootCAs: srvCerts},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
