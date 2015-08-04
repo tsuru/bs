@@ -199,9 +199,9 @@ func (l *LogForwarder) initWSConnection() error {
 	if err != nil {
 		return err
 	}
-	wsUrl := fmt.Sprintf("ws://%s/logs", tsuruUrl.Host)
+	tsuruUrl.Path = "/logs"
 	forwardChan, quitChan, err := processMessages(&wsForwarder{
-		url:   wsUrl,
+		url:   tsuruUrl.String(),
 		token: l.TsuruToken,
 	})
 	if err != nil {
