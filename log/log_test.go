@@ -118,6 +118,10 @@ func (s *S) TestLogForwarderWSForwarderHTTP(c *check.C) {
 	testLogForwarderWSForwarder(s, c, httptest.NewServer)
 }
 
+func (s *S) TestLogForwarderWSForwarderHTTPS(c *check.C) {
+	testLogForwarderWSForwarder(s, c, httptest.NewTLSServer)
+}
+
 func testLogForwarderWSForwarder(
 	s *S, c *check.C,
 	serverFunc func(handler http.Handler) *httptest.Server,
