@@ -200,6 +200,11 @@ func (l *LogForwarder) initWSConnection() error {
 		return err
 	}
 	tsuruUrl.Path = "/logs"
+	if tsuruUrl.Scheme == "https" {
+		tsuruUrl.Scheme = "wss"
+	} else {
+		tsuruUrl.Scheme = "ws"
+	}
 	forwardChan, quitChan, err := processMessages(&wsForwarder{
 		url:   tsuruUrl.String(),
 		token: l.TsuruToken,
