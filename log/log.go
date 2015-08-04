@@ -37,6 +37,7 @@ type LogForwarder struct {
 	DockerEndpoint   string
 	TsuruEndpoint    string
 	TsuruToken       string
+	TlsConfig        *tls.Config
 	infoClient       *container.InfoClient
 	forwardChans     []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
@@ -54,8 +55,9 @@ type syslogForwarder struct {
 }
 
 type wsForwarder struct {
-	url   string
-	token string
+	url       string
+	token     string
+	tlsConfig *tls.Config
 }
 
 func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, error) {
@@ -121,6 +123,9 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 	config, err := websocket.NewConfig(f.url, "ws://localhost/")
 	if err != nil {
 		return nil, err
+	}
+	if f.tlsConfig != nil {
+		config.TlsConfig = f.tlsConfig
 	}
 	config.Header.Add("Authorization", "bearer "+f.token)
 	var client net.Conn
@@ -206,8 +211,9 @@ func (l *LogForwarder) initWSConnection() error {
 		tsuruUrl.Scheme = "ws"
 	}
 	forwardChan, quitChan, err := processMessages(&wsForwarder{
-		url:   tsuruUrl.String(),
-		token: l.TsuruToken,
+		url:       tsuruUrl.String(),
+		token:     l.TsuruToken,
+		tlsConfig: l.TlsConfig,
 	})
 	if err != nil {
 		return err

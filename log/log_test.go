@@ -6,6 +6,8 @@ package log
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/tsuru/tsuru/app"
@@ -136,11 +138,21 @@ func testLogForwarderWSForwarder(
 		io.Copy(&body, ws)
 	}))
 	defer srv.Close()
+	srvCerts := x509.NewCertPool()
+	if srv.TLS != nil {
+		for _, c := range srv.TLS.Certificates {
+			roots, _ := x509.ParseCertificates(c.Certificate[len(c.Certificate)-1])
+			for _, root := range roots {
+				srvCerts.AddCert(root)
+			}
+		}
+	}
 	lf := LogForwarder{
 		BindAddress:    "udp://0.0.0.0:59317",
 		TsuruEndpoint:  srv.URL,
 		TsuruToken:     "mytoken",
 		DockerEndpoint: s.dockerServer.URL(),
+		TlsConfig:      &tls.Config{RootCAs: srvCerts},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
