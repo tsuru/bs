@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-FROM ubuntu:14.04
+FROM golang:1.4
 RUN apt-get update && apt-get install -y conntrack
-ADD bs /usr/bin/bs
-ENTRYPOINT ["/usr/bin/bs"]
+RUN go get github.com/tools/godep
+RUN go get -d github.com/tsuru/bs/...
+RUN cd /go/src/github.com/tsuru/bs && godep restore ./... && go install
+ENTRYPOINT ["/go/bin/bs"]
