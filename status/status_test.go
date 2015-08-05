@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package status
 
 import (
 	"bytes"
@@ -10,15 +10,30 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
-	"github.com/fsouza/go-dockerclient/testing"
+	dtesting "github.com/fsouza/go-dockerclient/testing"
 	"gopkg.in/check.v1"
 )
 
+var _ = check.Suite(S{})
+
+func Test(t *testing.T) {
+	check.TestingT(t)
+}
+
+type S struct{}
+
 func (s S) TestReportStatus(c *check.C) {
+	var logOutput bytes.Buffer
+	log.SetOutput(&logOutput)
+	defer log.SetOutput(os.Stderr)
 	bogusContainers := []bogusContainer{
 		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
@@ -36,10 +51,16 @@ func (s S) TestReportStatus(c *check.C) {
 	resp.Header.Set("Content-Type", "application/json")
 	tsuruServer, requests := s.startTsuruServer(&resp)
 	defer tsuruServer.Close()
-	config.DockerEndpoint = dockerServer.URL()
-	config.TsuruEndpoint = tsuruServer.URL
-	config.TsuruToken = "some-token"
-	reportStatus()
+	reporter := NewReporter(&ReporterConfig{
+		Interval:       10 * time.Minute,
+		DockerEndpoint: dockerServer.URL(),
+		TsuruEndpoint:  tsuruServer.URL,
+		TsuruToken:     "some-token",
+		AppNameEnvVar:  "TSURU_APPNAME=",
+	})
+	reporter.Stop()
+	reporter.reportStatus()
+	c.Log(logOutput.String())
 	req := <-requests
 	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
 	c.Assert(req.request.URL.Path, check.Equals, "/units/status")
@@ -93,8 +114,8 @@ type bogusContainer struct {
 	state  docker.State
 }
 
-func (S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*testing.DockerServer, []docker.Container) {
-	server, err := testing.NewServer("127.0.0.1:0", nil, hook)
+func (S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*dtesting.DockerServer, []docker.Container) {
+	server, err := dtesting.NewServer("127.0.0.1:0", nil, hook)
 	c.Assert(err, check.IsNil)
 	client, err := docker.NewClient(server.URL())
 	c.Assert(err, check.IsNil)

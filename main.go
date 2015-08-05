@@ -15,6 +15,7 @@ import (
 
 	bsLog "github.com/tsuru/bs/log"
 	"github.com/tsuru/bs/metric"
+	"github.com/tsuru/bs/status"
 )
 
 const defaultInterval = 60
@@ -59,23 +60,6 @@ func loadConfig() {
 	}
 }
 
-func statusReporter() (chan<- struct{}, <-chan struct{}) {
-	abort := make(chan struct{})
-	exit := make(chan struct{})
-	go func(abort <-chan struct{}) {
-		for {
-			select {
-			case <-abort:
-				close(exit)
-				return
-			case <-time.After(config.StatusInterval):
-				reportStatus()
-			}
-		}
-	}(abort)
-	return abort, exit
-}
-
 func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 	sigChan := make(chan os.Signal, 4)
 	go func() {
@@ -104,10 +88,16 @@ func main() {
 	if err != nil {
 		log.Printf("Unable to initialize metrics runner: %s\n", err)
 	}
-	abortReporter, reporterEnded := statusReporter()
+	reporter := status.NewReporter(&status.ReporterConfig{
+		TsuruEndpoint:  config.TsuruEndpoint,
+		TsuruToken:     config.TsuruToken,
+		DockerEndpoint: config.DockerEndpoint,
+		Interval:       config.StatusInterval,
+		AppNameEnvVar:  config.AppNameEnvVar,
+	})
 	startSignalHandler(func(signal os.Signal) {
-		close(abortReporter)
+		reporter.Stop()
 		mRunner.Stop()
 	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	<-reporterEnded
+	reporter.Wait()
 }
