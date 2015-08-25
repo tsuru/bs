@@ -110,7 +110,7 @@ func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, e
 		var status string
 		cont, err := client.InspectContainer(c.ID)
 		if err != nil {
-			log.Printf("[ERROR] failed to instpect container %q: %s", c.ID, err)
+			log.Printf("[ERROR] failed to inspect container %q: %s", c.ID, err)
 			status = "error"
 		} else {
 			if cont.State.Restarting {
