@@ -5,6 +5,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -18,7 +20,12 @@ import (
 	"github.com/tsuru/bs/status"
 )
 
-const defaultInterval = 60
+const (
+	defaultInterval = 60
+	version         = "v1"
+)
+
+var printVersion bool
 
 var config struct {
 	DockerEndpoint         string
@@ -30,6 +37,10 @@ var config struct {
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
 	SyslogForwardAddresses []string
+}
+
+func init() {
+	flag.BoolVar(&printVersion, "version", false, "Print version and exit")
 }
 
 func loadConfig() {
@@ -71,6 +82,11 @@ func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 }
 
 func main() {
+	flag.Parse()
+	if printVersion {
+		fmt.Printf("bs version %s\n", version)
+		return
+	}
 	loadConfig()
 	lf := bsLog.LogForwarder{
 		BindAddress:      config.SyslogListenAddress,
