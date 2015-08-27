@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-FROM golang:1.4
+FROM golang:1.5
 RUN apt-get update && apt-get install -y conntrack
 RUN go get github.com/tools/godep
 RUN go get -d github.com/tsuru/bs/...
