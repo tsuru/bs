@@ -63,7 +63,12 @@ func (s *S) TearDownTest(c *check.C) {
 	s.dockerServer.Stop()
 }
 
-func (s *S) TestLogForwarderStartCachedAppName(c *check.C) {
+func (s *S) TestLogForwarderStart(c *check.C) {
+	oldLocal := time.Local
+	defer func() { time.Local = oldLocal }()
+	var err error
+	time.Local, err = time.LoadLocation("America/Fortaleza")
+	c.Assert(err, check.IsNil)
 	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
@@ -86,10 +91,10 @@ func (s *S) TestLogForwarderStartCachedAppName(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(buffer[:n], check.DeepEquals, []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", s.id)))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg\n", s.id))
 }
 
-func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
+func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
@@ -98,6 +103,7 @@ func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
 		DockerEndpoint:   s.dockerServer.URL(),
+		SyslogTimezone:   "America/Grenada",
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -112,8 +118,7 @@ func (s *S) TestLogForwarderStartDockerAppName(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	expected := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z %s coolappname[procx]: mymsg\n", s.id))
-	c.Assert(buffer[:n], check.DeepEquals, expected)
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 12:13:47 %s coolappname[procx]: mymsg\n", s.id))
 }
 
 func (s *S) TestLogForwarderWSForwarderHTTP(c *check.C) {

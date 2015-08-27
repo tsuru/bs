@@ -37,12 +37,14 @@ type LogForwarder struct {
 	DockerEndpoint   string
 	TsuruEndpoint    string
 	TsuruToken       string
+	SyslogTimezone   string
 	TlsConfig        *tls.Config
 	infoClient       *container.InfoClient
 	forwardChans     []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
 	server           *syslog.Server
 	messagesCounter  int64
+	syslogLocation   *time.Location
 }
 
 type processable interface {
@@ -241,6 +243,15 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
+	l.syslogLocation = time.Local
+	if l.SyslogTimezone != "" {
+		tz, err := time.LoadLocation(l.SyslogTimezone)
+		if err == nil {
+			l.syslogLocation = tz
+		} else {
+			log.Printf("[WARNING] unable to parse syslog timezone format: %s", err)
+		}
+	}
 	l.server = syslog.NewServer()
 	l.server.SetHandler(l)
 	l.server.SetFormat(LenientFormat{})
@@ -308,7 +319,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		},
 		syslogMsg: []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
 			priority,
-			ts.Format(time.RFC3339),
+			ts.In(l.syslogLocation).Format(time.Stamp),
 			contId,
 			contData.AppName,
 			contData.ProcessName,

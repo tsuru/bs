@@ -37,6 +37,7 @@ var config struct {
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
 	SyslogForwardAddresses []string
+	SyslogTimezone         string
 }
 
 func init() {
@@ -49,6 +50,7 @@ func loadConfig() {
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	config.TsuruToken = os.Getenv("TSURU_TOKEN")
+	config.SyslogTimezone = os.Getenv("SYSLOG_TIMEZONE")
 	statusInterval := os.Getenv("STATUS_INTERVAL")
 	parsedInterval, err := strconv.Atoi(statusInterval)
 	if err != nil {
@@ -94,6 +96,7 @@ func main() {
 		DockerEndpoint:   config.DockerEndpoint,
 		TsuruEndpoint:    config.TsuruEndpoint,
 		TsuruToken:       config.TsuruToken,
+		SyslogTimezone:   config.SyslogTimezone,
 	}
 	err := lf.Start()
 	if err != nil {
