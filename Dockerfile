@@ -5,6 +5,6 @@
 FROM golang:1.5
 RUN apt-get update && apt-get install -y conntrack
 RUN go get github.com/tools/godep
-RUN go get -d github.com/tsuru/bs/...
+ADD . /go/src/github.com/tsuru/bs
 RUN cd /go/src/github.com/tsuru/bs && godep restore ./... && go install
 ENTRYPOINT ["/go/bin/bs"]
