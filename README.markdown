@@ -87,6 +87,12 @@ rewritten to properly identify the application and process responsible for the
 entry. The default value is an empty string, which means that bs will not
 forward logs to any syslog server, only to tsuru API.
 
+### SYSLOG_TIMEZONE
+
+`SYSLOG_TIMEZONE` which timezone to use when forwarding log to SysLog servers.
+The timezone format must be a location existing in the [IANA Time Zone
+database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+
 ### METRICS_INTERVAL
 
 `METRICS_INTERVAL` is the interval in seconds between metrics collecting and
