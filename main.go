@@ -22,7 +22,7 @@ import (
 
 const (
 	defaultInterval = 60
-	version         = "v1"
+	version         = "v1.1"
 )
 
 var printVersion bool
