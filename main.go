@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"syscall"
@@ -83,7 +85,40 @@ func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 	signal.Notify(sigChan, signals...)
 }
 
+func onSignalDebugGoroutines(signal os.Signal) {
+	var buf []byte
+	var written int
+	currLen := 1024
+	for written == len(buf) {
+		buf = make([]byte, currLen)
+		written = runtime.Stack(buf, true)
+		currLen *= 2
+	}
+	fmt.Print(string(buf[:written]))
+	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
+}
+
+func onSignalDebugProfile(signal os.Signal) {
+	profFileName := "cpuprofile.out"
+	log.Printf("Starting cpu profile, writing output to %s", profFileName)
+	defer log.Printf("Finished cpu profile, see %s", profFileName)
+	file, err := os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	if err != nil {
+		log.Printf("Error trying to open profile file %q: %s", profFileName, err)
+	}
+	defer file.Close()
+	err = pprof.StartCPUProfile(file)
+	if err != nil {
+		log.Printf("Error trying to start cpu profile: %s", err)
+	}
+	defer pprof.StopCPUProfile()
+	time.Sleep(30 * time.Second)
+	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
+}
+
 func main() {
+	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
+	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
 	flag.Parse()
 	if printVersion {
 		fmt.Printf("bs version %s\n", version)
