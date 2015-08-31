@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	forwardConnTimeout    = time.Second
-	messageChanBufferSize = 1000
+	forwardConnDialTimeout  = time.Second
+	forwardConnWriteTimeout = time.Second
+	messageChanBufferSize   = 1000
 )
 
 type LogMessage struct {
@@ -91,6 +92,9 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 					break
 				}
 			}
+			// Reset deadline, if we don't do this the connection remains open
+			// on the other end (causing tests to fail) for some weird reason.
+			conn.SetWriteDeadline(time.Time{})
 			conn.Close()
 			if err == nil {
 				break
@@ -103,7 +107,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 }
 
 func (f *syslogForwarder) connect() (net.Conn, error) {
-	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnTimeout)
+	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnDialTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("[log forwarder] unable to connect to %q: %s", f.url, err)
 	}
@@ -111,6 +115,10 @@ func (f *syslogForwarder) connect() (net.Conn, error) {
 }
 
 func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
+	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	if err != nil {
+		return err
+	}
 	n, err := conn.Write(msg.syslogMsg)
 	if err != nil {
 		return err
@@ -136,7 +144,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		host = config.Location.Host
 	}
 	dialer := &net.Dialer{
-		Timeout:   forwardConnTimeout,
+		Timeout:   forwardConnDialTimeout,
 		KeepAlive: 30 * time.Second,
 	}
 	switch config.Location.Scheme {
@@ -170,6 +178,10 @@ func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
 		return err
 	}
 	data = append(data, '\n')
+	err = conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	if err != nil {
+		return err
+	}
 	n, err := conn.Write(data)
 	if err != nil {
 		return err
