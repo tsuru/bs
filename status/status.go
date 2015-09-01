@@ -18,6 +18,7 @@ import (
 
 type container struct {
 	ID     string
+	Name   string
 	Status string
 }
 
@@ -121,7 +122,11 @@ func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, e
 				status = "stopped"
 			}
 		}
-		payload[i] = container{ID: c.ID, Status: status}
+		var name string
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
+		payload[i] = container{ID: c.ID, Name: name, Status: status}
 	}
 	var body bytes.Buffer
 	err = json.NewEncoder(&body).Encode(payload)

@@ -35,11 +35,11 @@ func (s S) TestReportStatus(c *check.C) {
 	log.SetOutput(&logOutput)
 	defer log.SetOutput(os.Stderr)
 	bogusContainers := []bogusContainer{
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
+		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
+		{name: "x3", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
+		{name: "x4", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+		{name: "x5", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
@@ -67,11 +67,11 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Assert(req.request.Method, check.Equals, "POST")
 	var input []container
 	expected := []container{
-		{ID: containers[0].ID, Status: "started"},
-		{ID: containers[1].ID, Status: "stopped"},
-		{ID: containers[2].ID, Status: "error"},
-		{ID: containers[3].ID, Status: "started"},
-		{ID: containers[4].ID, Status: "stopped"},
+		{ID: containers[0].ID, Status: "started", Name: "x1"},
+		{ID: containers[1].ID, Status: "stopped", Name: "x2"},
+		{ID: containers[2].ID, Status: "error", Name: "x3"},
+		{ID: containers[3].ID, Status: "started", Name: "x4"},
+		{ID: containers[4].ID, Status: "stopped", Name: "x5"},
 	}
 	err := json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
@@ -112,6 +112,7 @@ func (S) startTsuruServer(resp *http.Response) (*httptest.Server, <-chan tsuruRe
 type bogusContainer struct {
 	config docker.Config
 	state  docker.State
+	name   string
 }
 
 func (S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*dtesting.DockerServer, []docker.Container) {
@@ -124,7 +125,7 @@ func (S) startDockerServer(containers []bogusContainer, hook func(*http.Request)
 		pullOpts := docker.PullImageOptions{Repository: bogus.config.Image}
 		err = client.PullImage(pullOpts, docker.AuthConfiguration{})
 		c.Assert(err, check.IsNil)
-		createOpts := docker.CreateContainerOptions{Config: &bogus.config}
+		createOpts := docker.CreateContainerOptions{Config: &bogus.config, Name: bogus.name}
 		container, err := client.CreateContainer(createOpts)
 		c.Assert(err, check.IsNil)
 		err = server.MutateContainer(container.ID, bogus.state)
