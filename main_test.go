@@ -33,8 +33,6 @@ func (S) TestLoadConfig(c *check.C) {
 	c.Check(config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
 	c.Check(config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
 	c.Check(config.TsuruToken, check.Equals, "sometoken")
-	c.Check(config.AppNameEnvVar, check.Equals, "TSURU_APPNAME=")
-	c.Check(config.ProcessNameEnvVar, check.Equals, "TSURU_PROCESSNAME=")
 	c.Check(config.StatusInterval, check.Equals, time.Duration(45e9))
 	c.Check(config.SyslogListenAddress, check.Equals, "udp://0.0.0.0:1514")
 	c.Check(config.SyslogForwardAddresses, check.DeepEquals, []string{
@@ -55,8 +53,6 @@ func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	c.Check(config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
 	c.Check(config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
 	c.Check(config.TsuruToken, check.Equals, "sometoken")
-	c.Check(config.AppNameEnvVar, check.Equals, "TSURU_APPNAME=")
-	c.Check(config.ProcessNameEnvVar, check.Equals, "TSURU_PROCESSNAME=")
 	c.Check(config.StatusInterval, check.Equals, time.Duration(60e9))
 	c.Assert(buf.String(), check.Matches, `(?m).*\[WARNING\] invalid interval "four"\. Using the default value of 60 seconds$`)
 }

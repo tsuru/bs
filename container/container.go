@@ -5,12 +5,14 @@
 package container
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/hashicorp/golang-lru"
 )
+
+var ErrTsuruVariablesNotFound = errors.New("could not find wanted envs")
 
 type InfoClient struct {
 	endpoint       string
@@ -44,6 +46,19 @@ func (c *InfoClient) GetClient() *docker.Client {
 }
 
 func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
+	return c.getContainer(containerId, false, []string{
+		"TSURU_APPNAME=",
+		"TSURU_PROCESSNAME=",
+	})
+}
+
+func (c *InfoClient) GetFreshContainer(containerId string) (*Container, error) {
+	return c.getContainer(containerId, true, []string{
+		"TSURU_APPNAME=",
+	})
+}
+
+func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []string) (*Container, error) {
 	if val, ok := c.containerCache.Get(containerId); ok {
 		return val.(*Container), nil
 	}
@@ -52,10 +67,6 @@ func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 		return nil, err
 	}
 	contData := Container{Container: *cont, client: c}
-	wanted := []string{
-		"TSURU_APPNAME=",
-		"TSURU_PROCESSNAME=",
-	}
 	toFill := []*string{
 		&contData.AppName,
 		&contData.ProcessName,
@@ -76,7 +87,7 @@ func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 			return &contData, nil
 		}
 	}
-	return nil, fmt.Errorf("could not find wanted envs in %s", containerId)
+	return nil, ErrTsuruVariablesNotFound
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {

@@ -43,21 +43,21 @@ func (s S) TestReportStatus(c *check.C) {
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
-	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":false}]`
-	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[4].ID))
+	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false}]`
+	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID))
 	var resp http.Response
 	resp.Body = ioutil.NopCloser(buf)
 	resp.Header = make(http.Header)
 	resp.Header.Set("Content-Type", "application/json")
 	tsuruServer, requests := s.startTsuruServer(&resp)
 	defer tsuruServer.Close()
-	reporter := NewReporter(&ReporterConfig{
+	reporter, err := NewReporter(&ReporterConfig{
 		Interval:       10 * time.Minute,
 		DockerEndpoint: dockerServer.URL(),
 		TsuruEndpoint:  tsuruServer.URL,
 		TsuruToken:     "some-token",
-		AppNameEnvVar:  "TSURU_APPNAME=",
 	})
+	c.Assert(err, check.IsNil)
 	reporter.Stop()
 	reporter.reportStatus()
 	c.Log(logOutput.String())
@@ -65,15 +65,14 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
 	c.Assert(req.request.URL.Path, check.Equals, "/units/status")
 	c.Assert(req.request.Method, check.Equals, "POST")
-	var input []container
-	expected := []container{
+	var input []containerStatus
+	expected := []containerStatus{
 		{ID: containers[0].ID, Status: "started", Name: "x1"},
 		{ID: containers[1].ID, Status: "stopped", Name: "x2"},
 		{ID: containers[2].ID, Status: "error", Name: "x3"},
 		{ID: containers[3].ID, Status: "started", Name: "x4"},
-		{ID: containers[4].ID, Status: "stopped", Name: "x5"},
 	}
-	err := json.Unmarshal(req.body, &input)
+	err = json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
 	c.Assert(input, check.DeepEquals, expected)
 	dockerClient, err := docker.NewClient(dockerServer.URL())

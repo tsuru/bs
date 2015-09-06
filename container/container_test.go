@@ -71,7 +71,7 @@ func (S) TestInfoClientGetContainerNoEnvs(c *check.C) {
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	_, err = client.GetContainer(id)
-	c.Assert(err, check.ErrorMatches, "could not find wanted envs in "+id)
+	c.Assert(err, check.Equals, ErrTsuruVariablesNotFound)
 }
 
 func (S) TestInfoClientGetContainerNotFound(c *check.C) {

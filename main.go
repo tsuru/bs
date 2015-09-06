@@ -33,8 +33,6 @@ var config struct {
 	DockerEndpoint         string
 	TsuruEndpoint          string
 	TsuruToken             string
-	AppNameEnvVar          string
-	ProcessNameEnvVar      string
 	MetricsInterval        time.Duration
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
@@ -47,8 +45,6 @@ func init() {
 }
 
 func loadConfig() {
-	config.AppNameEnvVar = "TSURU_APPNAME="
-	config.ProcessNameEnvVar = "TSURU_PROCESSNAME="
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	config.TsuruToken = os.Getenv("TSURU_TOKEN")
@@ -142,13 +138,15 @@ func main() {
 	if err != nil {
 		log.Printf("Unable to initialize metrics runner: %s\n", err)
 	}
-	reporter := status.NewReporter(&status.ReporterConfig{
+	reporter, err := status.NewReporter(&status.ReporterConfig{
 		TsuruEndpoint:  config.TsuruEndpoint,
 		TsuruToken:     config.TsuruToken,
 		DockerEndpoint: config.DockerEndpoint,
 		Interval:       config.StatusInterval,
-		AppNameEnvVar:  config.AppNameEnvVar,
 	})
+	if err != nil {
+		log.Fatalf("Unable to initialize status reporter: %s\n", err)
+	}
 	startSignalHandler(func(signal os.Signal) {
 		reporter.Stop()
 		mRunner.Stop()
