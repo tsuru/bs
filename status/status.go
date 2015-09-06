@@ -185,13 +185,10 @@ func (r *Reporter) handleTsuruResponse(resp []respUnit) error {
 			goneUnits = append(goneUnits, unit.ID)
 		}
 	}
-	client, err := docker.NewClient(r.config.DockerEndpoint)
-	if err != nil {
-		return err
-	}
+	client := r.infoClient.GetClient()
 	for _, id := range goneUnits {
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
-		err = client.RemoveContainer(opts)
+		err := client.RemoveContainer(opts)
 		if err != nil {
 			log.Printf("[ERROR] failed to remove container %q: %s", id, err)
 		}

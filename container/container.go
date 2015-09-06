@@ -6,7 +6,10 @@ package container
 
 import (
 	"errors"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/hashicorp/golang-lru"
@@ -27,6 +30,25 @@ type Container struct {
 	ProcessName string
 }
 
+const (
+	dialTimeout = 10 * time.Second
+	fullTimeout = 1 * time.Minute
+)
+
+var (
+	timeoutDialer = &net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: 30 * time.Second,
+	}
+	timeoutHttpClient = &http.Client{
+		Transport: &http.Transport{
+			Dial:                timeoutDialer.Dial,
+			TLSHandshakeTimeout: dialTimeout,
+		},
+		Timeout: fullTimeout,
+	}
+)
+
 func NewClient(endpoint string) (*InfoClient, error) {
 	c := InfoClient{endpoint: endpoint}
 	var err error
@@ -38,6 +60,7 @@ func NewClient(endpoint string) (*InfoClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.client.HTTPClient = timeoutHttpClient
 	return &c, nil
 }
 
