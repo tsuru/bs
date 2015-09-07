@@ -82,8 +82,10 @@ func (c *InfoClient) GetFreshContainer(containerId string) (*Container, error) {
 }
 
 func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []string) (*Container, error) {
-	if val, ok := c.containerCache.Get(containerId); ok {
-		return val.(*Container), nil
+	if !refresh {
+		if val, ok := c.containerCache.Get(containerId); ok {
+			return val.(*Container), nil
+		}
 	}
 	cont, err := c.client.InspectContainer(containerId)
 	if err != nil {

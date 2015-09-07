@@ -64,6 +64,31 @@ func (S) TestInfoClientGetContainer(c *check.C) {
 	c.Assert(cached.(*Container), check.DeepEquals, cont)
 }
 
+func (S) TestInfoClientGetFreshContainer(c *check.C) {
+	dockerCalls := 0
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, func(req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/json") {
+			dockerCalls++
+		}
+	})
+	c.Assert(err, check.IsNil)
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"})
+	client, err := NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	cont, err := client.GetFreshContainer(id)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(cont.AppName, check.Equals, "coolappname")
+	c.Assert(dockerCalls, check.Equals, 1)
+	cont, err = client.GetFreshContainer(id)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(dockerCalls, check.Equals, 2)
+	cached, ok := client.containerCache.Get(id)
+	c.Assert(ok, check.Equals, true)
+	c.Assert(cached.(*Container), check.DeepEquals, cont)
+}
+
 func (S) TestInfoClientGetContainerNoEnvs(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
