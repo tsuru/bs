@@ -7,7 +7,7 @@ package metric
 import (
 	"bytes"
 	"encoding/xml"
-	"log"
+	"fmt"
 	"os/exec"
 )
 
@@ -37,8 +37,7 @@ func conntrack() ([]conn, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		log.Printf("[ERROR] conntrack failed: %s. Output: %s", err, stderr.String())
-		return nil, err
+		return nil, fmt.Errorf("conntrack failed: %s. Output: %s", err, stderr.String())
 	}
 	var result conntrackResult
 	err = xml.Unmarshal(stdout.Bytes(), &result)

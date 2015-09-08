@@ -7,7 +7,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -17,7 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	bsLog "github.com/tsuru/bs/log"
+	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/log"
 	"github.com/tsuru/bs/metric"
 	"github.com/tsuru/bs/status"
 )
@@ -45,6 +45,7 @@ func init() {
 }
 
 func loadConfig() {
+	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	config.TsuruToken = os.Getenv("TSURU_TOKEN")
@@ -52,14 +53,14 @@ func loadConfig() {
 	statusInterval := os.Getenv("STATUS_INTERVAL")
 	parsedInterval, err := strconv.Atoi(statusInterval)
 	if err != nil {
-		log.Printf("[WARNING] invalid interval %q. Using the default value of %d seconds", statusInterval, defaultInterval)
+		bslog.Warnf("invalid interval %q. Using the default value of %d seconds", statusInterval, defaultInterval)
 		parsedInterval = defaultInterval
 	}
 	config.StatusInterval = time.Duration(parsedInterval) * time.Second
 	metricsInterval := os.Getenv("METRICS_INTERVAL")
 	parsedMetricsInterval, err := strconv.Atoi(metricsInterval)
 	if err != nil {
-		log.Printf("[WARNING] invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
+		bslog.Warnf("invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
 		parsedMetricsInterval = defaultInterval
 	}
 	config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
@@ -96,16 +97,16 @@ func onSignalDebugGoroutines(signal os.Signal) {
 
 func onSignalDebugProfile(signal os.Signal) {
 	profFileName := "cpuprofile.out"
-	log.Printf("Starting cpu profile, writing output to %s", profFileName)
-	defer log.Printf("Finished cpu profile, see %s", profFileName)
+	bslog.Warnf("Starting cpu profile, writing output to %s", profFileName)
+	defer bslog.Warnf("Finished cpu profile, see %s", profFileName)
 	file, err := os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
-		log.Printf("Error trying to open profile file %q: %s", profFileName, err)
+		bslog.Warnf("Error trying to open profile file %q: %s", profFileName, err)
 	}
 	defer file.Close()
 	err = pprof.StartCPUProfile(file)
 	if err != nil {
-		log.Printf("Error trying to start cpu profile: %s", err)
+		bslog.Warnf("Error trying to start cpu profile: %s", err)
 	}
 	defer pprof.StopCPUProfile()
 	time.Sleep(30 * time.Second)
@@ -121,7 +122,7 @@ func main() {
 		return
 	}
 	loadConfig()
-	lf := bsLog.LogForwarder{
+	lf := log.LogForwarder{
 		BindAddress:      config.SyslogListenAddress,
 		ForwardAddresses: config.SyslogForwardAddresses,
 		DockerEndpoint:   config.DockerEndpoint,
@@ -131,12 +132,12 @@ func main() {
 	}
 	err := lf.Start()
 	if err != nil {
-		log.Fatalf("Unable to initialize log forwarder: %s\n", err)
+		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
 	mRunner := metric.NewRunner(config.DockerEndpoint, config.MetricsInterval)
 	err = mRunner.Start()
 	if err != nil {
-		log.Printf("Unable to initialize metrics runner: %s\n", err)
+		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
 		TsuruEndpoint:  config.TsuruEndpoint,
@@ -145,7 +146,7 @@ func main() {
 		Interval:       config.StatusInterval,
 	})
 	if err != nil {
-		log.Fatalf("Unable to initialize status reporter: %s\n", err)
+		bslog.Fatalf("Unable to initialize status reporter: %s\n", err)
 	}
 	startSignalHandler(func(signal os.Signal) {
 		reporter.Stop()

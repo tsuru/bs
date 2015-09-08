@@ -5,10 +5,10 @@
 package metric
 
 import (
-	"log"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 )
 
@@ -20,7 +20,7 @@ type Reporter struct {
 func (r *Reporter) Do() {
 	containers, err := r.listContainers()
 	if err != nil {
-		log.Printf("[ERROR] failed to list containers: %s", err)
+		bslog.Errorf("failed to list containers: %s", err)
 	}
 	r.getMetrics(containers)
 }
@@ -33,7 +33,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	var wg sync.WaitGroup
 	conns, err := conntrack()
 	if err != nil {
-		log.Printf("[ERROR] failed to execute conntrack: %s", err)
+		bslog.Errorf("failed to execute conntrack: %s", err)
 	}
 	for _, container := range containers {
 		wg.Add(1)
@@ -41,26 +41,26 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 			defer wg.Done()
 			container, err := r.infoClient.GetContainer(contID)
 			if err != nil {
-				log.Printf("[ERROR] cannot inspect container %q: %s", contID, err)
+				bslog.Errorf("cannot inspect container %q: %s", contID, err)
 				return
 			}
 			stats, err := container.Stats()
 			if err != nil {
-				log.Printf("[ERROR] cannot get stats for container %v: %s", container, err)
+				bslog.Errorf("cannot get stats for container %v: %s", container, err)
 				return
 			}
 			metrics, err := statsToMetricsMap(stats)
 			if err != nil {
-				log.Printf("[ERROR] failed to get metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to get metrics for container %v: %s", container, err)
 				return
 			}
 			err = r.sendMetrics(container, metrics)
 			if err != nil {
-				log.Printf("[ERROR] failed to send metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to send metrics for container %v: %s", container, err)
 			}
 			err = r.sendConnMetrics(container, conns)
 			if err != nil {
-				log.Printf("[ERROR] failed to send conn metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to send conn metrics for container %v: %s", container, err)
 			}
 		}(container.ID)
 	}
@@ -71,7 +71,7 @@ func (r *Reporter) sendMetrics(container *container.Container, metrics map[strin
 	for key, value := range metrics {
 		err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
 		if err != nil {
-			log.Printf("[ERROR] failed to send metrics for container %q: %s", container, err)
+			bslog.Errorf("failed to send metrics for container %q: %s", container, err)
 			return err
 		}
 	}
@@ -90,7 +90,7 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 		if value != "" {
 			err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, "connection", value)
 			if err != nil {
-				log.Printf("[ERROR] failed to send connection metrics for container %q: %s", container, err)
+				bslog.Errorf("failed to send connection metrics for container %q: %s", container, err)
 				return err
 			}
 		}

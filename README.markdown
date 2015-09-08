@@ -127,3 +127,8 @@ The default value is `tsuru`.
 ### METRICS_STATSD_HOST
 
 `METRICS_STATSD_HOST` is the `Statsd` host. The default value is `localhost`.
+
+### BS_DEBUG
+
+`BS_DEBUG` is a boolean value used to determine whether debug logs will be
+printed. The default value is `false`.

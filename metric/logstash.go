@@ -6,9 +6,10 @@ package metric
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"os"
+
+	"github.com/tsuru/bs/bslog"
 )
 
 func newLogStash() (statter, error) {
@@ -59,12 +60,12 @@ func (s *logStash) Send(app, hostname, process, key, value string) error {
 	}
 	data, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("[ERROR] unable to marshal metrics data json. Wrote %d bytes before error: %s", err)
+		bslog.Errorf("unable to marshal metrics data json. Wrote %d bytes before error: %s", err)
 		return err
 	}
 	bytesWritten, err := conn.Write(data)
 	if err != nil {
-		log.Printf("[ERROR] unable to send metrics to logstash via UDP. Wrote %d bytes before error: %s", bytesWritten, err)
+		bslog.Errorf("unable to send metrics to logstash via UDP. Wrote %d bytes before error: %s", bytesWritten, err)
 		return err
 	}
 	return nil

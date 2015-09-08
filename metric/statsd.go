@@ -6,12 +6,12 @@ package metric
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"time"
 
 	statsdClient "github.com/quipo/statsd"
+	"github.com/tsuru/bs/bslog"
 )
 
 func newStatsd() (statter, error) {
@@ -53,7 +53,7 @@ func (s *statsd) Send(app, hostname, process, key, value string) error {
 	stats := statsdClient.NewStatsdBuffer(interval, client)
 	err := stats.Gauge(key, 0.0)
 	if err != nil {
-		log.Printf("[ERROR] unable to send metrics to statsd via UDP: %s", err)
+		bslog.Errorf("unable to send metrics to statsd via UDP: %s", err)
 		return err
 	}
 	return nil

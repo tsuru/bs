@@ -8,13 +8,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 )
 
@@ -107,12 +107,12 @@ func (r *Reporter) reportStatus() {
 	opts := docker.ListContainersOptions{All: true}
 	containers, err := client.ListContainers(opts)
 	if err != nil {
-		log.Printf("[ERROR] failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
+		bslog.Errorf("failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
 		return
 	}
 	resp, err := r.updateUnits(containers)
 	if err != nil {
-		log.Printf("[ERROR] failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
+		bslog.Errorf("failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
 		return
 	}
 	if len(resp) == 0 {
@@ -120,7 +120,7 @@ func (r *Reporter) reportStatus() {
 	}
 	err = r.handleTsuruResponse(resp)
 	if err != nil {
-		log.Printf("[ERROR] failed to handle tsuru response: %s", err)
+		bslog.Errorf("failed to handle tsuru response: %s", err)
 	}
 }
 
@@ -133,7 +133,7 @@ func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, e
 			continue
 		}
 		if err != nil {
-			log.Printf("[ERROR] failed to inspect container %q: %s", c.ID, err)
+			bslog.Errorf("failed to inspect container %q: %s", c.ID, err)
 			status = "error"
 		} else {
 			if cont.Container.State.Restarting {
@@ -190,7 +190,7 @@ func (r *Reporter) handleTsuruResponse(resp []respUnit) error {
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
 		err := client.RemoveContainer(opts)
 		if err != nil {
-			log.Printf("[ERROR] failed to remove container %q: %s", id, err)
+			bslog.Errorf("[ERROR] failed to remove container %q: %s", id, err)
 		}
 	}
 	return nil

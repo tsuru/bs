@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 	"sync/atomic"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/jeromer/syslogparser"
 	"github.com/mcuadros/go-syslog"
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
@@ -99,7 +99,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 			if err == nil {
 				break
 			}
-			log.Printf("[log forwarder] error writing to %#v: %s", processInfo, err)
+			bslog.Errorf("[log forwarder] error writing to %#v: %s", processInfo, err)
 			conn = nil
 		}
 	}()
@@ -261,7 +261,7 @@ func (l *LogForwarder) Start() (err error) {
 		if err == nil {
 			l.syslogLocation = tz
 		} else {
-			log.Printf("[WARNING] unable to parse syslog timezone format: %s", err)
+			bslog.Warnf("unable to parse syslog timezone format: %s", err)
 		}
 	}
 	l.server = syslog.NewServer()
@@ -311,14 +311,14 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	}
 	contData, err := l.infoClient.GetContainer(contId)
 	if err != nil {
-		log.Printf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
+		bslog.Debugf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
 		return
 	}
 	ts, _ := logParts["timestamp"].(time.Time)
 	priority, _ := logParts["priority"].(int)
 	content, _ := logParts["content"].(string)
 	if ts.IsZero() || priority == 0 || content == "" {
-		log.Printf("[log forwarder] invalid message %#v", logParts)
+		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
 	msg := &LogMessage{
