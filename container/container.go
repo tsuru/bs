@@ -61,6 +61,7 @@ func NewClient(endpoint string) (*InfoClient, error) {
 		return nil, err
 	}
 	c.client.HTTPClient = timeoutHttpClient
+	c.client.Dialer = timeoutDialer
 	return &c, nil
 }
 
