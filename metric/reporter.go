@@ -45,7 +45,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 				return
 			}
 			stats, err := container.Stats()
-			if err != nil {
+			if err != nil || stats == nil {
 				bslog.Errorf("cannot get stats for container %v: %s", container, err)
 				return
 			}
