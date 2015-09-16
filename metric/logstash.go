@@ -49,9 +49,9 @@ func (s *logStash) Send(app, hostname, process, key, value string) error {
 		return err
 	}
 	defer conn.Close()
-	message := map[string]string{
+	message := map[string]interface{}{
 		"client":  s.Client,
-		"count":   "1",
+		"count":   1,
 		"metric":  key,
 		"value":   value,
 		"app":     app,
