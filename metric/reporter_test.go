@@ -32,12 +32,12 @@ func (s *S) TestSendMetrics(c *check.C) {
 		ProcessName: "myprocess",
 	}
 	r := Reporter{backend: &fakeStatter}
-	metrics := map[string]interface{}{"cpu": 900, "mem": 512}
+	metrics := map[string]float64{"cpu": 900, "mem": 512}
 	err := r.sendMetrics(&cont, metrics)
 	c.Assert(err, check.IsNil)
 	expected := []fakeStat{
-		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "cpu", value: 900},
-		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "mem", value: 512},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "cpu", value: float64(900)},
+		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "mem", value: float64(512)},
 	}
 	if fakeStatter.stats[0].key != "cpu" {
 		expected[0], expected[1] = expected[1], expected[0]
@@ -54,7 +54,7 @@ func (s *S) TestSendMetricsFailure(c *check.C) {
 	r := Reporter{backend: &fakeStatter}
 	prepErr := errors.New("something went wrong")
 	fakeStatter.prepareFailure(prepErr)
-	err := r.sendMetrics(&cont, map[string]interface{}{"cpu": 256})
+	err := r.sendMetrics(&cont, map[string]float64{"cpu": 256})
 	c.Assert(err, check.Equals, prepErr)
 }
 

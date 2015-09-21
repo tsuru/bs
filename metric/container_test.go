@@ -117,9 +117,9 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
 	c.Assert(err, check.IsNil)
 	metricsMap, err := statsToMetricsMap(&stats)
 	c.Assert(err, check.IsNil)
-	c.Assert(metricsMap["mem_max"], check.Equals, uint64(6537216))
-	memPctMaxDiff := 9.74 - metricsMap["mem_pct_max"].(float64)
+	c.Assert(metricsMap["mem_max"], check.Equals, float64(6537216))
+	memPctMaxDiff := 9.74 - metricsMap["mem_pct_max"]
 	c.Assert(memPctMaxDiff < 0.01, check.Equals, true)
-	cpuUsageDiff := 0.00 - metricsMap["cpu_max"].(float64)
+	cpuUsageDiff := 0.00 - metricsMap["cpu_max"]
 	c.Assert(cpuUsageDiff < 0.01, check.Equals, true)
 }
