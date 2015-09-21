@@ -5,5 +5,5 @@
 package metric
 
 type statter interface {
-	Send(app, hostname, process, key string, value interface{}) error
+	Send(app, hostname, process, key, value string) error
 }

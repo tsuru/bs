@@ -17,7 +17,7 @@ type fakeStat struct {
 	hostname string
 	process  string
 	key      string
-	value    interface{}
+	value    string
 }
 
 type fake struct {
@@ -25,7 +25,7 @@ type fake struct {
 	failures chan error
 }
 
-func (s *fake) Send(app, hostname, process, key string, value interface{}) error {
+func (s *fake) Send(app, hostname, process, key, value string) error {
 	select {
 	case err := <-s.failures:
 		return err
