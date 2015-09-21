@@ -16,4 +16,4 @@ install:
 script:
   - go test ./...
 after_success:
-  - "curl -H 'Content-Type: application/json' --data '{\"build\": true}' -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/"
+  - /bin/bash -c "if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then curl -H 'Content-Type: application/json' --data '{\"build\": true, \"docker_tag\": \"${TRAVIS_BRANCH}\"}' -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/; fi"
