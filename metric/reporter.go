@@ -35,34 +35,36 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	if err != nil {
 		bslog.Errorf("failed to execute conntrack: %s", err)
 	}
-	for _, container := range containers {
+	for _, cont := range containers {
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()
-			container, err := r.infoClient.GetContainer(contID)
+			cont, err := r.infoClient.GetContainer(contID)
 			if err != nil {
-				bslog.Errorf("cannot inspect container %q: %s", contID, err)
+				if err != container.ErrTsuruVariablesNotFound {
+					bslog.Errorf("cannot inspect container %q: %s", contID, err)
+				}
 				return
 			}
-			stats, err := container.Stats()
+			stats, err := cont.Stats()
 			if err != nil || stats == nil {
-				bslog.Errorf("cannot get stats for container %v: %s", container, err)
+				bslog.Errorf("cannot get stats for container %v: %s", cont, err)
 				return
 			}
 			metrics, err := statsToMetricsMap(stats)
 			if err != nil {
-				bslog.Errorf("failed to get metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to get metrics for container %v: %s", cont, err)
 				return
 			}
-			err = r.sendMetrics(container, metrics)
+			err = r.sendMetrics(cont, metrics)
 			if err != nil {
-				bslog.Errorf("failed to send metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to send metrics for container %v: %s", cont, err)
 			}
-			err = r.sendConnMetrics(container, conns)
+			err = r.sendConnMetrics(cont, conns)
 			if err != nil {
-				bslog.Errorf("failed to send conn metrics for container %v: %s", container, err)
+				bslog.Errorf("failed to send conn metrics for container %v: %s", cont, err)
 			}
-		}(container.ID)
+		}(cont.ID)
 	}
 	wg.Wait()
 }
