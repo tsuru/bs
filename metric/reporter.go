@@ -69,7 +69,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 	wg.Wait()
 }
 
-func (r *Reporter) sendMetrics(container *container.Container, metrics map[string]float64) error {
+func (r *Reporter) sendMetrics(container *container.Container, metrics map[string]interface{}) error {
 	for key, value := range metrics {
 		err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
 		if err != nil {
