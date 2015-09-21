@@ -16,6 +16,4 @@ install:
 script:
   - go test ./...
 after_success:
-  - echo ${TRAVIS_PULL_REQUEST}
-  - echo ${TRAVIS_BRANCH}
   - "if [ \"${TRAVIS_PULL_REQUEST}\" = \"false\" ]; then curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/; fi"
