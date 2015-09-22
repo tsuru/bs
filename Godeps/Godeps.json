@@ -28,7 +28,8 @@
 		},
 		{
 			"ImportPath": "github.com/mcuadros/go-syslog",
-			"Rev": "85980de0b1db31d686d863d642cab3ff2812f552"
+			"Comment": "v2.1.0-7-ge079f55",
+			"Rev": "e079f554382028527e4509d7bb58793b5e98194e"
 		},
 		{
 			"ImportPath": "github.com/quipo/statsd",
