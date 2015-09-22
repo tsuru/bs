@@ -58,3 +58,7 @@ func (s *statsd) Send(app, hostname, process, key, value string) error {
 	}
 	return nil
 }
+
+func (s *statsd) SendConn(app, hostname, process, host string) error {
+	return s.Send(app, hostname, process, "connection", host)
+}

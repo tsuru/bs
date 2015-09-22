@@ -44,11 +44,6 @@ type logStash struct {
 }
 
 func (s *logStash) Send(app, hostname, process, key, value string) error {
-	conn, err := net.Dial("udp", net.JoinHostPort(s.Host, s.Port))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 	message := map[string]interface{}{
 		"client":  s.Client,
 		"count":   1,
@@ -58,6 +53,28 @@ func (s *logStash) Send(app, hostname, process, key, value string) error {
 		"host":    hostname,
 		"process": process,
 	}
+	return s.send(message)
+}
+
+func (s *logStash) SendConn(app, hostname, process, host string) error {
+	message := map[string]interface{}{
+		"client":     s.Client,
+		"count":      1,
+		"metric":     "connection",
+		"connection": host,
+		"app":        app,
+		"host":       hostname,
+		"process":    process,
+	}
+	return s.send(message)
+}
+
+func (s *logStash) send(message map[string]interface{}) error {
+	conn, err := net.Dial("udp", net.JoinHostPort(s.Host, s.Port))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
 	data, err := json.Marshal(message)
 	if err != nil {
 		bslog.Errorf("unable to marshal metrics data json. Wrote %d bytes before error: %s", err)

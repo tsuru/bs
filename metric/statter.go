@@ -6,4 +6,5 @@ package metric
 
 type statter interface {
 	Send(app, hostname, process, key, value string) error
+	SendConn(app, hostname, process, host string) error
 }

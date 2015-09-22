@@ -90,7 +90,7 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 			value = conn.SourceIP + ":" + conn.SourcePort
 		}
 		if value != "" {
-			err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, "connection", value)
+			err := r.backend.SendConn(container.AppName, container.Config.Hostname, container.ProcessName, value)
 			if err != nil {
 				bslog.Errorf("failed to send connection metrics for container %q: %s", container, err)
 				return err
