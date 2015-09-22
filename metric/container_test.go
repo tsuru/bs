@@ -117,11 +117,9 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
 	c.Assert(err, check.IsNil)
 	metricsMap, err := statsToMetricsMap(&stats)
 	c.Assert(err, check.IsNil)
-	expected := map[string]string{
-		"mem_pct_max": "9.74",
-		"cpu_max":     "0.00",
-		"mem_max":     "6537216.00",
-	}
-	c.Assert(metricsMap, check.DeepEquals, expected)
-	c.Assert(err, check.IsNil)
+	c.Assert(metricsMap["mem_max"], check.Equals, float(6537216))
+	diffMemPctMax := 9.74 - metricsMap["mem_pct_max"]
+	c.Assert(diffMemPctMax < 0.01, check.Equals, true)
+	diffCpuMax := 0 - metricsMap["cpu_max"]
+	c.Assert(diffCpuMax < 0.01, check.Equals, true)
 }

@@ -53,7 +53,7 @@ func (s *S) TestRunner(c *check.C) {
 		hostname: conts[0].ID[:12],
 		process:  "myprocess",
 		key:      "cpu_max",
-		value:    "250.00",
+		value:    float(250),
 	}
 	c.Assert(cpuStat, check.DeepEquals, expected)
 }

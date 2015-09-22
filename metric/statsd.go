@@ -45,7 +45,7 @@ type statsd struct {
 	Prefix string
 }
 
-func (s *statsd) Send(app, hostname, process, key, value string) error {
+func (s *statsd) Send(app, hostname, process, key string, value interface{}) error {
 	prefix := fmt.Sprintf("%stsuru.%s.%s", s.Prefix, app, hostname)
 	client := statsdClient.NewStatsdClient(net.JoinHostPort(s.Host, s.Port), prefix)
 	client.CreateSocket()

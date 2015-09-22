@@ -43,7 +43,7 @@ type logStash struct {
 	Client string
 }
 
-func (s *logStash) Send(app, hostname, process, key, value string) error {
+func (s *logStash) Send(app, hostname, process, key string, value interface{}) error {
 	message := map[string]interface{}{
 		"client":  s.Client,
 		"count":   1,
