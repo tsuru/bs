@@ -5,7 +5,7 @@
 package metric
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -16,9 +16,9 @@ func statsToMetricsMap(s *docker.Stats) (map[string]string, error) {
 	cpuPercent := calculateCPUPercent(previousCPU, previousSystem, s)
 	memPercent := float64(s.MemoryStats.Usage) / float64(s.MemoryStats.Limit) * 100.0
 	stats := map[string]string{
-		"cpu_max":     strconv.FormatFloat(cpuPercent, 'f', 2, 64),
-		"mem_max":     strconv.FormatUint(s.MemoryStats.Usage, 10),
-		"mem_pct_max": strconv.FormatFloat(memPercent, 'f', 2, 64),
+		"cpu_max":     fmt.Sprintf("%.2f", cpuPercent),
+		"mem_max":     fmt.Sprintf("%.2f", float64(s.MemoryStats.Usage)),
+		"mem_pct_max": fmt.Sprintf("%.2f", memPercent),
 	}
 	return stats, nil
 }
