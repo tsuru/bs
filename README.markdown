@@ -115,6 +115,11 @@ The default value is `tsuru`.
 
 `METRICS_LOGSTASH_HOST` is the `Logstash` host. The default value is `localhost`.
 
+### METRICS_ELASTICSEARCH_HOST
+
+`METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
+[tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
+
 ### METRICS_STATSD_PREFIX
 
 `METRICS_STATSD_PREFIX` is the prefix for the `Statsd` key. The key is composed by
