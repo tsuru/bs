@@ -10,9 +10,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/tsuru/tsuru/app"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +25,9 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
+	"github.com/jeromer/syslogparser"
+	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 	"gopkg.in/check.v1"
 )
@@ -271,11 +274,53 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 		go sender(n)
 	}
 	for {
-		val := atomic.LoadInt64(&lf.messagesCounter)
-		if val == int64(iterations) {
+		val := atomic.LoadUint64(&lf.messagesCounter)
+		if val == uint64(iterations) {
 			break
 		}
 		time.Sleep(10 * time.Microsecond)
 	}
 	lf.stop()
+}
+
+func (s *S) TestLogForwarderOverflow(c *check.C) {
+	prevLog := bslog.Logger
+	logBuf := bytes.NewBuffer(nil)
+	prevBufferSize := messageChanBufferSize
+	messageChanBufferSize = 100
+	bslog.Logger = log.New(logBuf, "", 0)
+	defer func() {
+		bslog.Logger = prevLog
+		messageChanBufferSize = prevBufferSize
+	}()
+	var err error
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(ioutil.Discard, ws)
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BindAddress:    "udp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	logParts := syslogparser.LogParts{
+		"priority":     30,
+		"facility":     3,
+		"severity":     6,
+		"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+		"hostname":     "ubuntu-trusty-64",
+		"tag":          "docker/" + s.id,
+		"proc_id":      "4843",
+		"content":      "hey",
+		"rawmsg":       []byte{},
+		"container_id": s.id,
+	}
+	for i := 0; i < 1000; i++ {
+		lf.Handle(logParts, 0, nil)
+	}
+	lf.stop()
+	c.Assert(logBuf.String(), check.Equals, "[ERROR] Dropping log messages to due to full channel buffer.\n")
 }

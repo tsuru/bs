@@ -24,8 +24,9 @@ import (
 const (
 	forwardConnDialTimeout  = time.Second
 	forwardConnWriteTimeout = time.Second
-	messageChanBufferSize   = 1000
 )
+
+var messageChanBufferSize = 1000000
 
 type LogMessage struct {
 	logEntry  *app.Applog
@@ -44,8 +45,9 @@ type LogForwarder struct {
 	forwardChans     []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
 	server           *syslog.Server
-	messagesCounter  int64
+	messagesCounter  uint64
 	syslogLocation   *time.Location
+	nextNotify       <-chan time.Time
 }
 
 type processable interface {
@@ -255,6 +257,7 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
+	l.nextNotify = time.After(0)
 	l.syslogLocation = time.Local
 	if l.SyslogTimezone != "" {
 		tz, err := time.LoadLocation(l.SyslogTimezone)
@@ -305,6 +308,10 @@ func (l *LogForwarder) stop() {
 }
 
 func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
+	if err != nil {
+		bslog.Debugf("[log forwarder] ignored msg %#v error processing: %s", logParts, err)
+		return
+	}
 	contId, _ := logParts["container_id"].(string)
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
@@ -339,7 +346,16 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		)),
 	}
 	for _, ch := range l.forwardChans {
-		ch <- msg
+		select {
+		case ch <- msg:
+		default:
+			select {
+			case <-l.nextNotify:
+				bslog.Errorf("Dropping log messages to due to full channel buffer.")
+				l.nextNotify = time.After(time.Minute)
+			default:
+			}
+		}
 	}
-	atomic.AddInt64(&l.messagesCounter, int64(1))
+	atomic.AddUint64(&l.messagesCounter, uint64(1))
 }
