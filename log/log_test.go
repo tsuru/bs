@@ -287,7 +287,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	prevLog := bslog.Logger
 	logBuf := bytes.NewBuffer(nil)
 	prevBufferSize := messageChanBufferSize
-	messageChanBufferSize = 100
+	messageChanBufferSize = 10
 	bslog.Logger = log.New(logBuf, "", 0)
 	defer func() {
 		bslog.Logger = prevLog
@@ -318,9 +318,17 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 		"rawmsg":       []byte{},
 		"container_id": s.id,
 	}
-	for i := 0; i < 1000; i++ {
-		lf.Handle(logParts, 0, nil)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				lf.Handle(logParts, 0, nil)
+			}
+		}()
 	}
+	wg.Wait()
 	lf.stop()
 	c.Assert(logBuf.String(), check.Equals, "[ERROR] Dropping log messages to due to full channel buffer.\n")
 }
