@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -43,8 +44,8 @@ func (S) TestLoadConfig(c *check.C) {
 
 func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	var buf bytes.Buffer
-	bslog.Logger.SetOutput(&buf)
-	defer bslog.Logger.SetOutput(os.Stderr)
+	bslog.Logger = log.New(&buf, "", 0)
+	defer func() { bslog.Logger = log.New(os.Stderr, "", log.LstdFlags) }()
 	os.Setenv("DOCKER_ENDPOINT", "http://192.168.50.4:2375")
 	os.Setenv("TSURU_ENDPOINT", "http://192.168.50.4:8080")
 	os.Setenv("TSURU_TOKEN", "sometoken")

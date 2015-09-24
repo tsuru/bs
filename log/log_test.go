@@ -284,10 +284,11 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 }
 
 func (s *S) TestLogForwarderOverflow(c *check.C) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
 	prevLog := bslog.Logger
 	logBuf := bytes.NewBuffer(nil)
 	prevBufferSize := messageChanBufferSize
-	messageChanBufferSize = 10
+	messageChanBufferSize = 1
 	bslog.Logger = log.New(logBuf, "", 0)
 	defer func() {
 		bslog.Logger = prevLog
