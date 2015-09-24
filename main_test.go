@@ -6,11 +6,11 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/tsuru/bs/bslog"
 	"gopkg.in/check.v1"
 )
 
@@ -43,8 +43,8 @@ func (S) TestLoadConfig(c *check.C) {
 
 func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
+	bslog.Logger.SetOutput(&buf)
+	defer bslog.Logger.SetOutput(os.Stderr)
 	os.Setenv("DOCKER_ENDPOINT", "http://192.168.50.4:2375")
 	os.Setenv("TSURU_ENDPOINT", "http://192.168.50.4:8080")
 	os.Setenv("TSURU_TOKEN", "sometoken")

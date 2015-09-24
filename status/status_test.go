@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	dtesting "github.com/fsouza/go-dockerclient/testing"
+	"github.com/tsuru/bs/bslog"
 	"gopkg.in/check.v1"
 )
 
@@ -32,8 +32,8 @@ type S struct{}
 
 func (s S) TestReportStatus(c *check.C) {
 	var logOutput bytes.Buffer
-	log.SetOutput(&logOutput)
-	defer log.SetOutput(os.Stderr)
+	bslog.Logger.SetOutput(&logOutput)
+	defer bslog.Logger.SetOutput(os.Stderr)
 	bogusContainers := []bogusContainer{
 		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},

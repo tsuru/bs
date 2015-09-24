@@ -7,9 +7,12 @@ package bslog
 import (
 	"fmt"
 	"log"
+	"os"
 )
 
 var Debug bool
+
+var Logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func Debugf(msg string, params ...interface{}) {
 	if Debug {
@@ -26,10 +29,10 @@ func Errorf(msg string, params ...interface{}) {
 }
 
 func Fatalf(msg string, params ...interface{}) {
-	log.Fatalf(msg, params...)
+	Logger.Fatalf(msg, params...)
 }
 
 func printf(level string, msg string, params ...interface{}) {
 	msg = fmt.Sprintf("[%s] %s", level, msg)
-	log.Printf(msg, params...)
+	Logger.Printf(msg, params...)
 }
