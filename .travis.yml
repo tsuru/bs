@@ -11,7 +11,6 @@ install:
   - export PATH="$HOME/gopath/bin:$PATH"
   - sed -ie 's;git://;https://;' .git/config
   - go get -x github.com/tools/godep
-  - go get -d -t -u -f -x ./... || true
   - godep restore ./...
 script:
   - go test ./...
