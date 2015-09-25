@@ -60,6 +60,7 @@ func (s *S) SetUpTest(c *check.C) {
 	cont, err := dockerClient.CreateContainer(opts)
 	c.Assert(err, check.IsNil)
 	s.id = cont.ID
+	pingInterval = 100 * time.Millisecond
 }
 
 func (s *S) TearDownTest(c *check.C) {
@@ -331,5 +332,77 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}
 	wg.Wait()
 	lf.stop()
-	c.Assert(logBuf.String(), check.Equals, "[ERROR] Dropping log messages to due to full channel buffer.\n")
+	c.Assert(logBuf.String(), check.Matches, `(?s)\[ERROR\] Dropping log messages to due to full channel buffer.*`)
+}
+
+func (s *S) TestLogForwarderTableTennis(c *check.C) {
+	prevLog := bslog.Logger
+	logBuf := bytes.NewBuffer(nil)
+	bslog.Logger = log.New(logBuf, "", 0)
+	defer func() {
+		bslog.Logger = prevLog
+	}()
+	var err error
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(ioutil.Discard, ws)
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BindAddress:    "udp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	time.Sleep(time.Second)
+	lf.stop()
+	logParts := strings.Split(logBuf.String(), "\n")
+	for _, part := range logParts {
+		c.Check(part, check.Not(check.Matches), `.*no pong response in.*`)
+	}
+}
+
+func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
+	prevLog := bslog.Logger
+	logBuf := bytes.NewBuffer(nil)
+	bslog.Logger = log.New(logBuf, "", 0)
+	defer func() {
+		bslog.Logger = prevLog
+	}()
+	var err error
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		buf := make([]byte, 1024)
+		for {
+			frame, err := ws.NewFrameReader()
+			if err == io.EOF {
+				break
+			}
+			if frame.PayloadType() != websocket.PingFrame {
+				frameReader, err := ws.HandleFrame(frame)
+				c.Assert(err, check.IsNil)
+				if frameReader == nil {
+					continue
+				}
+				_, err = frameReader.Read(buf)
+				if err == io.EOF {
+					if trailer := frameReader.TrailerReader(); trailer != nil {
+						io.Copy(ioutil.Discard, trailer)
+					}
+				}
+			}
+		}
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BindAddress:    "udp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	time.Sleep(time.Second)
+	lf.stop()
+	c.Assert(logBuf.String(), check.Matches, `(?s).*no pong response in.*`)
 }

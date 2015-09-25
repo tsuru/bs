@@ -8,17 +8,20 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/jeromer/syslogparser"
-	"github.com/mcuadros/go-syslog"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
+	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
 const (
@@ -26,7 +29,11 @@ const (
 	forwardConnWriteTimeout = time.Second
 )
 
-var messageChanBufferSize = 1000000
+var (
+	messageChanBufferSize = 1000000
+	pingInterval          = 30 * time.Second
+	debugStopWg           = sync.WaitGroup{}
+)
 
 type LogMessage struct {
 	logEntry  *app.Applog
@@ -72,7 +79,9 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 	if err != nil {
 		return nil, nil, err
 	}
+	debugStopWg.Add(1)
 	go func() {
+		defer debugStopWg.Done()
 		var err error
 		for {
 			select {
@@ -171,6 +180,47 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		client.Close()
 		return nil, err
 	}
+	pingWriter, err := ws.NewFrameWriter(websocket.PingFrame)
+	if err != nil {
+		client.Close()
+		bslog.Errorf("[log forwarder] unable to create ping frame writer, closing websocket: %s", err)
+		return nil, err
+	}
+	lastPongTime := time.Now().UnixNano()
+	debugStopWg.Add(2)
+	go func() {
+		defer debugStopWg.Done()
+		defer client.Close()
+		for {
+			frame, err := ws.NewFrameReader()
+			if err != nil {
+				bslog.Errorf("[log forwarder] unable to create pong frame reader, closing websocket: %s", err)
+				return
+			}
+			if frame.PayloadType() == websocket.PongFrame {
+				atomic.StoreInt64(&lastPongTime, time.Now().UnixNano())
+			}
+			io.Copy(ioutil.Discard, frame)
+		}
+	}()
+	go func() {
+		defer debugStopWg.Done()
+		defer client.Close()
+		for range time.Tick(pingInterval) {
+			_, err := pingWriter.Write([]byte{'z'})
+			if err != nil {
+				bslog.Errorf("[log forwarder] error sending ping frame: %s", err)
+				return
+			}
+			mylastPongTime := atomic.LoadInt64(&lastPongTime)
+			lastPong := time.Unix(0, mylastPongTime)
+			now := time.Now()
+			if now.After(lastPong.Add(pingInterval * 2)) {
+				bslog.Errorf("[log forwarder] no pong response in %v, closing websocket", now.Sub(lastPong))
+				return
+			}
+		}
+	}()
 	return ws, nil
 }
 
@@ -288,14 +338,9 @@ func (l *LogForwarder) Start() (err error) {
 }
 
 func (l *LogForwarder) stop() {
-	func() {
-		defer func() {
-			recover()
-		}()
-		if l.server != nil {
-			l.server.Kill()
-		}
-	}()
+	if l.server != nil {
+		l.server.Kill()
+	}
 	if l.server != nil {
 		l.server.Wait()
 	}
@@ -305,6 +350,7 @@ func (l *LogForwarder) stop() {
 	for _, ch := range l.forwardChans {
 		close(ch)
 	}
+	debugStopWg.Wait()
 }
 
 func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
