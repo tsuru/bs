@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/tsuru/bs",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5.1",
 	"Packages": [
 		"./..."
 	],
@@ -25,10 +25,6 @@
 		{
 			"ImportPath": "github.com/jeromer/syslogparser",
 			"Rev": "812866d0389ae7e1f5a0110d47dea20224fc776f"
-		},
-		{
-			"ImportPath": "gopkg.in/mcuadros/go-syslog.v2",
-			"Rev": "e079f554382028527e4509d7bb58793b5e98194e"
 		},
 		{
 			"ImportPath": "github.com/quipo/statsd",
@@ -138,6 +134,11 @@
 		{
 			"ImportPath": "gopkg.in/check.v1",
 			"Rev": "64131543e7896d5bcc6bd5a76287eb75ea96c673"
+		},
+		{
+			"ImportPath": "gopkg.in/mcuadros/go-syslog.v2",
+			"Comment": "v2.1.0",
+			"Rev": "6cba2bfcf64a025c899aa3be061161d2b89d8b54"
 		},
 		{
 			"ImportPath": "gopkg.in/mgo.v2",
