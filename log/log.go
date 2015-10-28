@@ -60,6 +60,7 @@ type LogForwarder struct {
 type processable interface {
 	connect() (net.Conn, error)
 	process(conn net.Conn, msg *LogMessage) error
+	close(conn net.Conn)
 }
 
 type syslogForwarder struct {
@@ -70,6 +71,7 @@ type wsForwarder struct {
 	url       string
 	token     string
 	tlsConfig *tls.Config
+	connMutex sync.Mutex
 }
 
 func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, error) {
@@ -103,10 +105,7 @@ func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, 
 					break
 				}
 			}
-			// Reset deadline, if we don't do this the connection remains open
-			// on the other end (causing tests to fail) for some weird reason.
-			conn.SetWriteDeadline(time.Time{})
-			conn.Close()
+			processInfo.close(conn)
 			if err == nil {
 				break
 			}
@@ -138,6 +137,13 @@ func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
 		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
 	}
 	return nil
+}
+
+func (f *syslogForwarder) close(conn net.Conn) {
+	// Reset deadline, if we don't do this the connection remains open
+	// on the other end (causing tests to fail) for some weird reason.
+	conn.SetWriteDeadline(time.Time{})
+	conn.Close()
 }
 
 func (f *wsForwarder) connect() (net.Conn, error) {
@@ -207,9 +213,9 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		defer debugStopWg.Done()
 		defer client.Close()
 		for range time.Tick(pingInterval) {
-			_, err := pingWriter.Write([]byte{'z'})
+			err := f.writeWithDeadline(ws, pingWriter, []byte{'z'})
 			if err != nil {
-				bslog.Errorf("[log forwarder] error sending ping frame: %s", err)
+				bslog.Errorf("[log forwarder] ping: %s", err)
 				return
 			}
 			mylastPongTime := atomic.LoadInt64(&lastPongTime)
@@ -224,24 +230,43 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 	return ws, nil
 }
 
+func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, data []byte) error {
+	f.connMutex.Lock()
+	defer f.connMutex.Unlock()
+	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	if err != nil {
+		return fmt.Errorf("error setting deadline: %s", err)
+	}
+	n, err := writer.Write(data)
+	if err != nil {
+		return fmt.Errorf("error sending message: %s", err)
+	}
+	if n < len(data) {
+		return fmt.Errorf("short write trying to write log to %q", conn.RemoteAddr())
+	}
+	return nil
+}
+
 func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
 	data, err := json.Marshal(msg.logEntry)
 	if err != nil {
 		return err
 	}
 	data = append(data, '\n')
-	err = conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	err = f.writeWithDeadline(conn, conn, data)
 	if err != nil {
 		return err
-	}
-	n, err := conn.Write(data)
-	if err != nil {
-		return err
-	}
-	if n < len(data) {
-		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
 	}
 	return nil
+}
+
+func (f *wsForwarder) close(conn net.Conn) {
+	// Reset deadline, if we don't do this the connection remains open
+	// on the other end (causing tests to fail) for some weird reason.
+	f.connMutex.Lock()
+	defer f.connMutex.Unlock()
+	conn.SetWriteDeadline(time.Time{})
+	conn.Close()
 }
 
 func (l *LogForwarder) initForwardConnections() error {
