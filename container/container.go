@@ -123,7 +123,7 @@ func (c *Container) Stats() (*docker.Stats, error) {
 		ID:      c.ID,
 		Stream:  false,
 		Stats:   statsCh,
-		Timeout: fullTimeout,
+		Timeout: 10 * time.Second,
 	}
 	go func() {
 		defer close(errCh)
