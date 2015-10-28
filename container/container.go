@@ -120,9 +120,10 @@ func (c *Container) Stats() (*docker.Stats, error) {
 	statsCh := make(chan *docker.Stats, 1)
 	errCh := make(chan error, 1)
 	opts := docker.StatsOptions{
-		ID:     c.ID,
-		Stream: false,
-		Stats:  statsCh,
+		ID:      c.ID,
+		Stream:  false,
+		Stats:   statsCh,
+		Timeout: fullTimeout,
 	}
 	go func() {
 		defer close(errCh)
