@@ -6,7 +6,6 @@ go:
   - tip
 env:
   - GOARCH=amd64
-  - GOARCH=386
 install:
   - export PATH="$HOME/gopath/bin:$PATH"
   - sed -ie 's;git://;https://;' .git/config
