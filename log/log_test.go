@@ -378,7 +378,8 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 			if err == io.EOF {
 				break
 			}
-			if frame.PayloadType() != websocket.PingFrame {
+			if frame.PayloadType() != websocket.PingFrame &&
+				frame.PayloadType() != websocket.PongFrame {
 				frameReader, err := ws.HandleFrame(frame)
 				c.Assert(err, check.IsNil)
 				if frameReader == nil {
