@@ -73,7 +73,7 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	var err error
 	time.Local, err = time.LoadLocation("America/Fortaleza")
 	c.Assert(err, check.IsNil)
-	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
@@ -99,7 +99,7 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 }
 
 func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
-	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
