@@ -2,6 +2,6 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-FROM busybox
-RUN wget -O /bin/bs https://s3.amazonaws.com/tsuru/bs/bs
+FROM cirros
+RUN  curl -Lo /bin/bs https://s3.amazonaws.com/tsuru/bs/bs
 ENTRYPOINT ["/bin/bs"]
