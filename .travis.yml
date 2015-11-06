@@ -7,7 +7,6 @@ env:
   - GOARCH=amd64
 install:
   - export PATH="$HOME/gopath/bin:$PATH"
-  - sed -ie 's;git://;https://;' .git/config
   - go get -x github.com/tools/godep
   - godep restore ./...
 script:
