@@ -19,5 +19,3 @@ after_success:
   - travis/docker_image.bash
 services:
   - docker
-after_deploy:
-  - "curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/"
