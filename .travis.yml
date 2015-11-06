@@ -25,4 +25,4 @@ deploy:
   on:
     go: 1.5.1
 after_deploy:
-  - "if [ \"${TRAVIS_PULL_REQUEST}\" = \"false\" ]; then curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/; fi"
+  - "curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/"
