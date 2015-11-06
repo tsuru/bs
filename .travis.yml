@@ -1,28 +1,23 @@
 language: go
-sudo: false
+sudo: required
 go:
   - 1.5.1
   - tip
 env:
-  - GOARCH=amd64
+  global:
+    - GO_FOR_RELEASE=1.5.1
+  matrix:
+    - GOARCH=amd64
 install:
   - export PATH="$HOME/gopath/bin:$PATH"
   - go get -x github.com/tools/godep
   - godep restore ./...
 script:
   - go test ./...
-  - mkdir target
-  - go build -o target/bs
-deploy:
-  provider: s3
-  access_key_id: "${ACCESS_KEY_ID}"
-  secret_access_key: "${SECRET_ACCESS_KEY}"
-  bucket: tsuru
-  skip_cleanup: true
-  acl: public_read
-  local_dir: target
-  upload-dir: bs
-  on:
-    go: 1.5.1
+  - go build
+after_success:
+  - travis/docker_image.bash
+services:
+  - docker
 after_deploy:
   - "curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/"
