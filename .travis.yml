@@ -13,5 +13,16 @@ install:
   - godep restore ./...
 script:
   - go test ./...
-after_success:
+  - mkdir target
+  - go build -o target/bs
+deploy:
+  provider: s3
+  access_key_id: "${ACCESS_KEY_ID}"
+  secret_access_key: "${SECRET_ACCESS_KEY}"
+  bucket: tsuru
+  skip_cleanup: true
+  acl: public_read
+  local_dir: target
+  upload-dir: bs
+after_deploy:
   - "if [ \"${TRAVIS_PULL_REQUEST}\" = \"false\" ]; then curl -iH 'Content-Type: application/json' --data \"{\\\"source_type\\\": \\\"Branch\\\", \\\"source_name\\\": \\\"${TRAVIS_BRANCH}\\\"}\" -X POST https://registry.hub.docker.com/u/tsuru/bs/trigger/${HUB_TOKEN}/; fi"
