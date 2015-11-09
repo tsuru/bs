@@ -6,10 +6,10 @@ go:
 env:
   global:
     - GO_FOR_RELEASE=1.5.1
+    - PATH="$GOPATH/bin:$PATH"
   matrix:
     - GOARCH=amd64
 install:
-  - export PATH="$HOME/gopath/bin:$PATH"
   - go get -x github.com/tools/godep
   - godep restore ./...
 script:
