@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-FROM tsuru/bs-base
+FROM alpine:3.2
+RUN  apk update && apk add conntrack-tools ca-certificates && rm -rf /var/cache/apk/*
 ADD  bs /bin/bs
 ENTRYPOINT ["/bin/bs"]
