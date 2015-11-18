@@ -78,6 +78,7 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
 	lf := LogForwarder{
+		BufferSize:       100,
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
 		DockerEndpoint:   s.dockerServer.URL(),
@@ -104,6 +105,7 @@ func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
 	lf := LogForwarder{
+		BufferSize:       100,
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
 		DockerEndpoint:   s.dockerServer.URL(),
@@ -157,6 +159,7 @@ func testLogForwarderWSForwarder(
 		}
 	}
 	lf := LogForwarder{
+		BufferSize:     100,
 		BindAddress:    "udp://0.0.0.0:59317",
 		TsuruEndpoint:  srv.URL,
 		TsuruToken:     "mytoken",
@@ -206,6 +209,7 @@ func testLogForwarderWSForwarder(
 
 func (s *S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{
+		BufferSize:     100,
 		BindAddress:    "xudp://0.0.0.0:59317",
 		DockerEndpoint: s.dockerServer.URL(),
 	}
@@ -215,12 +219,14 @@ func (s *S) TestLogForwarderStartBindError(c *check.C) {
 
 func (s *S) TestLogForwarderForwardConnError(c *check.C) {
 	lf := LogForwarder{
+		BufferSize:       100,
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"xudp://127.0.0.1:1234"},
 	}
 	err := lf.Start()
 	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "xudp://127.0.0.1:1234": dial xudp: unknown network xudp`)
 	lf = LogForwarder{
+		BufferSize:       100,
 		BindAddress:      "udp://0.0.0.0:59317",
 		ForwardAddresses: []string{"tcp://localhost:99999"},
 	}
@@ -243,6 +249,7 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
+		BufferSize:  100,
 		BindAddress: "tcp://0.0.0.0:59317",
 		ForwardAddresses: []string{
 			"udp://" + forwardedConns[0].LocalAddr().String(),
@@ -288,12 +295,9 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
 	prevLog := bslog.Logger
 	logBuf := bytes.NewBuffer(nil)
-	prevBufferSize := messageChanBufferSize
-	messageChanBufferSize = 1
 	bslog.Logger = log.New(logBuf, "", 0)
 	defer func() {
 		bslog.Logger = prevLog
-		messageChanBufferSize = prevBufferSize
 	}()
 	var err error
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
@@ -301,6 +305,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
+		BufferSize:     1,
 		BindAddress:    "udp://0.0.0.0:59317",
 		DockerEndpoint: s.dockerServer.URL(),
 		TsuruEndpoint:  srv.URL,
@@ -348,6 +353,7 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
+		BufferSize:     100,
 		BindAddress:    "udp://0.0.0.0:59317",
 		DockerEndpoint: s.dockerServer.URL(),
 		TsuruEndpoint:  srv.URL,
@@ -396,6 +402,7 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
+		BufferSize:     100,
 		BindAddress:    "udp://0.0.0.0:59317",
 		DockerEndpoint: s.dockerServer.URL(),
 		TsuruEndpoint:  srv.URL,

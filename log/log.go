@@ -30,9 +30,8 @@ const (
 )
 
 var (
-	messageChanBufferSize = 1000000
-	pingInterval          = 30 * time.Second
-	debugStopWg           = sync.WaitGroup{}
+	pingInterval = 30 * time.Second
+	debugStopWg  = sync.WaitGroup{}
 )
 
 type LogMessage struct {
@@ -41,6 +40,7 @@ type LogMessage struct {
 }
 
 type LogForwarder struct {
+	BufferSize       int
 	BindAddress      string
 	ForwardAddresses []string
 	DockerEndpoint   string
@@ -74,8 +74,8 @@ type wsForwarder struct {
 	connMutex sync.Mutex
 }
 
-func processMessages(processInfo processable) (chan<- *LogMessage, chan<- bool, error) {
-	ch := make(chan *LogMessage, messageChanBufferSize)
+func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
+	ch := make(chan *LogMessage, bufferSize)
 	quit := make(chan bool)
 	conn, err := processInfo.connect()
 	if err != nil {
@@ -277,7 +277,7 @@ func (l *LogForwarder) initForwardConnections() error {
 		}
 		forwardChan, quitChan, err := processMessages(&syslogForwarder{
 			url: forwardUrl,
-		})
+		}, l.BufferSize)
 		if err != nil {
 			return err
 		}
@@ -305,7 +305,7 @@ func (l *LogForwarder) initWSConnection() error {
 		url:       tsuruUrl.String(),
 		token:     l.TsuruToken,
 		tlsConfig: l.TlsConfig,
-	})
+	}, l.BufferSize)
 	if err != nil {
 		return err
 	}

@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	defaultInterval = 60
-	version         = "v1.1"
+	defaultInterval   = 60
+	defaultBufferSize = 1000000
+	version           = "v1.1"
 )
 
 var printVersion bool
@@ -33,6 +34,7 @@ var config struct {
 	DockerEndpoint         string
 	TsuruEndpoint          string
 	TsuruToken             string
+	LogBufferSize          int
 	MetricsInterval        time.Duration
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
@@ -63,8 +65,15 @@ func loadConfig() {
 		bslog.Warnf("invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
 		parsedMetricsInterval = defaultInterval
 	}
+	bufferSize := os.Getenv("LOG_BUFFER_SIZE")
+	parsedBufferSize, err := strconv.Atoi(bufferSize)
+	if err != nil {
+		bslog.Warnf("invalid buffer size for the log. Using the default value of %d", defaultBufferSize)
+		parsedBufferSize = defaultBufferSize
+	}
 	config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
+	config.LogBufferSize = parsedBufferSize
 	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
 		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
 	} else {
@@ -123,6 +132,7 @@ func main() {
 	}
 	loadConfig()
 	lf := log.LogForwarder{
+		BufferSize:       config.LogBufferSize,
 		BindAddress:      config.SyslogListenAddress,
 		ForwardAddresses: config.SyslogForwardAddresses,
 		DockerEndpoint:   config.DockerEndpoint,
