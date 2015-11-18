@@ -29,10 +29,7 @@ const (
 	forwardConnWriteTimeout = time.Second
 )
 
-var (
-	pingInterval = 30 * time.Second
-	debugStopWg  = sync.WaitGroup{}
-)
+var debugStopWg sync.WaitGroup
 
 type LogMessage struct {
 	logEntry  *app.Applog
@@ -48,6 +45,8 @@ type LogForwarder struct {
 	TsuruToken       string
 	SyslogTimezone   string
 	TlsConfig        *tls.Config
+	WSPingInterval   time.Duration
+	WSPongInterval   time.Duration
 	infoClient       *container.InfoClient
 	forwardChans     []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
@@ -68,10 +67,12 @@ type syslogForwarder struct {
 }
 
 type wsForwarder struct {
-	url       string
-	token     string
-	tlsConfig *tls.Config
-	connMutex sync.Mutex
+	url          string
+	token        string
+	tlsConfig    *tls.Config
+	connMutex    sync.Mutex
+	pingInterval time.Duration
+	pongInterval time.Duration
 }
 
 func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
@@ -212,7 +213,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 	go func() {
 		defer debugStopWg.Done()
 		defer client.Close()
-		for range time.Tick(pingInterval) {
+		for range time.Tick(f.pingInterval) {
 			err := f.writeWithDeadline(ws, pingWriter, []byte{'z'})
 			if err != nil {
 				bslog.Errorf("[log forwarder] ping: %s", err)
@@ -221,7 +222,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			mylastPongTime := atomic.LoadInt64(&lastPongTime)
 			lastPong := time.Unix(0, mylastPongTime)
 			now := time.Now()
-			if now.After(lastPong.Add(pingInterval * 2)) {
+			if now.After(lastPong.Add(f.pongInterval)) {
 				bslog.Errorf("[log forwarder] no pong response in %v, closing websocket", now.Sub(lastPong))
 				return
 			}
@@ -302,9 +303,11 @@ func (l *LogForwarder) initWSConnection() error {
 		tsuruUrl.Scheme = "ws"
 	}
 	forwardChan, quitChan, err := processMessages(&wsForwarder{
-		url:       tsuruUrl.String(),
-		token:     l.TsuruToken,
-		tlsConfig: l.TlsConfig,
+		url:          tsuruUrl.String(),
+		token:        l.TsuruToken,
+		tlsConfig:    l.TlsConfig,
+		pingInterval: l.WSPingInterval,
+		pongInterval: l.WSPongInterval,
 	}, l.BufferSize)
 	if err != nil {
 		return err

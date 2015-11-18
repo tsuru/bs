@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	defaultInterval   = 60
-	defaultBufferSize = 1000000
-	version           = "v1.1"
+	defaultInterval       = 60
+	defaultBufferSize     = 1000000
+	defaultWsPingInterval = 30
+	version               = "v1.1"
 )
 
 var printVersion bool
@@ -40,6 +41,8 @@ var config struct {
 	SyslogListenAddress    string
 	SyslogForwardAddresses []string
 	SyslogTimezone         string
+	LogWSPingInterval      time.Duration
+	LogWSPongInterval      time.Duration
 }
 
 func init() {
@@ -65,13 +68,27 @@ func loadConfig() {
 		bslog.Warnf("invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
 		parsedMetricsInterval = defaultInterval
 	}
+	config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
 	bufferSize := os.Getenv("LOG_BUFFER_SIZE")
 	parsedBufferSize, err := strconv.Atoi(bufferSize)
 	if err != nil {
 		bslog.Warnf("invalid buffer size for the log. Using the default value of %d", defaultBufferSize)
 		parsedBufferSize = defaultBufferSize
 	}
-	config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
+	wsPingInterval := os.Getenv("LOG_WS_PING_INTERVAL")
+	parsedWsPingInterval, err := strconv.Atoi(wsPingInterval)
+	if err != nil {
+		bslog.Warnf("invalid WS ping interval %q. Using the default value of %d seconds", wsPingInterval, defaultWsPingInterval)
+		parsedWsPingInterval = defaultWsPingInterval
+	}
+	config.LogWSPingInterval = time.Duration(parsedWsPingInterval) * time.Second
+	wsPongInterval := os.Getenv("LOG_WS_PONG_INTERVAL")
+	parsedWsPongInterval, err := strconv.Atoi(wsPongInterval)
+	if err != nil || parsedWsPongInterval < parsedWsPingInterval {
+		parsedWsPongInterval = parsedWsPingInterval * 4
+		bslog.Warnf("invalid WS pong interval %q (it must be higher than ping interval). Using the default value of %d seconds", wsPongInterval, parsedWsPongInterval)
+	}
+	config.LogWSPongInterval = time.Duration(parsedWsPongInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
 	config.LogBufferSize = parsedBufferSize
 	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
@@ -138,6 +155,8 @@ func main() {
 		DockerEndpoint:   config.DockerEndpoint,
 		TsuruEndpoint:    config.TsuruEndpoint,
 		TsuruToken:       config.TsuruToken,
+		WSPingInterval:   config.LogWSPingInterval,
+		WSPongInterval:   config.LogWSPongInterval,
 		SyslogTimezone:   config.SyslogTimezone,
 	}
 	err := lf.Start()
