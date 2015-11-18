@@ -425,7 +425,7 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 		TsuruEndpoint:  srv.URL,
 		TsuruToken:     "mytoken",
 		WSPingInterval: 100e6,
-		WSPongInterval: 200e6,
+		WSPongInterval: 800e6,
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
