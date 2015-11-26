@@ -63,7 +63,7 @@ The collected metrics are:
 * mem_pct_max
 
 The metric backend is configured by setting some enviroment variables in the *bs* container.
-For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables). 
+For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables).
 
 ## Environment Variables
 
