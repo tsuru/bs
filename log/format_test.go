@@ -23,6 +23,15 @@ func (s *S) TestLenientFormatGetSplitFunc(c *check.C) {
 	c.Assert(splitFunc, check.IsNil)
 }
 
+func (s *S) BenchmarkLenientParserParse(c *check.C) {
+	logLine := []byte("<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey")
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		lp := LenientParser{line: logLine}
+		lp.Parse()
+	}
+}
+
 func (s *S) TestLenientParserParse(c *check.C) {
 	examples := []string{
 		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey",
