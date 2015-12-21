@@ -19,7 +19,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -246,7 +245,7 @@ func (s *S) TestLogForwarderForwardConnError(c *check.C) {
 }
 
 func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
-	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
+	c.StopTimer()
 	startReceiver := func() net.Conn {
 		addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
 		c.Assert(err, check.IsNil)
@@ -260,7 +259,7 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 	}))
 	defer srv.Close()
 	lf := LogForwarder{
-		BufferSize:  100,
+		BufferSize:  1000000,
 		BindAddress: "tcp://0.0.0.0:59317",
 		ForwardAddresses: []string{
 			"udp://" + forwardedConns[0].LocalAddr().String(),
@@ -270,37 +269,22 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 		TsuruToken:     "mytoken",
 		DockerEndpoint: s.dockerServer.URL(),
 		WSPingInterval: 100e6,
-		WSPongInterval: 200e6,
+		WSPongInterval: 400e6,
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	sender := func(n int) {
-		conn, err := net.Dial("tcp", "127.0.0.1:59317")
-		c.Assert(err, check.IsNil)
-		defer conn.Close()
-		msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
-		for i := 0; i < n; i++ {
-			_, err = conn.Write(msg)
-			c.Assert(err, check.IsNil)
-		}
+	logParts := syslogparser.LogParts{
+		"container_id": s.id,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
 	}
-	c.ResetTimer()
-	goroutines := 4
-	iterations := c.N
-	for i := 0; i < goroutines; i++ {
-		n := iterations / goroutines
-		if i == 0 {
-			n += iterations % goroutines
-		}
-		go sender(n)
+	c.StartTimer()
+	for i := 0; i < c.N; i++ {
+		lf.Handle(logParts, 1, nil)
 	}
-	for {
-		val := atomic.LoadUint64(&lf.messagesCounter)
-		if val == uint64(iterations) {
-			break
-		}
-		time.Sleep(10 * time.Microsecond)
-	}
+	c.StopTimer()
 	lf.stop()
 }
 

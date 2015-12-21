@@ -51,7 +51,6 @@ type LogForwarder struct {
 	forwardChans     []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
 	server           *syslog.Server
-	messagesCounter  uint64
 	syslogLocation   *time.Location
 	nextNotify       <-chan time.Time
 }
@@ -431,5 +430,4 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 			}
 		}
 	}
-	atomic.AddUint64(&l.messagesCounter, uint64(1))
 }
