@@ -419,9 +419,9 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	buffer = append(buffer, []byte(contId)...)
 	buffer = append(buffer, ' ')
 	buffer = append(buffer, []byte(contData.AppName)...)
-	buffer = append(buffer, ' ')
+	buffer = append(buffer, '[')
 	buffer = append(buffer, []byte(contData.ProcessName)...)
-	buffer = append(buffer, ' ')
+	buffer = append(buffer, ']', ':', ' ')
 	buffer = append(buffer, []byte(content)...)
 	buffer = append(buffer, '\n')
 	msg := &LogMessage{
