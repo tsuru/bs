@@ -6,7 +6,6 @@ package log
 
 import (
 	"bufio"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,30 +31,31 @@ type LenientParser struct {
 	subParser syslogparser.LogParser
 }
 
-var goFormatRegex = regexp.MustCompile(`^<(\d+?)>\s*(.+?)\s+(.+?)\s+(.+?)(\[(\d+?)\])?:\s+(.+)$`)
-
 func (p *LenientParser) Parse() error {
-	groups := goFormatRegex.FindSubmatch(p.line)
-	if len(groups) != 8 {
+	groups, withMsg, withPID := parseLogLine(p.line)
+	if !withMsg {
 		return p.defaultParsers()
 	}
-	priority, err := strconv.Atoi(string(groups[1]))
+	priority, err := strconv.Atoi(string(groups[0]))
 	if err != nil {
 		return p.defaultParsers()
 	}
-	ts, err := time.Parse(time.RFC3339, string(groups[2]))
+	ts, err := time.Parse(time.RFC3339, string(groups[1]))
 	if err != nil {
 		return p.defaultParsers()
+	}
+	contentIdx := 4
+	if withPID {
+		contentIdx++
 	}
 	p.logParts = syslogparser.LogParts{
 		"priority":  priority,
 		"facility":  priority / 8,
 		"severity":  priority % 8,
 		"timestamp": ts,
-		"hostname":  string(groups[3]),
-		"tag":       string(groups[4]),
-		"proc_id":   string(groups[6]),
-		"content":   string(groups[7]),
+		"hostname":  string(groups[2]),
+		"tag":       string(groups[3]),
+		"content":   string(groups[contentIdx]),
 	}
 	return nil
 }

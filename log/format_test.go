@@ -35,6 +35,7 @@ func (s *S) BenchmarkLenientParserParse(c *check.C) {
 func (s *S) TestLenientParserParse(c *check.C) {
 	examples := []string{
 		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey",
+		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0: hey",
 		"<31>Dec 26 05:08:46 hostname tag/my_id[296]: content",
 		"<165>1 2003-08-24T05:14:15.000003Z 192.0.2.1 myproc 8710 - - content",
 	}
@@ -46,9 +47,19 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
 			"hostname":     "vagrant-ubuntu-trusty-64",
 			"tag":          "docker/00dfa98fe8e0",
-			"proc_id":      "4843",
 			"content":      "hey",
 			"rawmsg":       []byte(examples[0]),
+			"container_id": "00dfa98fe8e0",
+		},
+		{
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+			"hostname":     "vagrant-ubuntu-trusty-64",
+			"tag":          "docker/00dfa98fe8e0",
+			"content":      "hey",
+			"rawmsg":       []byte(examples[1]),
 			"container_id": "00dfa98fe8e0",
 		},
 		{
@@ -59,7 +70,7 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"hostname":     "hostname",
 			"tag":          "tag/my_id",
 			"content":      "content",
-			"rawmsg":       []byte(examples[1]),
+			"rawmsg":       []byte(examples[2]),
 			"container_id": "my_id",
 		},
 		{
@@ -76,7 +87,7 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"msg_id":          "-",
 			"structured_data": "-",
 			"version":         1,
-			"rawmsg":          []byte(examples[2]),
+			"rawmsg":          []byte(examples[3]),
 		},
 	}
 	for i, line := range examples {
