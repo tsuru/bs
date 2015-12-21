@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/url"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +31,12 @@ const (
 )
 
 var debugStopWg sync.WaitGroup
+
+var syslogBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 200)
+	},
+}
 
 type LogMessage struct {
 	logEntry  *app.Applog
@@ -129,11 +136,13 @@ func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
 	if err != nil {
 		return err
 	}
+	lenMsg := len(msg.syslogMsg)
 	n, err := conn.Write(msg.syslogMsg)
+	syslogBufferPool.Put(msg.syslogMsg)
 	if err != nil {
 		return err
 	}
-	if n < len(msg.syslogMsg) {
+	if n < lenMsg {
 		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
 	}
 	return nil
@@ -401,6 +410,20 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
+	buffer := syslogBufferPool.Get().([]byte)[:0]
+	buffer = append(buffer, '<')
+	buffer = strconv.AppendInt(buffer, int64(priority), 10)
+	buffer = append(buffer, '>')
+	buffer = append(buffer, []byte(ts.In(l.syslogLocation).Format(time.Stamp))...)
+	buffer = append(buffer, ' ')
+	buffer = append(buffer, []byte(contId)...)
+	buffer = append(buffer, ' ')
+	buffer = append(buffer, []byte(contData.AppName)...)
+	buffer = append(buffer, ' ')
+	buffer = append(buffer, []byte(contData.ProcessName)...)
+	buffer = append(buffer, ' ')
+	buffer = append(buffer, []byte(content)...)
+	buffer = append(buffer, '\n')
 	msg := &LogMessage{
 		logEntry: &app.Applog{
 			Date:    ts,
@@ -409,14 +432,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 			Source:  contData.ProcessName,
 			Unit:    contId,
 		},
-		syslogMsg: []byte(fmt.Sprintf("<%d>%s %s %s[%s]: %s\n",
-			priority,
-			ts.In(l.syslogLocation).Format(time.Stamp),
-			contId,
-			contData.AppName,
-			contData.ProcessName,
-			content,
-		)),
+		syslogMsg: buffer,
 	}
 	for _, ch := range l.forwardChans {
 		select {
