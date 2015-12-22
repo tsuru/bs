@@ -55,11 +55,13 @@ type LogForwarder struct {
 	WSPingInterval   time.Duration
 	WSPongInterval   time.Duration
 	infoClient       *container.InfoClient
-	forwardChans     []chan<- *LogMessage
+	forwardTsuru     chan<- *LogMessage
+	forwardSyslog    []chan<- *LogMessage
 	forwardQuitChans []chan<- bool
 	server           *syslog.Server
 	syslogLocation   *time.Location
-	nextNotify       *time.Timer
+	nextNotifySyslog *time.Timer
+	nextNotifyTsuru  *time.Timer
 }
 
 type processable interface {
@@ -293,7 +295,7 @@ func (l *LogForwarder) initForwardConnections() error {
 		if err != nil {
 			return err
 		}
-		l.forwardChans = append(l.forwardChans, forwardChan)
+		l.forwardSyslog = append(l.forwardSyslog, forwardChan)
 		l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
 	}
 	return nil
@@ -323,7 +325,7 @@ func (l *LogForwarder) initWSConnection() error {
 	if err != nil {
 		return err
 	}
-	l.forwardChans = append(l.forwardChans, forwardChan)
+	l.forwardTsuru = forwardChan
 	l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
 	return nil
 }
@@ -346,7 +348,8 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
-	l.nextNotify = time.NewTimer(0)
+	l.nextNotifySyslog = time.NewTimer(0)
+	l.nextNotifyTsuru = time.NewTimer(0)
 	l.syslogLocation = time.Local
 	if l.SyslogTimezone != "" {
 		tz, err := time.LoadLocation(l.SyslogTimezone)
@@ -386,8 +389,11 @@ func (l *LogForwarder) stop() {
 	for _, ch := range l.forwardQuitChans {
 		close(ch)
 	}
-	for _, ch := range l.forwardChans {
+	for _, ch := range l.forwardSyslog {
 		close(ch)
+	}
+	if l.forwardTsuru != nil {
+		close(l.forwardTsuru)
 	}
 	debugStopWg.Wait()
 }
@@ -413,38 +419,61 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
+	if l.forwardTsuru != nil {
+		msg := &LogMessage{
+			logEntry: &app.Applog{
+				Date:    ts,
+				AppName: contData.AppName,
+				Message: content,
+				Source:  contData.ProcessName,
+				Unit:    contId,
+			},
+		}
+		select {
+		case l.forwardTsuru <- msg:
+		default:
+			select {
+			case <-l.nextNotifyTsuru.C:
+				bslog.Errorf("Dropping log messages to tsuru due to full channel buffer.")
+				l.nextNotifyTsuru.Reset(time.Minute)
+			default:
+			}
+		}
+	}
+	if len(l.forwardSyslog) == 0 {
+		return
+	}
 	buffer := syslogBufferPool.Get().([]byte)[:0]
 	buffer = append(buffer, '<')
 	buffer = strconv.AppendInt(buffer, int64(priority), 10)
 	buffer = append(buffer, '>')
-	buffer = append(buffer, []byte(ts.In(l.syslogLocation).Format(time.Stamp))...)
+	buffer = append(buffer, ts.In(l.syslogLocation).Format(time.Stamp)...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, []byte(contId)...)
+	buffer = append(buffer, contId...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, []byte(contData.AppName)...)
+	buffer = append(buffer, contData.AppName...)
 	buffer = append(buffer, '[')
-	buffer = append(buffer, []byte(contData.ProcessName)...)
+	buffer = append(buffer, contData.ProcessName...)
 	buffer = append(buffer, ']', ':', ' ')
-	buffer = append(buffer, []byte(content)...)
+	buffer = append(buffer, content...)
 	buffer = append(buffer, '\n')
-	msg := &LogMessage{
-		logEntry: &app.Applog{
-			Date:    ts,
-			AppName: contData.AppName,
-			Message: content,
-			Source:  contData.ProcessName,
-			Unit:    contId,
-		},
-		syslogMsg: buffer,
-	}
-	for _, ch := range l.forwardChans {
+	lenSyslogs := len(l.forwardSyslog)
+	for i, ch := range l.forwardSyslog {
+		var chBuffer []byte
+		if i == lenSyslogs-1 {
+			chBuffer = buffer
+		} else {
+			chBuffer = syslogBufferPool.Get().([]byte)[:0]
+			chBuffer = append(chBuffer, buffer...)
+		}
+		msg := &LogMessage{syslogMsg: chBuffer}
 		select {
 		case ch <- msg:
 		default:
 			select {
-			case <-l.nextNotify.C:
-				bslog.Errorf("Dropping log messages to due to full channel buffer.")
-				l.nextNotify.Reset(time.Minute)
+			case <-l.nextNotifySyslog.C:
+				bslog.Errorf("Dropping log messages to syslog due to full channel buffer.")
+				l.nextNotifySyslog.Reset(time.Minute)
 			default:
 			}
 		}
