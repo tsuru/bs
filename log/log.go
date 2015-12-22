@@ -79,6 +79,7 @@ type wsForwarder struct {
 	connMutex    sync.Mutex
 	pingInterval time.Duration
 	pongInterval time.Duration
+	jsonEncoder  *json.Encoder
 }
 
 func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
@@ -236,6 +237,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			}
 		}
 	}()
+	f.jsonEncoder = json.NewEncoder(ws)
 	return ws, nil
 }
 
@@ -257,14 +259,15 @@ func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, da
 }
 
 func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
-	data, err := json.Marshal(msg.logEntry)
+	f.connMutex.Lock()
+	defer f.connMutex.Unlock()
+	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting deadline: %s", err)
 	}
-	data = append(data, '\n')
-	err = f.writeWithDeadline(conn, conn, data)
+	err = f.jsonEncoder.Encode(msg.logEntry)
 	if err != nil {
-		return err
+		return fmt.Errorf("error sending message: %s", err)
 	}
 	return nil
 }
