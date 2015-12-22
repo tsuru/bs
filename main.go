@@ -122,10 +122,22 @@ func onSignalDebugGoroutines(signal os.Signal) {
 }
 
 func onSignalDebugProfile(signal os.Signal) {
-	profFileName := "cpuprofile.out"
+	profFileName := "memprofile.out"
+	file, err := os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	if err != nil {
+		bslog.Warnf("Error trying to open profile file %q: %s", profFileName, err)
+		return
+	}
+	err = pprof.WriteHeapProfile(file)
+	if err != nil {
+		bslog.Warnf("Error trying to write mem profile: %s", err)
+	}
+	bslog.Warnf("Wrote mem profile to %s", profFileName)
+	file.Close()
+	profFileName = "cpuprofile.out"
 	bslog.Warnf("Starting cpu profile, writing output to %s", profFileName)
 	defer bslog.Warnf("Finished cpu profile, see %s", profFileName)
-	file, err := os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	file, err = os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
 		bslog.Warnf("Error trying to open profile file %q: %s", profFileName, err)
 	}
