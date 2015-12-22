@@ -5,6 +5,7 @@
 package log
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
@@ -284,6 +285,48 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 	for i := 0; i < c.N; i++ {
 		lf.Handle(logParts, 1, nil)
 	}
+	c.StopTimer()
+	lf.stop()
+}
+
+func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
+	c.StopTimer()
+	done := make(chan bool)
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		counter := 0
+		scanner := bufio.NewScanner(ws)
+		for scanner.Scan() {
+			counter++
+			if counter == c.N {
+				close(done)
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+	lf := LogForwarder{
+		BufferSize:     1000000,
+		BindAddress:    "tcp://0.0.0.0:59317",
+		TsuruEndpoint:  srv.URL,
+		TsuruToken:     "mytoken",
+		DockerEndpoint: s.dockerServer.URL(),
+		WSPingInterval: 100e6,
+		WSPongInterval: 400e6,
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	logParts := syslogparser.LogParts{
+		"container_id": s.id,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	c.StartTimer()
+	for i := 0; i < c.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	<-done
 	c.StopTimer()
 	lf.stop()
 }
