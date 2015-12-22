@@ -332,6 +332,58 @@ func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
 	lf.stop()
 }
 
+func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
+	c.StopTimer()
+	done := []chan bool{make(chan bool), make(chan bool)}
+	startReceiver := func(i int) net.Listener {
+		addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+		c.Assert(err, check.IsNil)
+		tcpConn, err := net.ListenTCP("tcp", addr)
+		c.Assert(err, check.IsNil)
+		go func() {
+			conn, err := tcpConn.Accept()
+			c.Assert(err, check.IsNil)
+			counter := 0
+			scanner := bufio.NewScanner(conn)
+			for scanner.Scan() {
+				counter++
+				if counter == c.N {
+					close(done[i])
+					return
+				}
+			}
+		}()
+		return tcpConn
+	}
+	forwardedConns := []net.Listener{startReceiver(0), startReceiver(1)}
+	lf := LogForwarder{
+		BufferSize:     1000000,
+		BindAddress:    "tcp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+		ForwardAddresses: []string{
+			"tcp://" + forwardedConns[0].Addr().String(),
+			"tcp://" + forwardedConns[1].Addr().String(),
+		},
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	logParts := syslogparser.LogParts{
+		"container_id": s.id,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	c.StartTimer()
+	for i := 0; i < c.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	<-done[0]
+	<-done[1]
+	c.StopTimer()
+	lf.stop()
+}
+
 func (s *S) TestLogForwarderOverflow(c *check.C) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
 	prevLog := bslog.Logger
