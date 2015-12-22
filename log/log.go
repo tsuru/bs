@@ -59,7 +59,7 @@ type LogForwarder struct {
 	forwardQuitChans []chan<- bool
 	server           *syslog.Server
 	syslogLocation   *time.Location
-	nextNotify       <-chan time.Time
+	nextNotify       *time.Timer
 }
 
 type processable interface {
@@ -346,7 +346,7 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
-	l.nextNotify = time.After(0)
+	l.nextNotify = time.NewTimer(0)
 	l.syslogLocation = time.Local
 	if l.SyslogTimezone != "" {
 		tz, err := time.LoadLocation(l.SyslogTimezone)
@@ -442,9 +442,9 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		case ch <- msg:
 		default:
 			select {
-			case <-l.nextNotify:
+			case <-l.nextNotify.C:
 				bslog.Errorf("Dropping log messages to due to full channel buffer.")
-				l.nextNotify = time.After(time.Minute)
+				l.nextNotify.Reset(time.Minute)
 			default:
 			}
 		}
