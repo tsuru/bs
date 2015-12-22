@@ -44,7 +44,8 @@ type LogMessage struct {
 }
 
 type LogForwarder struct {
-	BufferSize       int
+	TsuruBufferSize  int
+	SyslogBufferSize int
 	BindAddress      string
 	ForwardAddresses []string
 	DockerEndpoint   string
@@ -291,7 +292,7 @@ func (l *LogForwarder) initForwardConnections() error {
 		}
 		forwardChan, quitChan, err := processMessages(&syslogForwarder{
 			url: forwardUrl,
-		}, l.BufferSize)
+		}, l.SyslogBufferSize)
 		if err != nil {
 			return err
 		}
@@ -321,7 +322,7 @@ func (l *LogForwarder) initWSConnection() error {
 		tlsConfig:    l.TlsConfig,
 		pingInterval: l.WSPingInterval,
 		pongInterval: l.WSPongInterval,
-	}, l.BufferSize)
+	}, l.TsuruBufferSize)
 	if err != nil {
 		return err
 	}

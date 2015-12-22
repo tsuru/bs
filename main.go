@@ -35,7 +35,8 @@ var config struct {
 	DockerEndpoint         string
 	TsuruEndpoint          string
 	TsuruToken             string
-	LogBufferSize          int
+	LogSyslogBufferSize    int
+	LogTsuruBufferSize     int
 	MetricsInterval        time.Duration
 	StatusInterval         time.Duration
 	SyslogListenAddress    string
@@ -72,8 +73,19 @@ func loadConfig() {
 	bufferSize := os.Getenv("LOG_BUFFER_SIZE")
 	parsedBufferSize, err := strconv.Atoi(bufferSize)
 	if err != nil {
-		bslog.Warnf("invalid buffer size for the log. Using the default value of %d", defaultBufferSize)
 		parsedBufferSize = defaultBufferSize
+	}
+	tsuruBufferSize := os.Getenv("LOG_TSURU_BUFFER_SIZE")
+	config.LogTsuruBufferSize, err = strconv.Atoi(tsuruBufferSize)
+	if err != nil {
+		bslog.Warnf("invalid buffer size for tsuru logs. Using the default value of %d", parsedBufferSize)
+		config.LogTsuruBufferSize = parsedBufferSize
+	}
+	syslogBufferSize := os.Getenv("LOG_SYSLOG_BUFFER_SIZE")
+	config.LogSyslogBufferSize, err = strconv.Atoi(syslogBufferSize)
+	if err != nil {
+		bslog.Warnf("invalid buffer size for syslog logs. Using the default value of %d", parsedBufferSize)
+		config.LogSyslogBufferSize = parsedBufferSize
 	}
 	wsPingInterval := os.Getenv("LOG_WS_PING_INTERVAL")
 	parsedWsPingInterval, err := strconv.Atoi(wsPingInterval)
@@ -90,7 +102,6 @@ func loadConfig() {
 	}
 	config.LogWSPongInterval = time.Duration(parsedWsPongInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
-	config.LogBufferSize = parsedBufferSize
 	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
 		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
 	} else {
@@ -161,7 +172,8 @@ func main() {
 	}
 	loadConfig()
 	lf := log.LogForwarder{
-		BufferSize:       config.LogBufferSize,
+		TsuruBufferSize:  config.LogTsuruBufferSize,
+		SyslogBufferSize: config.LogSyslogBufferSize,
 		BindAddress:      config.SyslogListenAddress,
 		ForwardAddresses: config.SyslogForwardAddresses,
 		DockerEndpoint:   config.DockerEndpoint,
