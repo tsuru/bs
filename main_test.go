@@ -1,4 +1,4 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -55,7 +55,7 @@ func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	c.Check(config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
 	c.Check(config.TsuruToken, check.Equals, "sometoken")
 	c.Check(config.StatusInterval, check.Equals, time.Duration(60e9))
-	c.Assert(buf.String(), check.Matches, `(?m).*\[WARNING\] invalid interval "four"\. Using the default value of 60 seconds$`)
+	c.Assert(buf.String(), check.Matches, `(?m).*\[WARNING\] invalid value for STATUS_INTERVAL\. Using the default value of 60$`)
 }
 
 func (S) TestLoadConfigNoForwarder(c *check.C) {

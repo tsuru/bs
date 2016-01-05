@@ -1,4 +1,4 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -50,59 +50,55 @@ func init() {
 	flag.BoolVar(&printVersion, "version", false, "Print version and exit")
 }
 
+func stringEnvOrDefault(defaultValue string, envs ...string) string {
+	for _, env := range envs {
+		val := os.Getenv(env)
+		if val != "" {
+			return val
+		}
+	}
+	if defaultValue != "" {
+		bslog.Warnf("no value found for %s. Using the default value of %s", strings.Join(envs, " or "), defaultValue)
+	}
+	return defaultValue
+}
+
+func intEnvOrDefault(defaultValue int, envs ...string) int {
+	for _, env := range envs {
+		val, err := strconv.Atoi(os.Getenv(env))
+		if err == nil {
+			return val
+		}
+	}
+	if defaultValue != 0 {
+		bslog.Warnf("invalid value for %s. Using the default value of %d", strings.Join(envs, " or "), defaultValue)
+	}
+	return defaultValue
+}
+
+func secondsEnvOrDefault(defaultValue int, envs ...string) time.Duration {
+	return time.Duration(intEnvOrDefault(defaultValue, envs...)) * time.Second
+}
+
 func loadConfig() {
 	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
 	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
 	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	config.TsuruToken = os.Getenv("TSURU_TOKEN")
 	config.SyslogTimezone = os.Getenv("SYSLOG_TIMEZONE")
-	statusInterval := os.Getenv("STATUS_INTERVAL")
-	parsedInterval, err := strconv.Atoi(statusInterval)
-	if err != nil {
-		bslog.Warnf("invalid interval %q. Using the default value of %d seconds", statusInterval, defaultInterval)
-		parsedInterval = defaultInterval
-	}
-	config.StatusInterval = time.Duration(parsedInterval) * time.Second
-	metricsInterval := os.Getenv("METRICS_INTERVAL")
-	parsedMetricsInterval, err := strconv.Atoi(metricsInterval)
-	if err != nil {
-		bslog.Warnf("invalid metrics interval %q. Using the default value of %d seconds", metricsInterval, defaultInterval)
-		parsedMetricsInterval = defaultInterval
-	}
-	config.MetricsInterval = time.Duration(parsedMetricsInterval) * time.Second
-	bufferSize := os.Getenv("LOG_BUFFER_SIZE")
-	parsedBufferSize, err := strconv.Atoi(bufferSize)
-	if err != nil {
-		parsedBufferSize = defaultBufferSize
-	}
-	tsuruBufferSize := os.Getenv("LOG_TSURU_BUFFER_SIZE")
-	config.LogTsuruBufferSize, err = strconv.Atoi(tsuruBufferSize)
-	if err != nil {
-		bslog.Warnf("invalid buffer size for tsuru logs. Using the default value of %d", parsedBufferSize)
-		config.LogTsuruBufferSize = parsedBufferSize
-	}
-	syslogBufferSize := os.Getenv("LOG_SYSLOG_BUFFER_SIZE")
-	config.LogSyslogBufferSize, err = strconv.Atoi(syslogBufferSize)
-	if err != nil {
-		bslog.Warnf("invalid buffer size for syslog logs. Using the default value of %d", parsedBufferSize)
-		config.LogSyslogBufferSize = parsedBufferSize
-	}
-	wsPingInterval := os.Getenv("LOG_WS_PING_INTERVAL")
-	parsedWsPingInterval, err := strconv.Atoi(wsPingInterval)
-	if err != nil {
-		bslog.Warnf("invalid WS ping interval %q. Using the default value of %d seconds", wsPingInterval, defaultWsPingInterval)
-		parsedWsPingInterval = defaultWsPingInterval
-	}
-	config.LogWSPingInterval = time.Duration(parsedWsPingInterval) * time.Second
-	wsPongInterval := os.Getenv("LOG_WS_PONG_INTERVAL")
-	parsedWsPongInterval, err := strconv.Atoi(wsPongInterval)
-	if err != nil || parsedWsPongInterval < parsedWsPingInterval {
-		parsedWsPongInterval = parsedWsPingInterval * 4
-		bslog.Warnf("invalid WS pong interval %q (it must be higher than ping interval). Using the default value of %d seconds", wsPongInterval, parsedWsPongInterval)
-	}
-	config.LogWSPongInterval = time.Duration(parsedWsPongInterval) * time.Second
 	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
-	if forwarders := os.Getenv("SYSLOG_FORWARD_ADDRESSES"); forwarders != "" {
+	config.StatusInterval = secondsEnvOrDefault(defaultInterval, "STATUS_INTERVAL")
+	config.MetricsInterval = secondsEnvOrDefault(defaultInterval, "METRICS_INTERVAL")
+	config.LogTsuruBufferSize = intEnvOrDefault(defaultBufferSize, "LOG_TSURU_BUFFER_SIZE", "LOG_BUFFER_SIZE")
+	config.LogSyslogBufferSize = intEnvOrDefault(defaultBufferSize, "LOG_SYSLOG_BUFFER_SIZE", "LOG_BUFFER_SIZE")
+	config.LogWSPingInterval = secondsEnvOrDefault(defaultWsPingInterval, "LOG_TSURU_PING_INTERVAL", "LOG_WS_PING_INTERVAL")
+	config.LogWSPongInterval = secondsEnvOrDefault(0, "LOG_TSURU_PONG_INTERVAL", "LOG_WS_PONG_INTERVAL")
+	if config.LogWSPongInterval < config.LogWSPingInterval {
+		config.LogWSPongInterval = config.LogWSPingInterval * 4
+		bslog.Warnf("invalid WS pong interval %v (it must be higher than ping interval). Using the default value of %v", config.LogWSPongInterval/4, config.LogWSPongInterval)
+	}
+	forwarders := stringEnvOrDefault("", "LOG_SYSLOG_FORWARD_ADDRESSES", "SYSLOG_FORWARD_ADDRESSES")
+	if forwarders != "" {
 		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
 	} else {
 		config.SyslogForwardAddresses = nil
