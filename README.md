@@ -74,24 +74,68 @@ Some variables can be used to configure how the default bs application will
 behave. A custom bs image can also make use of set variables to change their
 behavior.
 
-### STATUS_INTERVAL
+### LOG_BACKENDS
 
-`STATUS_INTERVAL` is the interval in seconds between status collecting and
-reporting from bs to the tsuru API. The default value is 60 seconds.
+Comma separated list of which log backends are enabled. Currently possible
+options are `tsuru` and `syslog`. Default value is `tsuru,syslog` enabling
+both available backends.
 
-### SYSLOG_FORWARD_ADDRESSES
+Each backend has it's own possible config variables described in the next
+sections.
 
-`SYSLOG_FORWARD_ADDRESSES` is a comma separated list of SysLog endpoints to
-which bs will forward the logs from Docker containers. Log entries will be
+### `tsuru` backend
+
+Enabling `tsuru` log backend will send all received messages to tsuru api
+server. The `tsuru app-log` command will only work if this backend is enabled.
+
+#### LOG_TSURU_BUFFER_SIZE
+
+`LOG_TSURU_BUFFER_SIZE` is the buffer size for log messages on this backend.
+Default value is 1000000. Messages will be dropped if the buffer is full.
+
+#### LOG_TSURU_PING_INTERVAL
+
+`LOG_TSURU_PING_INTERVAL` is the interval in seconds between websocket Ping
+frames sent to tsuru API server. This works as a heartbeat to check if the API
+is still alive. Default value is 30 seconds.
+
+#### LOG_TSURU_PONG_INTERVAL
+
+`LOG_TSURU_PONG_INTERVAL` is the interval in seconds tsuru will wait for a
+response Pong frame from a tsuru API server, after the Ping message is sent.
+If a Pong message is not received in this interval the websocket connection
+will be reopened. Default value is 4 times the value of
+`LOG_TSURU_PING_INTERVAL`.
+
+### `syslog` backend
+
+Enabling `syslog` log backend will allow bs to forward all received logs to
+other syslog servers. For this to work, at least one server must be set in
+`LOG_SYSLOG_FORWARD_ADDRESSES`.
+
+#### LOG_SYSLOG_BUFFER_SIZE
+
+`LOG_SYSLOG_BUFFER_SIZE` is the buffer size for log messages on this backend.
+Default value is 1000000. Messages will be dropped if the buffer is full.
+
+#### LOG_SYSLOG_FORWARD_ADDRESSES (Previously SYSLOG_FORWARD_ADDRESSES)
+
+`LOG_SYSLOG_FORWARD_ADDRESSES` is a comma separated list of SysLog endpoints
+to which bs will forward the logs from Docker containers. Log entries will be
 rewritten to properly identify the application and process responsible for the
 entry. The default value is an empty string, which means that bs will not
 forward logs to any syslog server, only to tsuru API.
 
-### SYSLOG_TIMEZONE
+#### LOG_SYSLOG_TIMEZONE (Previously SYSLOG_TIMEZONE)
 
-`SYSLOG_TIMEZONE` which timezone to use when forwarding log to SysLog servers.
-The timezone format must be a location existing in the [IANA Time Zone
-database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+`LOG_SYSLOG_TIMEZONE` which timezone to use when forwarding log to SysLog
+servers. The timezone format must be a location existing in the [IANA Time
+Zone database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+
+### STATUS_INTERVAL
+
+`STATUS_INTERVAL` is the interval in seconds between status collecting and
+reporting from bs to the tsuru API. The default value is 60 seconds.
 
 ### METRICS_INTERVAL
 

@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -66,6 +67,11 @@ func (s *S) SetUpTest(c *check.C) {
 	cont, err := dockerClient.CreateContainer(opts)
 	c.Assert(err, check.IsNil)
 	s.id = cont.ID
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "LOG_") || strings.HasPrefix(env, "TSURU_") {
+			os.Unsetenv(strings.SplitN(env, "=", 2)[0])
+		}
+	}
 }
 
 func (s *S) TearDownTest(c *check.C) {
@@ -77,14 +83,11 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
-		DockerEndpoint:   s.dockerServer.URL(),
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -103,19 +106,16 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 }
 
 func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
+	os.Setenv("LOG_SYSLOG_TIMEZONE", "America/Grenada")
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	c.Assert(err, check.IsNil)
 	udpConn, err := net.ListenUDP("udp", addr)
 	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		ForwardAddresses: []string{"udp://" + udpConn.LocalAddr().String()},
-		DockerEndpoint:   s.dockerServer.URL(),
-		SyslogTimezone:   "America/Grenada",
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -164,16 +164,16 @@ func testLogForwarderWSForwarder(
 			}
 		}
 	}
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("TSURU_TOKEN", "mytoken")
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	testTlsConfig = &tls.Config{RootCAs: srvCerts}
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		TsuruEndpoint:    srv.URL,
-		TsuruToken:       "mytoken",
-		DockerEndpoint:   s.dockerServer.URL(),
-		TlsConfig:        &tls.Config{RootCAs: srvCerts},
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -218,38 +218,28 @@ func testLogForwarderWSForwarder(
 
 func (s *S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "xudp://0.0.0.0:59317",
-		DockerEndpoint:   s.dockerServer.URL(),
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		BindAddress:    "xudp://0.0.0.0:59317",
+		DockerEndpoint: s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.ErrorMatches, `invalid protocol "xudp", expected tcp or udp`)
 }
 
 func (s *S) TestLogForwarderForwardConnError(c *check.C) {
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "xudp://127.0.0.1:1234")
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		ForwardAddresses: []string{"xudp://127.0.0.1:1234"},
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		BindAddress:     "udp://0.0.0.0:59317",
+		EnabledBackends: []string{"syslog"},
 	}
 	err := lf.Start()
-	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "xudp://127.0.0.1:1234": dial xudp: unknown network xudp`)
+	c.Assert(err, check.ErrorMatches, `unable to initialize log backend "syslog": \[log forwarder\] unable to connect to "xudp://127.0.0.1:1234": dial xudp: unknown network xudp`)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://localhost:99999")
 	lf = LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		ForwardAddresses: []string{"tcp://localhost:99999"},
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		BindAddress:     "udp://0.0.0.0:59317",
+		EnabledBackends: []string{"syslog"},
 	}
 	err = lf.Start()
-	c.Assert(err, check.ErrorMatches, `\[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
+	c.Assert(err, check.ErrorMatches, `unable to initialize log backend "syslog": \[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
 }
 
 func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
@@ -266,19 +256,15 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 		io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
 	lf := LogForwarder{
-		SyslogBufferSize: 1000000,
-		TsuruBufferSize:  1000000,
-		BindAddress:      "tcp://0.0.0.0:59317",
-		ForwardAddresses: []string{
-			"udp://" + forwardedConns[0].LocalAddr().String(),
-			"udp://" + forwardedConns[1].LocalAddr().String(),
-		},
-		TsuruEndpoint:  srv.URL,
-		TsuruToken:     "mytoken",
-		DockerEndpoint: s.dockerServer.URL(),
-		WSPingInterval: 100e6,
-		WSPongInterval: 400e6,
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"tsuru", "syslog"},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -312,15 +298,14 @@ func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
 		}
 	}))
 	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
 	lf := LogForwarder{
-		SyslogBufferSize: 1000000,
-		TsuruBufferSize:  1000000,
-		BindAddress:      "tcp://0.0.0.0:59317",
-		TsuruEndpoint:    srv.URL,
-		TsuruToken:       "mytoken",
-		DockerEndpoint:   s.dockerServer.URL(),
-		WSPingInterval:   100e6,
-		WSPongInterval:   400e6,
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -364,15 +349,11 @@ func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
 		return tcpConn
 	}
 	forwardedConns := []net.Listener{startReceiver(0), startReceiver(1)}
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String()+",tcp://"+forwardedConns[1].Addr().String())
 	lf := LogForwarder{
-		SyslogBufferSize: 1000000,
-		TsuruBufferSize:  1000000,
-		BindAddress:      "tcp://0.0.0.0:59317",
-		DockerEndpoint:   s.dockerServer.URL(),
-		ForwardAddresses: []string{
-			"tcp://" + forwardedConns[0].Addr().String(),
-			"tcp://" + forwardedConns[1].Addr().String(),
-		},
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -406,15 +387,14 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 		io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
 	lf := LogForwarder{
-		SyslogBufferSize: 1,
-		TsuruBufferSize:  1,
-		BindAddress:      "udp://0.0.0.0:59317",
-		DockerEndpoint:   s.dockerServer.URL(),
-		TsuruEndpoint:    srv.URL,
-		TsuruToken:       "mytoken",
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -442,7 +422,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}
 	wg.Wait()
 	lf.stop()
-	c.Assert(logBuf.String(), check.Matches, `(?s)\[ERROR\] Dropping log messages to tsuru due to full channel buffer.*`)
+	c.Assert(logBuf.String(), check.Matches, `(?s).*\[ERROR\] Dropping log messages to tsuru due to full channel buffer.*`)
 }
 
 func (s *S) TestLogForwarderTableTennis(c *check.C) {
@@ -457,15 +437,14 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 		io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		DockerEndpoint:   s.dockerServer.URL(),
-		TsuruEndpoint:    srv.URL,
-		TsuruToken:       "mytoken",
-		WSPingInterval:   100e6,
-		WSPongInterval:   200e6,
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -485,7 +464,9 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 		bslog.Logger = prevLog
 	}()
 	var err error
+	done := make(chan bool)
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		defer close(done)
 		buf := make([]byte, 1024)
 		for {
 			frame, err := ws.NewFrameReader()
@@ -495,7 +476,6 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 			if frame.PayloadType() != websocket.PingFrame &&
 				frame.PayloadType() != websocket.PongFrame {
 				frameReader, err := ws.HandleFrame(frame)
-				c.Assert(err, check.IsNil)
 				if frameReader == nil {
 					continue
 				}
@@ -509,19 +489,22 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 		}
 	}))
 	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.8")
 	lf := LogForwarder{
-		SyslogBufferSize: 100,
-		TsuruBufferSize:  100,
-		BindAddress:      "udp://0.0.0.0:59317",
-		DockerEndpoint:   s.dockerServer.URL(),
-		TsuruEndpoint:    srv.URL,
-		TsuruToken:       "mytoken",
-		WSPingInterval:   100e6,
-		WSPongInterval:   800e6,
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	time.Sleep(time.Second)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		c.Fatal("timeout after 5 seconds")
+	}
 	lf.stop()
 	c.Assert(logBuf.String(), check.Matches, `(?s).*no pong response in.*`)
 }

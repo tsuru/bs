@@ -1,27 +1,21 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package log
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
 	"net/url"
-	"strconv"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/jeromer/syslogparser"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
-	"golang.org/x/net/websocket"
 	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
@@ -30,13 +24,13 @@ const (
 	forwardConnWriteTimeout = time.Second
 )
 
-var debugStopWg sync.WaitGroup
-
-var syslogBufferPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 200)
-	},
-}
+var (
+	debugStopWg sync.WaitGroup
+	logBackends = map[string]func() logBackend{
+		"syslog": func() logBackend { return &syslogBackend{} },
+		"tsuru":  func() logBackend { return &tsuruBackend{} },
+	}
+)
 
 type LogMessage struct {
 	logEntry  *app.Applog
@@ -44,51 +38,31 @@ type LogMessage struct {
 }
 
 type LogForwarder struct {
-	TsuruBufferSize  int
-	SyslogBufferSize int
-	BindAddress      string
-	ForwardAddresses []string
-	DockerEndpoint   string
-	TsuruEndpoint    string
-	TsuruToken       string
-	SyslogTimezone   string
-	TlsConfig        *tls.Config
-	WSPingInterval   time.Duration
-	WSPongInterval   time.Duration
-	infoClient       *container.InfoClient
-	forwardTsuru     chan<- *LogMessage
-	forwardSyslog    []chan<- *LogMessage
-	forwardQuitChans []chan<- bool
-	server           *syslog.Server
-	syslogLocation   *time.Location
-	nextNotifySyslog *time.Timer
-	nextNotifyTsuru  *time.Timer
+	BindAddress     string
+	DockerEndpoint  string
+	EnabledBackends []string
+	infoClient      *container.InfoClient
+	server          *syslog.Server
+	nextNotifyTsuru *time.Timer
+	backends        []logBackend
 }
 
-type processable interface {
+type forwarderBackend interface {
 	connect() (net.Conn, error)
 	process(conn net.Conn, msg *LogMessage) error
 	close(conn net.Conn)
 }
 
-type syslogForwarder struct {
-	url *url.URL
+type logBackend interface {
+	initialize() error
+	sendMessage(int, time.Time, string, string, string, string)
+	stop()
 }
 
-type wsForwarder struct {
-	url          string
-	token        string
-	tlsConfig    *tls.Config
-	connMutex    sync.Mutex
-	pingInterval time.Duration
-	pongInterval time.Duration
-	jsonEncoder  *json.Encoder
-}
-
-func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
+func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
 	ch := make(chan *LogMessage, bufferSize)
 	quit := make(chan bool)
-	conn, err := processInfo.connect()
+	conn, err := forwarder.connect()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -103,7 +77,7 @@ func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessag
 			default:
 			}
 			if conn == nil {
-				conn, err = processInfo.connect()
+				conn, err = forwarder.connect()
 				if err != nil {
 					conn = nil
 					time.Sleep(100 * time.Millisecond)
@@ -111,224 +85,20 @@ func processMessages(processInfo processable, bufferSize int) (chan<- *LogMessag
 				}
 			}
 			for msg := range ch {
-				err = processInfo.process(conn, msg)
+				err = forwarder.process(conn, msg)
 				if err != nil {
 					break
 				}
 			}
-			processInfo.close(conn)
+			forwarder.close(conn)
 			if err == nil {
 				break
 			}
-			bslog.Errorf("[log forwarder] error writing to %#v: %s", processInfo, err)
+			bslog.Errorf("[log forwarder] error writing to %#v: %s", forwarder, err)
 			conn = nil
 		}
 	}()
 	return ch, quit, nil
-}
-
-func (f *syslogForwarder) connect() (net.Conn, error) {
-	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnDialTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("[log forwarder] unable to connect to %q: %s", f.url, err)
-	}
-	return conn, nil
-}
-
-func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
-	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
-	if err != nil {
-		return err
-	}
-	lenMsg := len(msg.syslogMsg)
-	n, err := conn.Write(msg.syslogMsg)
-	syslogBufferPool.Put(msg.syslogMsg)
-	if err != nil {
-		return err
-	}
-	if n < lenMsg {
-		return fmt.Errorf("[log forwarder] short write trying to write log to %q", conn.RemoteAddr())
-	}
-	return nil
-}
-
-func (f *syslogForwarder) close(conn net.Conn) {
-	// Reset deadline, if we don't do this the connection remains open
-	// on the other end (causing tests to fail) for some weird reason.
-	conn.SetWriteDeadline(time.Time{})
-	conn.Close()
-}
-
-func (f *wsForwarder) connect() (net.Conn, error) {
-	config, err := websocket.NewConfig(f.url, "ws://localhost/")
-	if err != nil {
-		return nil, err
-	}
-	if f.tlsConfig != nil {
-		config.TlsConfig = f.tlsConfig
-	}
-	config.Header.Add("Authorization", "bearer "+f.token)
-	var client net.Conn
-	host, port, _ := net.SplitHostPort(config.Location.Host)
-	if host == "" {
-		host = config.Location.Host
-	}
-	dialer := &net.Dialer{
-		Timeout:   forwardConnDialTimeout,
-		KeepAlive: 30 * time.Second,
-	}
-	switch config.Location.Scheme {
-	case "ws":
-		if port == "" {
-			port = "80"
-		}
-		client, err = dialer.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
-	case "wss":
-		if port == "" {
-			port = "443"
-		}
-		client, err = tls.DialWithDialer(dialer, "tcp", fmt.Sprintf("%s:%s", host, port), config.TlsConfig)
-	default:
-		err = websocket.ErrBadScheme
-	}
-	if err != nil {
-		return nil, err
-	}
-	ws, err := websocket.NewClient(config, client)
-	if err != nil {
-		client.Close()
-		return nil, err
-	}
-	pingWriter, err := ws.NewFrameWriter(websocket.PingFrame)
-	if err != nil {
-		client.Close()
-		bslog.Errorf("[log forwarder] unable to create ping frame writer, closing websocket: %s", err)
-		return nil, err
-	}
-	lastPongTime := time.Now().UnixNano()
-	debugStopWg.Add(2)
-	go func() {
-		defer debugStopWg.Done()
-		defer client.Close()
-		for {
-			frame, err := ws.NewFrameReader()
-			if err != nil {
-				bslog.Errorf("[log forwarder] unable to create pong frame reader, closing websocket: %s", err)
-				return
-			}
-			if frame.PayloadType() == websocket.PongFrame {
-				atomic.StoreInt64(&lastPongTime, time.Now().UnixNano())
-			}
-			io.Copy(ioutil.Discard, frame)
-		}
-	}()
-	go func() {
-		defer debugStopWg.Done()
-		defer client.Close()
-		for range time.Tick(f.pingInterval) {
-			err := f.writeWithDeadline(ws, pingWriter, []byte{'z'})
-			if err != nil {
-				bslog.Errorf("[log forwarder] ping: %s", err)
-				return
-			}
-			mylastPongTime := atomic.LoadInt64(&lastPongTime)
-			lastPong := time.Unix(0, mylastPongTime)
-			now := time.Now()
-			if now.After(lastPong.Add(f.pongInterval)) {
-				bslog.Errorf("[log forwarder] no pong response in %v, closing websocket", now.Sub(lastPong))
-				return
-			}
-		}
-	}()
-	f.jsonEncoder = json.NewEncoder(ws)
-	return ws, nil
-}
-
-func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, data []byte) error {
-	f.connMutex.Lock()
-	defer f.connMutex.Unlock()
-	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
-	if err != nil {
-		return fmt.Errorf("error setting deadline: %s", err)
-	}
-	n, err := writer.Write(data)
-	if err != nil {
-		return fmt.Errorf("error sending message: %s", err)
-	}
-	if n < len(data) {
-		return fmt.Errorf("short write trying to write log to %q", conn.RemoteAddr())
-	}
-	return nil
-}
-
-func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
-	f.connMutex.Lock()
-	defer f.connMutex.Unlock()
-	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
-	if err != nil {
-		return fmt.Errorf("error setting deadline: %s", err)
-	}
-	err = f.jsonEncoder.Encode(msg.logEntry)
-	if err != nil {
-		return fmt.Errorf("error sending message: %s", err)
-	}
-	return nil
-}
-
-func (f *wsForwarder) close(conn net.Conn) {
-	// Reset deadline, if we don't do this the connection remains open
-	// on the other end (causing tests to fail) for some weird reason.
-	f.connMutex.Lock()
-	defer f.connMutex.Unlock()
-	conn.SetWriteDeadline(time.Time{})
-	conn.Close()
-}
-
-func (l *LogForwarder) initForwardConnections() error {
-	for _, addr := range l.ForwardAddresses {
-		forwardUrl, err := url.Parse(addr)
-		if err != nil {
-			return fmt.Errorf("unable to parse %q: %s", addr, err)
-		}
-		forwardChan, quitChan, err := processMessages(&syslogForwarder{
-			url: forwardUrl,
-		}, l.SyslogBufferSize)
-		if err != nil {
-			return err
-		}
-		l.forwardSyslog = append(l.forwardSyslog, forwardChan)
-		l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
-	}
-	return nil
-}
-
-func (l *LogForwarder) initWSConnection() error {
-	if l.TsuruEndpoint == "" {
-		return nil
-	}
-	tsuruUrl, err := url.Parse(l.TsuruEndpoint)
-	if err != nil {
-		return err
-	}
-	tsuruUrl.Path = "/logs"
-	if tsuruUrl.Scheme == "https" {
-		tsuruUrl.Scheme = "wss"
-	} else {
-		tsuruUrl.Scheme = "ws"
-	}
-	forwardChan, quitChan, err := processMessages(&wsForwarder{
-		url:          tsuruUrl.String(),
-		token:        l.TsuruToken,
-		tlsConfig:    l.TlsConfig,
-		pingInterval: l.WSPingInterval,
-		pongInterval: l.WSPongInterval,
-	}, l.TsuruBufferSize)
-	if err != nil {
-		return err
-	}
-	l.forwardTsuru = forwardChan
-	l.forwardQuitChans = append(l.forwardQuitChans, quitChan)
-	return nil
 }
 
 func (l *LogForwarder) Start() (err error) {
@@ -337,28 +107,25 @@ func (l *LogForwarder) Start() (err error) {
 			l.stop()
 		}
 	}()
-	err = l.initWSConnection()
-	if err != nil {
-		return
+	for _, backendName := range l.EnabledBackends {
+		backendName = strings.TrimSpace(backendName)
+		constructor := logBackends[backendName]
+		if constructor == nil {
+			return fmt.Errorf("invalid log backend: %s", backendName)
+		}
+		backend := constructor()
+		err := backend.initialize()
+		if err != nil {
+			return fmt.Errorf("unable to initialize log backend %q: %s", backendName, err)
+		}
+		l.backends = append(l.backends, backend)
 	}
-	err = l.initForwardConnections()
-	if err != nil {
-		return
+	if len(l.backends) == 0 {
+		bslog.Warnf("no log backend enabled, discarding all received log messages.")
 	}
 	l.infoClient, err = container.NewClient(l.DockerEndpoint)
 	if err != nil {
 		return
-	}
-	l.nextNotifySyslog = time.NewTimer(0)
-	l.nextNotifyTsuru = time.NewTimer(0)
-	l.syslogLocation = time.Local
-	if l.SyslogTimezone != "" {
-		tz, err := time.LoadLocation(l.SyslogTimezone)
-		if err == nil {
-			l.syslogLocation = tz
-		} else {
-			bslog.Warnf("unable to parse syslog timezone format: %s", err)
-		}
 	}
 	l.server = syslog.NewServer()
 	l.server.SetHandler(l)
@@ -387,14 +154,8 @@ func (l *LogForwarder) stop() {
 	if l.server != nil {
 		l.server.Wait()
 	}
-	for _, ch := range l.forwardQuitChans {
-		close(ch)
-	}
-	for _, ch := range l.forwardSyslog {
-		close(ch)
-	}
-	if l.forwardTsuru != nil {
-		close(l.forwardTsuru)
+	for _, backend := range l.backends {
+		backend.stop()
 	}
 	debugStopWg.Wait()
 }
@@ -420,63 +181,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
-	if l.forwardTsuru != nil {
-		msg := &LogMessage{
-			logEntry: &app.Applog{
-				Date:    ts,
-				AppName: contData.AppName,
-				Message: content,
-				Source:  contData.ProcessName,
-				Unit:    contId,
-			},
-		}
-		select {
-		case l.forwardTsuru <- msg:
-		default:
-			select {
-			case <-l.nextNotifyTsuru.C:
-				bslog.Errorf("Dropping log messages to tsuru due to full channel buffer.")
-				l.nextNotifyTsuru.Reset(time.Minute)
-			default:
-			}
-		}
-	}
-	if len(l.forwardSyslog) == 0 {
-		return
-	}
-	buffer := syslogBufferPool.Get().([]byte)[:0]
-	buffer = append(buffer, '<')
-	buffer = strconv.AppendInt(buffer, int64(priority), 10)
-	buffer = append(buffer, '>')
-	buffer = append(buffer, ts.In(l.syslogLocation).Format(time.Stamp)...)
-	buffer = append(buffer, ' ')
-	buffer = append(buffer, contId...)
-	buffer = append(buffer, ' ')
-	buffer = append(buffer, contData.AppName...)
-	buffer = append(buffer, '[')
-	buffer = append(buffer, contData.ProcessName...)
-	buffer = append(buffer, ']', ':', ' ')
-	buffer = append(buffer, content...)
-	buffer = append(buffer, '\n')
-	lenSyslogs := len(l.forwardSyslog)
-	for i, ch := range l.forwardSyslog {
-		var chBuffer []byte
-		if i == lenSyslogs-1 {
-			chBuffer = buffer
-		} else {
-			chBuffer = syslogBufferPool.Get().([]byte)[:0]
-			chBuffer = append(chBuffer, buffer...)
-		}
-		msg := &LogMessage{syslogMsg: chBuffer}
-		select {
-		case ch <- msg:
-		default:
-			select {
-			case <-l.nextNotifySyslog.C:
-				bslog.Errorf("Dropping log messages to syslog due to full channel buffer.")
-				l.nextNotifySyslog.Reset(time.Minute)
-			default:
-			}
-		}
+	for _, backend := range l.backends {
+		backend.sendMessage(priority, ts, contId, contData.AppName, contData.ProcessName, content)
 	}
 }

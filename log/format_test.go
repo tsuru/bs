@@ -1,4 +1,4 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -66,7 +66,7 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"priority":     31,
 			"facility":     3,
 			"severity":     7,
-			"timestamp":    time.Date(2015, 12, 26, 5, 8, 46, 0, time.UTC),
+			"timestamp":    time.Date(time.Now().Year(), 12, 26, 5, 8, 46, 0, time.UTC),
 			"hostname":     "hostname",
 			"tag":          "tag/my_id",
 			"content":      "content",

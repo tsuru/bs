@@ -11,98 +11,24 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/log"
 	"github.com/tsuru/bs/metric"
 	"github.com/tsuru/bs/status"
 )
 
 const (
-	defaultInterval       = 60
-	defaultBufferSize     = 1000000
-	defaultWsPingInterval = 30
-	version               = "v1.1"
+	version = "v1.1"
 )
 
 var printVersion bool
 
-var config struct {
-	DockerEndpoint         string
-	TsuruEndpoint          string
-	TsuruToken             string
-	LogSyslogBufferSize    int
-	LogTsuruBufferSize     int
-	MetricsInterval        time.Duration
-	StatusInterval         time.Duration
-	SyslogListenAddress    string
-	SyslogForwardAddresses []string
-	SyslogTimezone         string
-	LogWSPingInterval      time.Duration
-	LogWSPongInterval      time.Duration
-}
-
 func init() {
 	flag.BoolVar(&printVersion, "version", false, "Print version and exit")
-}
-
-func stringEnvOrDefault(defaultValue string, envs ...string) string {
-	for _, env := range envs {
-		val := os.Getenv(env)
-		if val != "" {
-			return val
-		}
-	}
-	if defaultValue != "" {
-		bslog.Warnf("no value found for %s. Using the default value of %s", strings.Join(envs, " or "), defaultValue)
-	}
-	return defaultValue
-}
-
-func intEnvOrDefault(defaultValue int, envs ...string) int {
-	for _, env := range envs {
-		val, err := strconv.Atoi(os.Getenv(env))
-		if err == nil {
-			return val
-		}
-	}
-	if defaultValue != 0 {
-		bslog.Warnf("invalid value for %s. Using the default value of %d", strings.Join(envs, " or "), defaultValue)
-	}
-	return defaultValue
-}
-
-func secondsEnvOrDefault(defaultValue int, envs ...string) time.Duration {
-	return time.Duration(intEnvOrDefault(defaultValue, envs...)) * time.Second
-}
-
-func loadConfig() {
-	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
-	config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
-	config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
-	config.TsuruToken = os.Getenv("TSURU_TOKEN")
-	config.SyslogTimezone = os.Getenv("SYSLOG_TIMEZONE")
-	config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
-	config.StatusInterval = secondsEnvOrDefault(defaultInterval, "STATUS_INTERVAL")
-	config.MetricsInterval = secondsEnvOrDefault(defaultInterval, "METRICS_INTERVAL")
-	config.LogTsuruBufferSize = intEnvOrDefault(defaultBufferSize, "LOG_TSURU_BUFFER_SIZE", "LOG_BUFFER_SIZE")
-	config.LogSyslogBufferSize = intEnvOrDefault(defaultBufferSize, "LOG_SYSLOG_BUFFER_SIZE", "LOG_BUFFER_SIZE")
-	config.LogWSPingInterval = secondsEnvOrDefault(defaultWsPingInterval, "LOG_TSURU_PING_INTERVAL", "LOG_WS_PING_INTERVAL")
-	config.LogWSPongInterval = secondsEnvOrDefault(0, "LOG_TSURU_PONG_INTERVAL", "LOG_WS_PONG_INTERVAL")
-	if config.LogWSPongInterval < config.LogWSPingInterval {
-		config.LogWSPongInterval = config.LogWSPingInterval * 4
-		bslog.Warnf("invalid WS pong interval %v (it must be higher than ping interval). Using the default value of %v", config.LogWSPongInterval/4, config.LogWSPongInterval)
-	}
-	forwarders := stringEnvOrDefault("", "LOG_SYSLOG_FORWARD_ADDRESSES", "SYSLOG_FORWARD_ADDRESSES")
-	if forwarders != "" {
-		config.SyslogForwardAddresses = strings.Split(forwarders, ",")
-	} else {
-		config.SyslogForwardAddresses = nil
-	}
 }
 
 func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
@@ -166,33 +92,25 @@ func main() {
 		fmt.Printf("bs version %s\n", version)
 		return
 	}
-	loadConfig()
 	lf := log.LogForwarder{
-		TsuruBufferSize:  config.LogTsuruBufferSize,
-		SyslogBufferSize: config.LogSyslogBufferSize,
-		BindAddress:      config.SyslogListenAddress,
-		ForwardAddresses: config.SyslogForwardAddresses,
-		DockerEndpoint:   config.DockerEndpoint,
-		TsuruEndpoint:    config.TsuruEndpoint,
-		TsuruToken:       config.TsuruToken,
-		WSPingInterval:   config.LogWSPingInterval,
-		WSPongInterval:   config.LogWSPongInterval,
-		SyslogTimezone:   config.SyslogTimezone,
+		BindAddress:     config.Config.SyslogListenAddress,
+		DockerEndpoint:  config.Config.DockerEndpoint,
+		EnabledBackends: config.Config.LogBackends,
 	}
 	err := lf.Start()
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
-	mRunner := metric.NewRunner(config.DockerEndpoint, config.MetricsInterval)
+	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval)
 	err = mRunner.Start()
 	if err != nil {
 		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
-		TsuruEndpoint:  config.TsuruEndpoint,
-		TsuruToken:     config.TsuruToken,
-		DockerEndpoint: config.DockerEndpoint,
-		Interval:       config.StatusInterval,
+		TsuruEndpoint:  config.Config.TsuruEndpoint,
+		TsuruToken:     config.Config.TsuruToken,
+		DockerEndpoint: config.Config.DockerEndpoint,
+		Interval:       config.Config.StatusInterval,
 	})
 	if err != nil {
 		bslog.Fatalf("Unable to initialize status reporter: %s\n", err)
