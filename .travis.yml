@@ -1,11 +1,12 @@
 language: go
 sudo: required
 go:
-  - 1.5.1
+  - 1.5.2
+  - 1.6beta1
   - tip
 env:
   global:
-    - GO_FOR_RELEASE=1.5.1
+    - GO_FOR_RELEASE=1.5.2
     - PATH="$GOPATH/bin:$PATH"
   matrix:
     - GOARCH=amd64
