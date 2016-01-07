@@ -1,6 +1,5 @@
 # bs
 
-[![Build Status](https://drone.io/github.com/tsuru/bs/status.png?branch=master)](https://drone.io/github.com/tsuru/bs/latest)
 [![Build Status](https://travis-ci.org/tsuru/bs.png?branch=master)](https://travis-ci.org/tsuru/bs)
 
 bs (or big sibling) is a tsuru component, responsible for reporting
