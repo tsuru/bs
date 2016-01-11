@@ -16,6 +16,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
+	"github.com/tsuru/tsuru/provision"
 )
 
 type containerStatus struct {
@@ -127,28 +128,30 @@ func (r *Reporter) reportStatus() {
 func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, error) {
 	payload := make([]containerStatus, 0, len(containers))
 	for _, c := range containers {
-		var status string
+		var status provision.Status
 		cont, err := r.infoClient.GetFreshContainer(c.ID)
 		if err == container.ErrTsuruVariablesNotFound {
 			continue
 		}
 		if err != nil {
 			bslog.Errorf("failed to inspect container %q: %s", c.ID, err)
-			status = "error"
+			status = provision.StatusError
 		} else {
 			if cont.Container.State.Restarting {
-				status = "error"
+				status = provision.StatusError
 			} else if cont.Container.State.Running {
-				status = "started"
+				status = provision.StatusStarted
+			} else if cont.Container.State.StartedAt.IsZero() {
+				status = provision.StatusCreated
 			} else {
-				status = "stopped"
+				status = provision.StatusStopped
 			}
 		}
 		var name string
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		payload = append(payload, containerStatus{ID: c.ID, Name: name, Status: status})
+		payload = append(payload, containerStatus{ID: c.ID, Name: name, Status: status.String()})
 	}
 	if len(payload) == 0 {
 		return nil, nil

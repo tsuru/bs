@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -37,15 +38,16 @@ func (s S) TestReportStatus(c *check.C) {
 	defer func() { bslog.Logger = log.New(os.Stderr, "", log.LstdFlags) }()
 	bogusContainers := []bogusContainer{
 		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
-		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
+		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1, StartedAt: time.Now()}},
 		{name: "x3", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
 		{name: "x4", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{name: "x5", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
+		{name: "x6", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false}},
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
-	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false}]`
-	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID))
+	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":true}]`
+	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[5].ID))
 	var resp http.Response
 	resp.Body = ioutil.NopCloser(buf)
 	resp.Header = make(http.Header)
@@ -72,6 +74,7 @@ func (s S) TestReportStatus(c *check.C) {
 		{ID: containers[1].ID, Status: "stopped", Name: "x2"},
 		{ID: containers[2].ID, Status: "error", Name: "x3"},
 		{ID: containers[3].ID, Status: "started", Name: "x4"},
+		{ID: containers[5].ID, Status: "created", Name: "x6"},
 	}
 	err = json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
@@ -84,7 +87,10 @@ func (s S) TestReportStatus(c *check.C) {
 	for i, cont := range apiContainers {
 		ids[i] = cont.ID
 	}
-	c.Assert(ids, check.DeepEquals, []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID})
+	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID}
+	sort.Strings(ids)
+	sort.Strings(expectedIDs)
+	c.Assert(ids, check.DeepEquals, expectedIDs)
 }
 
 type tsuruRequest struct {
