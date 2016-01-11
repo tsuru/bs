@@ -33,7 +33,19 @@
 			"revisionTime": "2016-01-07T08:01:32-02:00"
 		},
 		{
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/idtools",
+			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/idtools",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
+		},
+		{
 			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/ioutils",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
+		},
+		{
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/longpath",
+			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/longpath",
 			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
 			"revisionTime": "2016-01-07T08:01:32-02:00"
 		},
@@ -68,14 +80,10 @@
 			"revisionTime": "2015-10-15T16:23:15-03:00"
 		},
 		{
-			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/units",
-			"revision": "cc8cb2dcad73aa53c5f6b5b7927699e9941e6dbe",
-			"revisionTime": "2015-10-15T16:23:15-03:00"
-		},
-		{
-			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/volume",
-			"revision": "cc8cb2dcad73aa53c5f6b5b7927699e9941e6dbe",
-			"revisionTime": "2015-10-15T16:23:15-03:00"
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/github.com/docker/go-units",
+			"path": "github.com/fsouza/go-dockerclient/external/github.com/docker/go-units",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
 		},
 		{
 			"path": "github.com/fsouza/go-dockerclient/external/github.com/gorilla/context",
@@ -88,7 +96,25 @@
 			"revisionTime": "2016-01-07T08:01:32-02:00"
 		},
 		{
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/github.com/hashicorp/go-cleanhttp",
+			"path": "github.com/fsouza/go-dockerclient/external/github.com/hashicorp/go-cleanhttp",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
+		},
+		{
 			"path": "github.com/fsouza/go-dockerclient/external/github.com/opencontainers/runc/libcontainer/user",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
+		},
+		{
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/golang.org/x/net/context",
+			"path": "github.com/fsouza/go-dockerclient/external/golang.org/x/net/context",
+			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
+			"revisionTime": "2016-01-07T08:01:32-02:00"
+		},
+		{
+			"origin": "github.com/tsuru/bs/vendor/github.com/fsouza/go-dockerclient/external/golang.org/x/sys/unix",
+			"path": "github.com/fsouza/go-dockerclient/external/golang.org/x/sys/unix",
 			"revision": "5be6810ca4a5ba031005bc1f818eaf616a734e6f",
 			"revisionTime": "2016-01-07T08:01:32-02:00"
 		},
