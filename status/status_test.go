@@ -1,4 +1,4 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -38,7 +38,7 @@ func (s S) TestReportStatus(c *check.C) {
 	defer func() { bslog.Logger = log.New(os.Stderr, "", log.LstdFlags) }()
 	bogusContainers := []bogusContainer{
 		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
-		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1, StartedAt: time.Now()}},
+		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1, StartedAt: time.Now().Add(-time.Hour)}},
 		{name: "x3", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
 		{name: "x4", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{name: "x5", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
@@ -49,6 +49,7 @@ func (s S) TestReportStatus(c *check.C) {
 	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":true}]`
 	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[5].ID))
 	var resp http.Response
+	resp.StatusCode = http.StatusOK
 	resp.Body = ioutil.NopCloser(buf)
 	resp.Header = make(http.Header)
 	resp.Header.Set("Content-Type", "application/json")
