@@ -15,6 +15,11 @@ func statsToMetricsMap(s *docker.Stats) (map[string]float, error) {
 		"cpu_max":     float(cpuPercent),
 		"mem_max":     float(s.MemoryStats.Usage),
 		"mem_pct_max": float(memPercent),
+		"mem_limit":   float(s.MemoryStats.Limit),
+	}
+	if s.MemoryStats.Stats.Swap != 0 {
+		stats["swap"] = float(s.MemoryStats.Stats.Swap)
+		stats["swap_limit"] = float(s.MemoryStats.Stats.HierarchicalMemswLimit - s.MemoryStats.Stats.HierarchicalMemoryLimit)
 	}
 	return stats, nil
 }

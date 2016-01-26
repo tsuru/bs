@@ -43,7 +43,7 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
              "total_writeback" : 0,
              "total_inactive_anon" : 0,
              "rss_huge" : 6291456,
-         "hierarchical_memory_limit": 189204833,
+             "hierarchical_memory_limit": 67108864,
              "total_pgfault" : 964,
              "total_active_file" : 0,
              "active_anon" : 6537216,
@@ -54,7 +54,9 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
              "active_file" : 0,
              "pgfault" : 964,
              "inactive_file" : 0,
-             "total_pgpgin" : 477
+             "total_pgpgin" : 477,
+             "swap" : 47312896,
+             "hierarchical_memsw_limit" : 1610612736
           },
           "max_usage" : 6651904,
           "usage" : 6537216,
@@ -118,6 +120,9 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
 	metricsMap, err := statsToMetricsMap(&stats)
 	c.Assert(err, check.IsNil)
 	c.Assert(metricsMap["mem_max"], check.Equals, float(6537216))
+	c.Assert(metricsMap["mem_limit"], check.Equals, float(67108864))
+	c.Assert(metricsMap["swap"], check.Equals, float(47312896))
+	c.Assert(metricsMap["swap_limit"], check.Equals, float(1543503872))
 	diffMemPctMax := 9.74 - metricsMap["mem_pct_max"]
 	c.Assert(diffMemPctMax < 0.01, check.Equals, true)
 	diffCpuMax := 0 - metricsMap["cpu_max"]
