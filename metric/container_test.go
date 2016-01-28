@@ -22,7 +22,7 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
           "tx_dropped" : 0,
           "rx_packets" : 8,
           "tx_errors" : 0,
-          "tx_bytes" : 648
+          "tx_bytes" : 649
        },
        "memory_stats" : {
           "stats" : {
@@ -123,8 +123,24 @@ func (s *S) TestStatsToMetricsMap(c *check.C) {
 	c.Assert(metricsMap["mem_limit"], check.Equals, float(67108864))
 	c.Assert(metricsMap["swap"], check.Equals, float(47312896))
 	c.Assert(metricsMap["swap_limit"], check.Equals, float(1543503872))
+	c.Assert(metricsMap["netrx"], check.Equals, float(648))
+	c.Assert(metricsMap["nettx"], check.Equals, float(649))
 	diffMemPctMax := 9.74 - metricsMap["mem_pct_max"]
 	c.Assert(diffMemPctMax < 0.01, check.Equals, true)
 	diffCpuMax := 0 - metricsMap["cpu_max"]
 	c.Assert(diffCpuMax < 0.01, check.Equals, true)
+	stats.Networks = map[string]docker.NetworkStats{
+		"eth0": {
+			RxBytes: 1,
+			TxBytes: 2,
+		},
+		"eth1": {
+			RxBytes: 3,
+			TxBytes: 4,
+		},
+	}
+	metricsMap, err = statsToMetricsMap(&stats)
+	c.Assert(err, check.IsNil)
+	c.Assert(metricsMap["netrx"], check.Equals, float(4))
+	c.Assert(metricsMap["nettx"], check.Equals, float(6))
 }

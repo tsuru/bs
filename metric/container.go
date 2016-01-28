@@ -21,6 +21,18 @@ func statsToMetricsMap(s *docker.Stats) (map[string]float, error) {
 		stats["swap"] = float(s.MemoryStats.Stats.Swap)
 		stats["swap_limit"] = float(s.MemoryStats.Stats.HierarchicalMemswLimit - s.MemoryStats.Stats.HierarchicalMemoryLimit)
 	}
+	var netRx, netTx uint64
+	if len(s.Networks) > 0 {
+		for _, n := range s.Networks {
+			netRx += n.RxBytes
+			netTx += n.TxBytes
+		}
+	} else {
+		netRx = s.Network.RxBytes
+		netTx = s.Network.TxBytes
+	}
+	stats["netrx"] = float(netRx)
+	stats["nettx"] = float(netTx)
 	return stats, nil
 }
 
