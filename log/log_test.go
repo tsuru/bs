@@ -105,6 +105,22 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg\n", s.id))
 }
 
+func (s *S) TestLogForwarderStartNoneBackend(c *check.C) {
+	lf := LogForwarder{
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"none"},
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+}
+
 func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	os.Setenv("LOG_SYSLOG_TIMEZONE", "America/Grenada")
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")

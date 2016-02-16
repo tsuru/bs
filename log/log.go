@@ -22,6 +22,7 @@ import (
 const (
 	forwardConnDialTimeout  = time.Second
 	forwardConnWriteTimeout = time.Second
+	noneBackend             = "none"
 )
 
 var (
@@ -107,6 +108,9 @@ func (l *LogForwarder) Start() (err error) {
 			l.stop()
 		}
 	}()
+	if len(l.EnabledBackends) == 1 && l.EnabledBackends[0] == noneBackend {
+		return
+	}
 	for _, backendName := range l.EnabledBackends {
 		backendName = strings.TrimSpace(backendName)
 		constructor := logBackends[backendName]

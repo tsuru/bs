@@ -73,8 +73,8 @@ behavior.
 ### LOG_BACKENDS
 
 Comma separated list of which log backends are enabled. Currently possible
-options are `tsuru` and `syslog`. Default value is `tsuru,syslog` enabling
-both available backends.
+options are `tsuru`, `syslog` and `none`. Default value is `tsuru,syslog`
+enabling both available backends.
 
 Each backend has it's own possible config variables described in the next
 sections.
