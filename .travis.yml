@@ -6,7 +6,7 @@ go:
   - tip
 env:
   global:
-    - GO_FOR_RELEASE=1.5.3
+    - GO_FOR_RELEASE=1.6
     - GO15VENDOREXPERIMENT=1
   matrix:
     - GOARCH=amd64
