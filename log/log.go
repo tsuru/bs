@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +111,6 @@ func (l *LogForwarder) Start() (err error) {
 		return
 	}
 	for _, backendName := range l.EnabledBackends {
-		backendName = strings.TrimSpace(backendName)
 		constructor := logBackends[backendName]
 		if constructor == nil {
 			return fmt.Errorf("invalid log backend: %s", backendName)

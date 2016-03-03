@@ -29,7 +29,7 @@ func (S) TestLoadConfig(c *check.C) {
 	os.Setenv("TSURU_TOKEN", "sometoken")
 	os.Setenv("STATUS_INTERVAL", "45")
 	os.Setenv("SYSLOG_LISTEN_ADDRESS", "udp://0.0.0.0:1514")
-	os.Setenv("LOG_BACKENDS", "b1,b2")
+	os.Setenv("LOG_BACKENDS", "b1, b2 ")
 	LoadConfig()
 	c.Check(Config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
 	c.Check(Config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
@@ -59,4 +59,25 @@ func (S) TestLoadConfigDefaultLogBackends(c *check.C) {
 	os.Unsetenv("LOG_BACKENDS")
 	LoadConfig()
 	c.Check(Config.LogBackends, check.DeepEquals, []string{"tsuru", "syslog"})
+}
+
+func (S) TestStringsEnvOrDefault(c *check.C) {
+	var buf bytes.Buffer
+	bslog.Logger = log.New(&buf, "", 0)
+	defer func() { bslog.Logger = log.New(os.Stderr, "", log.LstdFlags) }()
+	v := StringsEnvOrDefault(nil, "STRINGS_ENV")
+	c.Assert(v, check.IsNil)
+	c.Assert(buf.String(), check.Equals, "")
+	v = StringsEnvOrDefault([]string{"a"}, "STRINGS_ENV")
+	c.Assert(v, check.DeepEquals, []string{"a"})
+	c.Assert(buf.String(), check.Matches, `(?m).*\[WARNING\] invalid value for STRINGS_ENV\. Using the default value of \[a\]$`)
+	buf.Reset()
+	os.Setenv("STRINGS_ENV", "myvalue")
+	v = StringsEnvOrDefault(nil, "STRINGS_ENV")
+	c.Assert(v, check.DeepEquals, []string{"myvalue"})
+	c.Assert(buf.String(), check.Equals, "")
+	os.Setenv("STRINGS_ENV", "myvalue , other,value, ok ")
+	v = StringsEnvOrDefault(nil, "STRINGS_ENV")
+	c.Assert(v, check.DeepEquals, []string{"myvalue", "other", "value", "ok"})
+	c.Assert(buf.String(), check.Equals, "")
 }
