@@ -81,7 +81,7 @@ func (s S) TestReportStatus(c *check.C) {
 	var input hostStatus
 	err = json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
-	c.Assert(input.Checks, check.HasLen, 4)
+	c.Assert(input.Checks, check.HasLen, 2)
 	input.Checks = nil
 	c.Assert(input, check.DeepEquals, expected)
 	dockerClient, err := docker.NewClient(dockerServer.URL())

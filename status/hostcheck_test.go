@@ -11,6 +11,44 @@ import (
 	"gopkg.in/check.v1"
 )
 
+func (s S) TestNewCheckCollection(c *check.C) {
+	checkColl, err := NewCheckCollection(nil)
+	c.Assert(err, check.IsNil)
+	c.Assert(checkColl.checks, check.HasLen, 2)
+	writableCheck := checkColl.checks["writableRoot"].(*writableCheck)
+	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
+	c.Assert(writableCheck.path, check.Equals, "/")
+	c.Assert(ccCheck.baseContID, check.Equals, "")
+	c.Assert(ccCheck.client, check.IsNil)
+	c.Assert(ccCheck.message, check.Equals, "ok")
+}
+
+func (s S) TestNewCheckCollectionExtraPaths(c *check.C) {
+	os.Setenv("HOSTCHECK_EXTRA_PATHS", "/var/log, /var/lib/docker")
+	defer os.Unsetenv("HOSTCHECK_EXTRA_PATHS")
+	checkColl, err := NewCheckCollection(nil)
+	c.Assert(err, check.IsNil)
+	c.Assert(checkColl.checks, check.HasLen, 4)
+	writableCheck1, ok := checkColl.checks["writableCustomPath1"].(*writableCheck)
+	c.Assert(ok, check.Equals, true)
+	c.Assert(writableCheck1.path, check.Equals, "/var/log")
+	writableCheck2, ok := checkColl.checks["writableCustomPath2"].(*writableCheck)
+	c.Assert(ok, check.Equals, true)
+	c.Assert(writableCheck2.path, check.Equals, "/var/lib/docker")
+}
+
+func (s S) TestNewCheckCollectionBaseContainerName(c *check.C) {
+	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "big-sibling")
+	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
+	checkColl, err := NewCheckCollection(nil)
+	c.Assert(err, check.IsNil)
+	c.Assert(checkColl.checks, check.HasLen, 2)
+	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
+	c.Assert(ccCheck.baseContID, check.Equals, "big-sibling")
+	c.Assert(ccCheck.client, check.IsNil)
+	c.Assert(ccCheck.message, check.Equals, "ok")
+}
+
 func (s S) TestWritableCheckRun(c *check.C) {
 	dir, err := os.Getwd()
 	c.Assert(err, check.IsNil)
@@ -40,7 +78,7 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 			conts, err := client.ListContainers(docker.ListContainersOptions{})
 			c.Assert(err, check.IsNil)
 			for _, co := range conts {
-				if co.ID != conts[0].ID {
+				if co.ID != conts[0].ID && co.Status != "Exit 0" {
 					err = client.StopContainer(co.ID, 10)
 					break out
 				}

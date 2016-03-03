@@ -94,12 +94,12 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 	}
 	go func(abort <-chan struct{}) {
 		for {
+			reporter.reportStatus()
 			select {
 			case <-abort:
 				close(exit)
 				return
 			case <-time.After(reporter.config.Interval):
-				reporter.reportStatus()
 			}
 		}
 	}(abort)
@@ -123,7 +123,7 @@ func (r *Reporter) reportStatus() {
 	opts := docker.ListContainersOptions{All: true}
 	containers, err := client.ListContainers(opts)
 	if err != nil {
-		bslog.Errorf("failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
+		bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
 		return
 	}
 	containerStatuses := r.retrieveContainerStatuses(containers)
@@ -137,12 +137,12 @@ func (r *Reporter) reportStatus() {
 		resp, err = r.updateUnits(hostData.Units)
 	}
 	if err != nil {
-		bslog.Errorf("failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
+		bslog.Errorf("[status reporter] failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
 		return
 	}
 	err = r.handleTsuruResponse(resp)
 	if err != nil {
-		bslog.Errorf("failed to handle tsuru response: %s", err)
+		bslog.Errorf("[status reporter] failed to handle tsuru response: %s", err)
 	}
 }
 
@@ -155,7 +155,7 @@ func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) 
 			continue
 		}
 		if err != nil {
-			bslog.Errorf("failed to inspect container %q: %s", c.ID, err)
+			bslog.Errorf("[status reporter] failed to inspect container %q: %s", c.ID, err)
 			status = provision.StatusError
 		} else {
 			if cont.Container.State.Restarting {
@@ -225,11 +225,11 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("[status reported] unexpected response from tsuru %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("unexpected response from tsuru %d: %s", resp.StatusCode, string(body))
 	}
 	err := json.NewDecoder(resp.Body).Decode(&statusResp)
 	if err != nil {
-		return fmt.Errorf("[status reported] unable to parse tsuru response: %s", err)
+		return fmt.Errorf("unable to parse tsuru response: %s", err)
 	}
 	if len(statusResp) == 0 {
 		return nil
@@ -245,7 +245,7 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
 		err = client.RemoveContainer(opts)
 		if err != nil {
-			bslog.Errorf("[status reported] failed to remove container %q: %s", id, err)
+			bslog.Errorf("[status reporter] failed to remove invalid container %q: %s", id, err)
 		}
 	}
 	return nil

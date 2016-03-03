@@ -8,10 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 )
 
 type hostCheck interface {
@@ -28,23 +32,21 @@ type hostCheckResult struct {
 	Successful bool
 }
 
+var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
+
 func NewCheckCollection(client *docker.Client) (*checkCollection, error) {
-	dockerEnv, err := client.Info()
-	if err != nil {
-		return nil, err
-	}
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-	return &checkCollection{
+	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
+	checkColl := &checkCollection{
 		checks: map[string]hostCheck{
-			"writableRoot":       &writableCheck{path: "/"},
-			"writableLog":        &writableCheck{path: "/var/log"},
-			"writableDockerRoot": &writableCheck{path: dockerEnv.Get("DockerRootDir")},
-			"createContainer":    &createContainerCheck{client: client, baseContID: hostname, message: "ok"},
+			"writableRoot":    &writableCheck{path: "/"},
+			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: "ok"},
 		},
-	}, nil
+	}
+	extraPaths := config.StringsEnvOrDefault(nil, "HOSTCHECK_EXTRA_PATHS")
+	for i, p := range extraPaths {
+		checkColl.checks[fmt.Sprintf("writableCustomPath%d", i+1)] = &writableCheck{path: p}
+	}
+	return checkColl, nil
 }
 
 func (c *checkCollection) Run() []hostCheckResult {
@@ -55,6 +57,7 @@ func (c *checkCollection) Run() []hostCheckResult {
 		err := c.Run()
 		check.Successful = err == nil
 		if err != nil {
+			bslog.Errorf("[host check] failure running %q check: %s", name, err)
 			check.Err = err.Error()
 		}
 		result[i] = check
@@ -96,18 +99,46 @@ type createContainerCheck struct {
 	message    string
 }
 
+func (c *createContainerCheck) setBaseContainerID() error {
+	if c.baseContID != "" {
+		return nil
+	}
+	cgroupFile, err := os.Open("/proc/1/cgroup")
+	if err != nil {
+		return err
+	}
+	defer cgroupFile.Close()
+	data, err := ioutil.ReadAll(cgroupFile)
+	if err != nil {
+		return err
+	}
+	result := cgroupIDRegexp.FindSubmatch(data)
+	if len(result) != 2 {
+		return fmt.Errorf("unable to parse container id from /proc/1/cgroup, returned data:\n%s", string(data))
+	}
+	c.baseContID = string(result[1])
+	return nil
+}
+
 func (c *createContainerCheck) Run() error {
+	err := c.setBaseContainerID()
+	if err != nil {
+		return err
+	}
+	contName := "bs-hostcheck-container"
+	c.client.RemoveContainer(docker.RemoveContainerOptions{ID: contName, Force: true})
 	baseContInfo, err := c.client.InspectContainer(c.baseContID)
 	if err != nil {
 		return err
 	}
 	opts := docker.CreateContainerOptions{
+		Name: "bs-hostcheck-container",
 		Config: &docker.Config{
 			AttachStdout: true,
 			AttachStderr: true,
 			Image:        baseContInfo.Image,
-			Entrypoint:   []string{"/bin/sh", "-c"},
-			Cmd:          []string{"echo", c.message},
+			Entrypoint:   []string{},
+			Cmd:          []string{"echo", "-n", c.message},
 		},
 	}
 	cont, err := c.client.CreateContainer(opts)
@@ -132,7 +163,7 @@ func (c *createContainerCheck) Run() error {
 	}
 	waiter.Wait()
 	if output.String() != c.message {
-		return fmt.Errorf("unexpected container response: %s", output.String())
+		return fmt.Errorf("unexpected container response: %q", output.String())
 	}
 	return nil
 }
