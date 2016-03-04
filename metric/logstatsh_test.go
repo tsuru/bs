@@ -12,19 +12,17 @@ import (
 )
 
 func (s *S) TestSend(c *check.C) {
-	addr := net.UDPAddr{
-		Port: 0,
-		IP:   net.ParseIP("127.0.0.1"),
-	}
+	addr := net.UDPAddr{IP: net.ParseIP("127.0.0.1")}
 	conn, err := net.ListenUDP("udp", &addr)
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
 	host, port, err := net.SplitHostPort(conn.LocalAddr().String())
 	c.Assert(err, check.IsNil)
 	st := logStash{
-		Client: "test",
-		Host:   host,
-		Port:   port,
+		Client:   "test",
+		Host:     host,
+		Port:     port,
+		Protocol: "udp",
 	}
 	err = st.Send("app", "hostname", "process", "key", "value")
 	c.Assert(err, check.IsNil)
@@ -42,6 +40,50 @@ func (s *S) TestSend(c *check.C) {
 	}
 	var got map[string]interface{}
 	err = json.Unmarshal(data[:n], &got)
+	c.Assert(err, check.IsNil)
+	c.Assert(got, check.DeepEquals, expected)
+}
+
+func (s *S) TestSendTCP(c *check.C) {
+	addr := net.TCPAddr{IP: net.ParseIP("127.0.0.1")}
+	conn, err := net.ListenTCP("tcp", &addr)
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	dataCh := make(chan []byte, 1)
+
+	go func() {
+		client, err := conn.Accept()
+		c.Assert(err, check.IsNil)
+		defer client.Close()
+		var data [264]byte
+		n, err := client.Read(data[:])
+		c.Assert(err, check.IsNil)
+		dataCh <- data[:n]
+	}()
+
+	host, port, err := net.SplitHostPort(conn.Addr().String())
+	c.Assert(err, check.IsNil)
+	st := logStash{
+		Client:   "test",
+		Host:     host,
+		Port:     port,
+		Protocol: "tcp",
+	}
+	err = st.Send("app", "hostname", "process", "key", "value")
+	c.Assert(err, check.IsNil)
+
+	data := <-dataCh
+	expected := map[string]interface{}{
+		"count":   float64(1),
+		"client":  "test",
+		"metric":  "key",
+		"value":   "value",
+		"app":     "app",
+		"host":    "hostname",
+		"process": "process",
+	}
+	var got map[string]interface{}
+	err = json.Unmarshal(data, &got)
 	c.Assert(err, check.IsNil)
 	c.Assert(got, check.DeepEquals, expected)
 }

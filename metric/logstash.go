@@ -13,10 +13,11 @@ import (
 )
 
 func newLogStash() (statter, error) {
-	var (
-		defaultClient string = "tsuru"
-		defaultPort   string = "1984"
-		defaultHost   string = "localhost"
+	const (
+		defaultClient   = "tsuru"
+		defaultPort     = "1984"
+		defaultHost     = "localhost"
+		defaultProtocol = "udp"
 	)
 	client := os.Getenv("METRICS_LOGSTASH_CLIENT")
 	if client == "" {
@@ -30,17 +31,23 @@ func newLogStash() (statter, error) {
 	if host == "" {
 		host = defaultHost
 	}
+	protocol := os.Getenv("METRICS_LOGSTASH_PROTOCOL")
+	if protocol == "" {
+		protocol = defaultProtocol
+	}
 	return &logStash{
-		Client: client,
-		Host:   host,
-		Port:   port,
+		Client:   client,
+		Host:     host,
+		Port:     port,
+		Protocol: protocol,
 	}, nil
 }
 
 type logStash struct {
-	Host   string
-	Port   string
-	Client string
+	Host     string
+	Port     string
+	Client   string
+	Protocol string
 }
 
 func (s *logStash) Send(app, hostname, process, key string, value interface{}) error {
@@ -70,7 +77,7 @@ func (s *logStash) SendConn(app, hostname, process, host string) error {
 }
 
 func (s *logStash) send(message map[string]interface{}) error {
-	conn, err := net.Dial("udp", net.JoinHostPort(s.Host, s.Port))
+	conn, err := net.Dial(s.Protocol, net.JoinHostPort(s.Host, s.Port))
 	if err != nil {
 		return err
 	}
