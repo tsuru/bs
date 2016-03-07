@@ -88,7 +88,7 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 	contCheck := createContainerCheck{
 		client:     client,
 		baseContID: conts[0].ID,
-		message:    "Container is running\nWhat happened?\nSomething happened\n",
+		message:    "Container is not running\nWhat happened?\nSomething happened\n",
 	}
 	err = contCheck.Run()
 	c.Assert(err, check.IsNil)

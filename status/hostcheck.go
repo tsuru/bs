@@ -152,11 +152,14 @@ func (c *createContainerCheck) Run() error {
 		OutputStream: output,
 		Stream:       true,
 		Stdout:       true,
+		Success:      make(chan struct{}),
 	}
 	waiter, err := c.client.AttachToContainerNonBlocking(attachOptions)
 	if err != nil {
 		return err
 	}
+	<-attachOptions.Success
+	close(attachOptions.Success)
 	err = c.client.StartContainer(cont.ID, nil)
 	if err != nil {
 		return err
