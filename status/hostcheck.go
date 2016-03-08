@@ -34,7 +34,7 @@ type hostCheckResult struct {
 
 var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
 
-func NewCheckCollection(client *docker.Client) (*checkCollection, error) {
+func NewCheckCollection(client *docker.Client) *checkCollection {
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
 	checkColl := &checkCollection{
 		checks: map[string]hostCheck{
@@ -46,7 +46,7 @@ func NewCheckCollection(client *docker.Client) (*checkCollection, error) {
 	for i, p := range extraPaths {
 		checkColl.checks[fmt.Sprintf("writableCustomPath%d", i+1)] = &writableCheck{path: p}
 	}
-	return checkColl, nil
+	return checkColl
 }
 
 func (c *checkCollection) Run() []hostCheckResult {

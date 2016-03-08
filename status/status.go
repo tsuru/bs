@@ -44,11 +44,13 @@ type Reporter struct {
 	abort      chan<- struct{}
 	exit       <-chan struct{}
 	checks     *checkCollection
+	addrs      []string
 	infoClient *container.InfoClient
 	httpClient *http.Client
 }
 
 type hostStatus struct {
+	Addrs  []string
 	Units  []containerStatus
 	Checks []hostCheckResult
 }
@@ -70,9 +72,10 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 	if err != nil {
 		return nil, err
 	}
-	checks, err := NewCheckCollection(infoClient.GetClient())
+	checks := NewCheckCollection(infoClient.GetClient())
+	addrs, err := findNodeAddrs()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[status reporter] unable to get network addresses: %s", err)
 	}
 	transport := http.Transport{
 		Dial: (&net.Dialer{
@@ -87,6 +90,7 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 		exit:       exit,
 		infoClient: infoClient,
 		checks:     checks,
+		addrs:      addrs,
 		httpClient: &http.Client{
 			Transport: &transport,
 			Timeout:   fullTimeout,
@@ -129,6 +133,7 @@ func (r *Reporter) reportStatus() {
 	containerStatuses := r.retrieveContainerStatuses(containers)
 	hostChecks := r.checks.Run()
 	hostData := &hostStatus{
+		Addrs:  r.addrs,
 		Units:  containerStatuses,
 		Checks: hostChecks,
 	}
@@ -249,4 +254,30 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 		}
 	}
 	return nil
+}
+
+func findNodeAddrs() ([]string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+	addrsRet := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		var addrStr string
+		switch v := a.(type) {
+		case *net.IPNet:
+			addrStr = v.IP.String()
+		case *net.IPAddr:
+			addrStr = v.IP.String()
+		default:
+			ip := net.ParseIP(strings.SplitN(a.String(), "/", 2)[0])
+			if ip != nil {
+				addrStr = ip.String()
+			}
+		}
+		if addrStr != "" {
+			addrsRet = append(addrsRet, addrStr)
+		}
+	}
+	return addrsRet, nil
 }

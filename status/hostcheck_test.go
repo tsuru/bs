@@ -12,8 +12,7 @@ import (
 )
 
 func (s S) TestNewCheckCollection(c *check.C) {
-	checkColl, err := NewCheckCollection(nil)
-	c.Assert(err, check.IsNil)
+	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.HasLen, 2)
 	writableCheck := checkColl.checks["writableRoot"].(*writableCheck)
 	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
@@ -26,8 +25,7 @@ func (s S) TestNewCheckCollection(c *check.C) {
 func (s S) TestNewCheckCollectionExtraPaths(c *check.C) {
 	os.Setenv("HOSTCHECK_EXTRA_PATHS", "/var/log, /var/lib/docker")
 	defer os.Unsetenv("HOSTCHECK_EXTRA_PATHS")
-	checkColl, err := NewCheckCollection(nil)
-	c.Assert(err, check.IsNil)
+	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.HasLen, 4)
 	writableCheck1, ok := checkColl.checks["writableCustomPath1"].(*writableCheck)
 	c.Assert(ok, check.Equals, true)
@@ -40,8 +38,7 @@ func (s S) TestNewCheckCollectionExtraPaths(c *check.C) {
 func (s S) TestNewCheckCollectionBaseContainerName(c *check.C) {
 	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "big-sibling")
 	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
-	checkColl, err := NewCheckCollection(nil)
-	c.Assert(err, check.IsNil)
+	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.HasLen, 2)
 	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
 	c.Assert(ccCheck.baseContID, check.Equals, "big-sibling")
