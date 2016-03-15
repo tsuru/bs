@@ -177,3 +177,17 @@ The default value is `tsuru`.
 
 `BS_DEBUG` is a boolean value used to determine whether debug logs will be
 printed. The default value is `false`.
+
+### HOSTCHECK_BASE_CONTAINER_NAME
+
+`HOSTCHECK_BASE_CONTAINER_NAME` is the container name from where bs will
+extract the image name used to try creating a new container. The purpose of
+creating this container is simply checking if docker is working correctly. If
+this value is empty tsuru will try to use the same image used to start the bs
+container.
+
+### HOSTCHECK_EXTRA_PATHS
+
+`HOSTCHECK_EXTRA_PATHS` is a comma separated list of paths where bs will try
+to write a test file to check whether the filesystem is writable. If not set
+tsuru will only try to write to `/`.
