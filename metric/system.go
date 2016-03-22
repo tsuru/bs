@@ -9,22 +9,48 @@ import (
     "os"      
 )
 
+func getSystemMetrics() ([]map[string]float, error) {
+    collectors := []func()(map[string]float,error){
+        getSystemLoad, 
+        getSystemMem,
+    }
+    var metrics []map[string]float
+    for _, collector := range collectors {
+        metric, err := collector()
+        if err != nil {
+            return nil, err
+        }
+        metrics = append(metrics, metric)
+    }
+    return metrics, nil
+}
+
 func getSystemLoad() (map[string]float, error){
     concreteSigar := gosigar.ConcreteSigar{}
-    
     load, err := concreteSigar.GetLoadAverage()
     if err != nil {
         return nil, err
     }
-    
     stats := map[string]float{
         "load1": float(load.One),
         "load5": float(load.Five),
         "load15": float(load.Fifteen),
     }
-    
+    return stats, nil   
+}
+
+func getSystemMem() (map[string]float, error){
+    concreteSigar := gosigar.ConcreteSigar{}
+    mem, err := concreteSigar.GetMem()
+    if err != nil {
+        return nil, err
+    }
+    stats := map[string]float{
+        "mem_total": float(mem.Total),
+        "mem_used": float(mem.Used),
+        "mem_free": float(mem.Free),
+    }
     return stats, nil
-    
 }
 
 func getHostname() (string, error) {
