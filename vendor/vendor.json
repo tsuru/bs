@@ -3,6 +3,18 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "K3IjadQQFTDSMib8tbdhpUCdvKY=",
+			"path": "github.com/StackExchange/wmi",
+			"revision": "f3e2bae1e0cb5aef83e319133eabfee30013a4a5",
+			"revisionTime": "2015-05-20T15:46:26-04:00"
+		},
+		{
+			"checksumSHA1": "6bEyLXv1B9bVuyL7OoASZLoL8OE=",
+			"path": "github.com/elastic/gosigar",
+			"revision": "a19182d1f557de49dc3cef0eefa688ae6a3316d9",
+			"revisionTime": "2016-03-08T19:53:59+01:00"
+		},
+		{
 			"path": "github.com/fsouza/go-dockerclient",
 			"revision": "7f33a5c1f3f158a021f2edc7c3857a44dcc02da4",
 			"revisionTime": "2016-03-02T18:46:16-03:00"
@@ -128,6 +140,18 @@
 			"path": "github.com/garyburd/redigo/redis",
 			"revision": "f0bfa8e747315ab4e18d6af9c90f5969caaa05a1",
 			"revisionTime": "2016-01-06T20:16:19-02:00"
+		},
+		{
+			"checksumSHA1": "chuH+rt7NcP0fte9Gj3L4gigNh4=",
+			"path": "github.com/go-ole/go-ole",
+			"revision": "572eabb84c424e76a0d39d31510dd7dfd62f70b2",
+			"revisionTime": "2016-03-11T12:06:26+09:00"
+		},
+		{
+			"checksumSHA1": "qLYVTQDhgrVIeZ2KI9eZV51mmug=",
+			"path": "github.com/go-ole/go-ole/oleutil",
+			"revision": "572eabb84c424e76a0d39d31510dd7dfd62f70b2",
+			"revisionTime": "2016-03-11T12:06:26+09:00"
 		},
 		{
 			"path": "github.com/hashicorp/golang-lru",
