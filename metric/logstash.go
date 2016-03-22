@@ -76,6 +76,17 @@ func (s *logStash) SendConn(app, hostname, process, host string) error {
 	return s.send(message)
 }
 
+func (s *logStash) SendSys(hostname, key string, value interface{}) error {
+    message := map[string]interface{}{
+        "client":     s.Client,
+		"count":      1,
+        "metric":     key,
+        "value":      value,
+        "host":       hostname,
+    }
+    return s.send(message)
+}
+
 func (s *logStash) send(message map[string]interface{}) error {
 	conn, err := net.Dial(s.Protocol, net.JoinHostPort(s.Host, s.Port))
 	if err != nil {
