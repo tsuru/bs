@@ -116,3 +116,24 @@ func (s *S) TestGetMetrics(c *check.C) {
 	r := &Reporter{}
 	r.getMetrics(containers)
 }
+
+func (s *S) TestSendSysMetrics(c *check.C) {
+    r := Reporter{backend: &fakeStatter}
+    metrics := map[string]float{"cpu": float(900), "mem": float(512)}
+    err := r.sendSysMetrics("hostname", metrics)
+    c.Assert(err, check.IsNil)
+    expected := []fakeStat{
+        {app: "sysapp", hostname: "hostname", process: "-", key: "cpu", value: float(900)},
+        {app: "sysapp", hostname: "hostname", process: "-", key: "mem", value: float(512)},
+    }
+    c.Assert(fakeStatter.stats, check.DeepEquals, expected)
+}
+
+func (s *S) TestSendSysMetricsFailure(c *check.C) {
+    r := Reporter{backend: &fakeStatter}
+    prepErr := errors.New("something wen wrong")
+    fakeStatter.prepareFailure(prepErr)
+    metrics := map[string]float{"cpu": float(900)}
+    err := r.sendSysMetrics("hostname", metrics)
+    c.Assert(err, check.Equals, prepErr)
+}

@@ -23,6 +23,7 @@ func (r *Reporter) Do() {
 		bslog.Errorf("failed to list containers: %s", err)
 	}
 	r.getMetrics(containers)
+    r.getSysMetrics()
 }
 
 func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
@@ -98,4 +99,33 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 		}
 	}
 	return nil
+}
+
+func (r *Reporter) getSysMetrics() (error) {
+    metrics, err := getSystemMetrics()
+    if err != nil {
+        return err
+    } 
+    hostname, err := getHostname()
+    if err != nil {
+        return err
+    }
+    for _, metric := range metrics {
+        err := r.sendSysMetrics(hostname, metric)
+        if err != nil {
+            return err
+        }
+    }    
+    return nil
+}
+
+func (r *Reporter) sendSysMetrics(hostname string, metrics map[string]float) (error) {
+    for key, value := range metrics {
+        err := r.backend.SendSys(hostname, key, value)
+        if err != nil {
+            bslog.Errorf("failed to send system metric %s: %s", key, err)
+            return err
+        }
+    }
+    return nil
 }
