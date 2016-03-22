@@ -50,7 +50,7 @@ logs to other syslog servers, using the [configuration options described below](
 ## Metrics
 
 bs also collect metrics from containers and send them to a metric database backend.
-Supported backends are `statsd` and `logstash`.
+Currently the supported backend is `logstash`.
 
 The collected metrics are:
 
@@ -140,7 +140,7 @@ reporting from bs to the metric backend. The default value is 60 seconds.
 
 ### METRICS_BACKEND
 
-`METRICS_BACKEND` is the metric backend. Supported backends are `logstash` and `statsd`.
+`METRICS_BACKEND` is the metric backend. Currently the supported backend is `logstash`.
 
 ### METRICS_LOGSTASH_CLIENT
 
@@ -163,19 +163,6 @@ The default value is `tsuru`.
 
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
 [tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
-
-### METRICS_STATSD_PREFIX
-
-`METRICS_STATSD_PREFIX` is the prefix for the `Statsd` key. The key is composed by
-`{prefix}tsuru.{appname}.{hostname}`. The default value is an empty string `""`.
-
-### METRICS_STATSD_PORT
-
-`METRICS_STATSD_PORT` is the `Statsd` port. The default value is `8125`.
-
-### METRICS_STATSD_HOST
-
-`METRICS_STATSD_HOST` is the `Statsd` host. The default value is `localhost`.
 
 ### BS_DEBUG
 

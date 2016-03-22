@@ -156,16 +156,6 @@
 			"revisionTime": "2013-12-30T12:47:00-08:00"
 		},
 		{
-			"path": "github.com/quipo/statsd",
-			"revision": "b16c3be8a03e3c39a2d9c669b8f13f8876de61cd",
-			"revisionTime": "2015-04-07T17:10:22+01:00"
-		},
-		{
-			"path": "github.com/quipo/statsd/event",
-			"revision": "b16c3be8a03e3c39a2d9c669b8f13f8876de61cd",
-			"revisionTime": "2015-04-07T17:10:22+01:00"
-		},
-		{
 			"path": "github.com/tsuru/commandmocker",
 			"revision": "be4aec17ebc7264c791bf01709bfd956475d2ee8",
 			"revisionTime": "2015-07-17T10:58:58-03:00"
@@ -339,5 +329,6 @@
 			"revision": "f0bfa8e747315ab4e18d6af9c90f5969caaa05a1",
 			"revisionTime": "2016-01-06T20:16:19-02:00"
 		}
-	]
+	],
+	"rootPath": "github.com/tsuru/bs"
 }
