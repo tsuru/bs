@@ -155,6 +155,10 @@ The default value is `tsuru`.
 
 `METRICS_LOGSTASH_HOST` is the `Logstash` host. The default value is `localhost`.
 
+### METRICS_LOGSTASH_PROTOCOL
+
+`METRICS_LOGSTASH_PROTOCOL` is the `Logstash` protocol. Supported protocols are `udp` and `tcp`. The default value is `udp`.
+
 ### METRICS_ELASTICSEARCH_HOST
 
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
