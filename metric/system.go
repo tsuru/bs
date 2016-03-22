@@ -14,6 +14,7 @@ func getSystemMetrics() ([]map[string]float, error) {
         getSystemLoad, 
         getSystemMem,
         getSystemSwap,
+        getFileSystemUsage,
     }
     var metrics []map[string]float
     for _, collector := range collectors {
@@ -64,6 +65,20 @@ func getSystemSwap() (map[string]float, error) {
         "swap_total": float(swap.Total),
         "swap_used": float(swap.Used),
         "swap_free": float(swap.Free),
+    }
+    return stats, nil
+}
+
+func getFileSystemUsage() (map[string]float, error) {
+    concreteSigar := gosigar.ConcreteSigar{}
+    disk, err := concreteSigar.GetFileSystemUsage("/")
+    if err != nil {
+        return nil, err
+    }
+    stats := map[string]float{
+        "disk_total": float(disk.Total),
+        "disk_used": float(disk.Used),
+        "disk_free": float(disk.Free),
     }
     return stats, nil
 }

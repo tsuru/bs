@@ -14,6 +14,7 @@ func (s *S) TestGetSystemMetrics(c *check.C) {
     s.assertLoad(c, metrics[0])
     s.assertMem(c, metrics[1])
     s.assertSwap(c, metrics[2])
+    s.assertFileSystem(c, metrics[3])
 }
 
 func (s *S) TestGetSystemLoad(c *check.C) {
@@ -40,6 +41,12 @@ func (s *S) TestGetSwap(c *check.C) {
     s.assertSwap(c, swap)
 }
 
+func (s *S) TestGetFileSystemUsage(c *check.C) {
+    disk, err := getFileSystemUsage()
+    c.Assert(err, check.IsNil)
+    s.assertFileSystem(c, disk)
+}
+
 func (s *S) assertLoad(c *check.C, load map[string]float) {
     c.Assert(load["load1"], check.Not(check.Equals), float(0))
     c.Assert(load["load5"], check.Not(check.Equals), float(0))
@@ -56,4 +63,10 @@ func (s *S) assertSwap(c *check.C, swap map[string]float) {
     c.Assert(swap["swap_total"], check.Not(check.Equals), float(0))
     c.Assert(swap["swap_used"], check.Not(check.Equals), float(0))
     c.Assert(swap["swap_free"], check.Not(check.Equals), float(0))
+}
+
+func (s *S) assertFileSystem(c *check.C, disk map[string]float) {
+    c.Assert(disk["disk_total"], check.Not(check.Equals), float(0))
+    c.Assert(disk["disk_used"], check.Not(check.Equals), float(0))
+    c.Assert(disk["disk_free"], check.Not(check.Equals), float(0))
 }
