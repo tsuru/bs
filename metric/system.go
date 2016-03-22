@@ -13,6 +13,7 @@ func getSystemMetrics() ([]map[string]float, error) {
     collectors := []func()(map[string]float,error){
         getSystemLoad, 
         getSystemMem,
+        getSystemSwap,
     }
     var metrics []map[string]float
     for _, collector := range collectors {
@@ -25,7 +26,7 @@ func getSystemMetrics() ([]map[string]float, error) {
     return metrics, nil
 }
 
-func getSystemLoad() (map[string]float, error){
+func getSystemLoad() (map[string]float, error) {
     concreteSigar := gosigar.ConcreteSigar{}
     load, err := concreteSigar.GetLoadAverage()
     if err != nil {
@@ -39,7 +40,7 @@ func getSystemLoad() (map[string]float, error){
     return stats, nil   
 }
 
-func getSystemMem() (map[string]float, error){
+func getSystemMem() (map[string]float, error) {
     concreteSigar := gosigar.ConcreteSigar{}
     mem, err := concreteSigar.GetMem()
     if err != nil {
@@ -49,6 +50,20 @@ func getSystemMem() (map[string]float, error){
         "mem_total": float(mem.Total),
         "mem_used": float(mem.Used),
         "mem_free": float(mem.Free),
+    }
+    return stats, nil
+}
+
+func getSystemSwap() (map[string]float, error) {
+    concreteSigar := gosigar.ConcreteSigar{}
+    swap, err := concreteSigar.GetSwap()
+    if err != nil {
+        return nil, err
+    }
+    stats := map[string]float{
+        "swap_total": float(swap.Total),
+        "swap_used": float(swap.Used),
+        "swap_free": float(swap.Free),
     }
     return stats, nil
 }
