@@ -23,6 +23,7 @@ func (s *SysInfo) GetSystemMetrics() ([]map[string]float, error) {
 		s.getSystemMem,
 		s.getSystemSwap,
 		s.getFileSystemUsage,
+		s.getUptime,
 	}
 	var metrics []map[string]float
 	for _, collector := range collectors {
@@ -84,6 +85,16 @@ func (s *SysInfo) getFileSystemUsage() (map[string]float, error) {
 		"disk_used":  float(disk.Used),
 		"disk_free":  float(disk.Free),
 	}
+	return stats, nil
+}
+
+func (s *SysInfo) getUptime() (map[string]float, error) {
+	uptime := gosigar.Uptime{}
+	err := uptime.Get()
+	if err != nil {
+		return nil, err
+	}
+	stats := map[string]float{"uptime": float(uptime.Length)}
 	return stats, nil
 }
 

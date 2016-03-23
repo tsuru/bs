@@ -42,6 +42,7 @@ func (s *S) TestGetSystemMetrics(c *check.C) {
 	s.assertMem(c, metrics[1])
 	s.assertSwap(c, metrics[2])
 	s.assertFileSystem(c, metrics[3])
+	s.assertUptime(c, metrics[4])
 }
 
 func (s *S) TestGetSystemLoad(c *check.C) {
@@ -89,6 +90,15 @@ func (s *S) TestGetFileSystemUsage(c *check.C) {
 	s.assertFileSystem(c, disk)
 }
 
+func (s *S) TestGetUptime(c *check.C) {
+	fakeSigar := &FakeSigar{}
+	info := SysInfo{sigar: fakeSigar}
+
+	uptime, err := info.getUptime()
+	c.Assert(err, check.IsNil)
+	s.assertUptime(c, uptime)
+}
+
 func (s *S) assertLoad(c *check.C, load map[string]float) {
 	c.Assert(load["load1"], check.Equals, float(1.2))
 	c.Assert(load["load5"], check.Equals, float(2.3))
@@ -111,4 +121,8 @@ func (s *S) assertFileSystem(c *check.C, disk map[string]float) {
 	c.Assert(disk["disk_total"], check.Equals, float(300))
 	c.Assert(disk["disk_used"], check.Equals, float(200))
 	c.Assert(disk["disk_free"], check.Equals, float(100))
+}
+
+func (s *S) assertUptime(c *check.C, uptime map[string]float) {
+	c.Assert(uptime["uptime"], check.Not(check.Equals), float(0))
 }
