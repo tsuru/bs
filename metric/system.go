@@ -106,12 +106,12 @@ func (s *SysInfo) getCpuTimes() (map[string]float, error) {
 		return nil, err
 	}
 	cpuTotal := float(cpu.Total())
-
 	stats := map[string]float{
 		"cpu_user":   float(cpu.User) / cpuTotal,
 		"cpu_sys":    float(cpu.Sys) / cpuTotal,
 		"cpu_idle":   float(cpu.Idle) / cpuTotal,
 		"cpu_stolen": float(cpu.Stolen) / cpuTotal,
+		"cpu_wait":   float(cpu.Wait) / cpuTotal,
 	}
 	return stats, nil
 }
