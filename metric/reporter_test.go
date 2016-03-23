@@ -126,6 +126,9 @@ func (s *S) TestSendSysMetrics(c *check.C) {
 		{app: "sysapp", hostname: "hostname", process: "-", key: "cpu", value: float(900)},
 		{app: "sysapp", hostname: "hostname", process: "-", key: "mem", value: float(512)},
 	}
+	if fakeStatter.stats[0].key != "cpu" {
+		expected[0], expected[1] = expected[1], expected[0]
+	}
 	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
 }
 
