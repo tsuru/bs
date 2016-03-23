@@ -49,14 +49,23 @@ logs to other syslog servers, using the [configuration options described below](
 
 ## Metrics
 
-bs also collect metrics from containers and send them to a metric database backend.
+bs also collect metrics from containers and it's own host and send them to a metric database backend.
 Currently the supported backend is `logstash`.
 
-The collected metrics are:
+The following metrics are collected from containers:
 
 * cpu_max
 * mem_max
 * mem_pct_max
+
+The following metrics are collected from bs's own host:
+
+* cpu (user, system, idle, stolen and wait percentages)
+* mem (total, used and free)
+* swap (total, used and free)
+* disk (total, used and free)
+* load (one, five and fifteen minutes)
+* uptime (seconds)
 
 The metric backend is configured by setting some enviroment variables in the *bs* container.
 For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables).
