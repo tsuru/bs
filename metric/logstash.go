@@ -6,10 +6,9 @@ package metric
 
 import (
 	"encoding/json"
+	"github.com/tsuru/bs/bslog"
 	"net"
 	"os"
-
-	"github.com/tsuru/bs/bslog"
 )
 
 func newLogStash() (statter, error) {
@@ -77,14 +76,14 @@ func (s *logStash) SendConn(app, hostname, process, host string) error {
 }
 
 func (s *logStash) SendSys(hostname, key string, value interface{}) error {
-    message := map[string]interface{}{
-        "client":     s.Client,
-		"count":      1,
-        "metric":     key,
-        "value":      value,
-        "host":       hostname,
-    }
-    return s.send(message)
+	message := map[string]interface{}{
+		"client": s.Client,
+		"count":  1,
+		"metric": key,
+		"value":  value,
+		"host":   hostname,
+	}
+	return s.send(message)
 }
 
 func (s *logStash) send(message map[string]interface{}) error {

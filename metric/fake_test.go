@@ -47,7 +47,7 @@ func (s *fake) SendConn(app, hostname, process, host string) error {
 }
 
 func (s *fake) SendSys(hostname, key string, value interface{}) error {
-    return s.Send("sysapp", hostname, "-", key, value)
+	return s.Send("sysapp", hostname, "-", key, value)
 }
 
 func (s *fake) prepareFailure(err error) {
