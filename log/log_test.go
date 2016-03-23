@@ -404,7 +404,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
-	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1")
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
 	lf := LogForwarder{
@@ -427,7 +427,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 		"container_id": s.id,
 	}
 	wg := sync.WaitGroup{}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
