@@ -43,6 +43,7 @@ func (s *S) TestGetSystemMetrics(c *check.C) {
 	s.assertSwap(c, metrics[2])
 	s.assertFileSystem(c, metrics[3])
 	s.assertUptime(c, metrics[4])
+	s.assertCpuTimes(c, metrics[5])
 }
 
 func (s *S) TestGetSystemLoad(c *check.C) {
@@ -97,6 +98,21 @@ func (s *S) TestGetUptime(c *check.C) {
 	uptime, err := info.getUptime()
 	c.Assert(err, check.IsNil)
 	s.assertUptime(c, uptime)
+}
+
+func (s *S) TestGetCpuTimes(c *check.C) {
+	fakeSigar := &FakeSigar{}
+	info := SysInfo{sigar: fakeSigar}
+
+	cpu, err := info.getCpuTimes()
+	c.Assert(err, check.IsNil)
+	s.assertCpuTimes(c, cpu)
+}
+
+func (s *S) assertCpuTimes(c *check.C, cpu map[string]float) {
+	c.Assert(cpu["cpu_user"], check.Not(check.Equals), float(0))
+	c.Assert(cpu["cpu_sys"], check.Not(check.Equals), float(0))
+	c.Assert(cpu["cpu_idle"], check.Not(check.Equals), float(0))
 }
 
 func (s *S) assertLoad(c *check.C, load map[string]float) {

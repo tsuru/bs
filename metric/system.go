@@ -24,6 +24,7 @@ func (s *SysInfo) GetSystemMetrics() ([]map[string]float, error) {
 		s.getSystemSwap,
 		s.getFileSystemUsage,
 		s.getUptime,
+		s.getCpuTimes,
 	}
 	var metrics []map[string]float
 	for _, collector := range collectors {
@@ -95,6 +96,23 @@ func (s *SysInfo) getUptime() (map[string]float, error) {
 		return nil, err
 	}
 	stats := map[string]float{"uptime": float(uptime.Length)}
+	return stats, nil
+}
+
+func (s *SysInfo) getCpuTimes() (map[string]float, error) {
+	cpu := gosigar.Cpu{}
+	err := cpu.Get()
+	if err != nil {
+		return nil, err
+	}
+	cpuTotal := float(cpu.Total())
+
+	stats := map[string]float{
+		"cpu_user":   float(cpu.User) / cpuTotal,
+		"cpu_sys":    float(cpu.Sys) / cpuTotal,
+		"cpu_idle":   float(cpu.Idle) / cpuTotal,
+		"cpu_stolen": float(cpu.Stolen) / cpuTotal,
+	}
 	return stats, nil
 }
 
