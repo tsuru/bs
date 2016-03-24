@@ -47,6 +47,7 @@ func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	os.Setenv("TSURU_ENDPOINT", "http://192.168.50.4:8080")
 	os.Setenv("TSURU_TOKEN", "sometoken")
 	os.Setenv("STATUS_INTERVAL", "four")
+	os.Setenv("HOST_PROC", "/prochost")
 	LoadConfig()
 	c.Check(Config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
 	c.Check(Config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")

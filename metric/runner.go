@@ -47,7 +47,6 @@ func (r *runner) Start() error {
 	reporter := &Reporter{
 		backend:    backend,
 		infoClient: client,
-		sysInfo:    NewSysInfo(),
 	}
 	go func() {
 		for {

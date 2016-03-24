@@ -46,7 +46,7 @@ func (s *fake) SendConn(app, hostname, process, host string) error {
 	return s.Send(app, hostname, process, "connection", host)
 }
 
-func (s *fake) SendSys(hostname, key string, value interface{}) error {
+func (s *fake) SendHost(hostname, key string, value interface{}) error {
 	return s.Send("sysapp", hostname, "-", key, value)
 }
 

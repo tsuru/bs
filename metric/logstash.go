@@ -75,11 +75,11 @@ func (s *logStash) SendConn(app, hostname, process, host string) error {
 	return s.send(message)
 }
 
-func (s *logStash) SendSys(hostname, key string, value interface{}) error {
+func (s *logStash) SendHost(hostname, key string, value interface{}) error {
 	message := map[string]interface{}{
 		"client": s.Client,
 		"count":  1,
-		"metric": key,
+		"metric": "host_" + key,
 		"value":  value,
 		"host":   hostname,
 	}

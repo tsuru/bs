@@ -15,7 +15,6 @@ import (
 type Reporter struct {
 	backend    statter
 	infoClient *container.InfoClient
-	sysInfo    *SysInfo
 }
 
 func (r *Reporter) Do() {
@@ -24,7 +23,10 @@ func (r *Reporter) Do() {
 		bslog.Errorf("failed to list containers: %s", err)
 	}
 	r.getMetrics(containers)
-	r.getSysMetrics()
+	err = r.getHostMetrics()
+	if err != nil {
+		bslog.Errorf("failed to get host metrics: %s", err)
+	}
 }
 
 func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
@@ -102,17 +104,21 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 	return nil
 }
 
-func (r *Reporter) getSysMetrics() error {
-	metrics, err := r.sysInfo.GetSystemMetrics()
+func (r *Reporter) getHostMetrics() error {
+	hostClient, err := NewHostClient()
 	if err != nil {
 		return err
 	}
-	hostname, err := r.sysInfo.GetHostname()
+	metrics, err := hostClient.GetHostMetrics()
+	if err != nil {
+		return err
+	}
+	hostname, err := hostClient.GetHostname()
 	if err != nil {
 		return err
 	}
 	for _, metric := range metrics {
-		err := r.sendSysMetrics(hostname, metric)
+		err := r.sendHostMetrics(hostname, metric)
 		if err != nil {
 			return err
 		}
@@ -120,11 +126,11 @@ func (r *Reporter) getSysMetrics() error {
 	return nil
 }
 
-func (r *Reporter) sendSysMetrics(hostname string, metrics map[string]float) error {
+func (r *Reporter) sendHostMetrics(hostname string, metrics map[string]float) error {
 	for key, value := range metrics {
-		err := r.backend.SendSys(hostname, key, value)
+		err := r.backend.SendHost(hostname, key, value)
 		if err != nil {
-			bslog.Errorf("failed to send system metric %s: %s", key, err)
+			bslog.Errorf("failed to send host metric %s: %s", key, err)
 			return err
 		}
 	}

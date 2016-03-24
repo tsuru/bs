@@ -9,12 +9,6 @@
 			"revisionTime": "2015-05-20T15:46:26-04:00"
 		},
 		{
-			"checksumSHA1": "6bEyLXv1B9bVuyL7OoASZLoL8OE=",
-			"path": "github.com/elastic/gosigar",
-			"revision": "a19182d1f557de49dc3cef0eefa688ae6a3316d9",
-			"revisionTime": "2016-03-08T19:53:59+01:00"
-		},
-		{
 			"path": "github.com/fsouza/go-dockerclient",
 			"revision": "7f33a5c1f3f158a021f2edc7c3857a44dcc02da4",
 			"revisionTime": "2016-03-02T18:46:16-03:00"
@@ -178,6 +172,12 @@
 			"path": "github.com/jeromer/syslogparser/rfc5424",
 			"revision": "812866d0389ae7e1f5a0110d47dea20224fc776f",
 			"revisionTime": "2013-12-30T12:47:00-08:00"
+		},
+		{
+			"checksumSHA1": "1Q7OlfQ1RJyLl5PhUfxJx31n6Fo=",
+			"path": "github.com/shirou/gopsutil",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
 		},
 		{
 			"path": "github.com/tsuru/commandmocker",

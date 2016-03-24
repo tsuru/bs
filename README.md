@@ -67,7 +67,9 @@ The following metrics are collected from bs's own host:
 * load (one, five and fifteen minutes)
 * uptime (seconds)
 
-The metric backend is configured by setting some enviroment variables in the *bs* container.
+To be able to collect host metrics, the proc filesystem (`/proc`) must be mounted 
+as a volume inside *bs* container and the `HOST_PROC` environment variable must 
+be set to it's path. The metric backend is configured by setting some enviroment variables in the *bs* container.
 For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables).
 
 ## Environment Variables
@@ -172,6 +174,11 @@ The default value is `tsuru`.
 
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
 [tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
+
+### HOST_PROC
+
+`HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in the *bs* container.
+This environ must be set in order to get *bs* to send metrics about his host.
 
 ### BS_DEBUG
 

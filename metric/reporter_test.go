@@ -120,7 +120,7 @@ func (s *S) TestGetMetrics(c *check.C) {
 func (s *S) TestSendSysMetrics(c *check.C) {
 	r := Reporter{backend: &fakeStatter}
 	metrics := map[string]float{"cpu": float(900), "mem": float(512)}
-	err := r.sendSysMetrics("hostname", metrics)
+	err := r.sendHostMetrics("hostname", metrics)
 	c.Assert(err, check.IsNil)
 	expected := []fakeStat{
 		{app: "sysapp", hostname: "hostname", process: "-", key: "cpu", value: float(900)},
@@ -137,6 +137,6 @@ func (s *S) TestSendSysMetricsFailure(c *check.C) {
 	prepErr := errors.New("something wen wrong")
 	fakeStatter.prepareFailure(prepErr)
 	metrics := map[string]float{"cpu": float(900)}
-	err := r.sendSysMetrics("hostname", metrics)
+	err := r.sendHostMetrics("hostname", metrics)
 	c.Assert(err, check.Equals, prepErr)
 }
