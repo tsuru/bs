@@ -14,7 +14,7 @@ var _ = check.Suite(&H{})
 type H struct{}
 
 func (h *H) SetUpTest(c *check.C) {
-	os.Setenv("HOST_PROC", "/prochost")
+	os.Setenv("HOST_PROC", "/proc")
 }
 
 func (h *H) TestNewHostClient(c *check.C) {
@@ -40,6 +40,7 @@ func (h *H) TestGetSystemMetrics(c *check.C) {
 	h.assertFileSystem(c, metrics[3])
 	h.assertUptime(c, metrics[4])
 	h.assertCpuTimes(c, metrics[5])
+	h.assertNetworkUsage(c, metrics[6])
 }
 
 func (h *H) TestGetSystemLoad(c *check.C) {
@@ -89,6 +90,18 @@ func (h *H) TestGetCpuTimes(c *check.C) {
 	cpu, err := hostClient.getHostCpuTimes()
 	c.Assert(err, check.IsNil)
 	h.assertCpuTimes(c, cpu)
+}
+
+func (h *H) TestGetHostNetworkUsage(c *check.C) {
+	hostClient, _ := NewHostClient()
+	net, err := hostClient.getHostNetworkUsage()
+	c.Assert(err, check.IsNil)
+	h.assertNetworkUsage(c, net)
+}
+
+func (h *H) assertNetworkUsage(c *check.C, net map[string]float) {
+	c.Assert(net["bytes_recv"], check.Not(check.Equals), float(0))
+	c.Assert(net["bytes_sent"], check.Not(check.Equals), float(0))
 }
 
 func (h *H) assertCpuTimes(c *check.C, cpu map[string]float) {

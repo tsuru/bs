@@ -11,6 +11,7 @@ import (
 	host "github.com/shirou/gopsutil/host"
 	load "github.com/shirou/gopsutil/load"
 	mem "github.com/shirou/gopsutil/mem"
+	net "github.com/shirou/gopsutil/net"
 	"os"
 )
 
@@ -32,6 +33,7 @@ func (h *HostClient) GetHostMetrics() ([]map[string]float, error) {
 		h.getHostFileSystemUsage,
 		h.getHostUptime,
 		h.getHostCpuTimes,
+		h.getHostNetworkUsage,
 	}
 	var metrics []map[string]float
 	for _, collector := range collectors {
@@ -117,6 +119,18 @@ func (h *HostClient) getHostCpuTimes() (map[string]float, error) {
 		"cpu_idle":   float(cpuStats[0].Idle) / cpuTotal,
 		"cpu_stolen": float(cpuStats[0].Stolen) / cpuTotal,
 		"cpu_wait":   float(cpuStats[0].Iowait) / cpuTotal,
+	}
+	return stats, nil
+}
+
+func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {
+	netStat, err := net.NetIOCounters(false)
+	if err != nil {
+		return nil, err
+	}
+	stats := map[string]float{
+		"bytes_recv": float(netStat[0].BytesRecv),
+		"bytes_sent": float(netStat[0].BytesSent),
 	}
 	return stats, nil
 }
