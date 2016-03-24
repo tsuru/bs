@@ -180,6 +180,60 @@
 			"revisionTime": "2016-03-22T21:55:16+09:00"
 		},
 		{
+			"checksumSHA1": "1DWWlWUBnTV/Z84fNih6JEzMw30=",
+			"path": "github.com/shirou/gopsutil/cpu",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "BJJUQXrhv8klyU1mH6d2okbNiOs=",
+			"path": "github.com/shirou/gopsutil/disk",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "ifu29kitM8Rsvax30EHhTJVGGwg=",
+			"path": "github.com/shirou/gopsutil/host",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "elQmkHH4AYy7BKZIh6wX/XC+i58=",
+			"path": "github.com/shirou/gopsutil/internal/common",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "tKM8rs1awHc0mld1cWC4Y0O6DHs=",
+			"path": "github.com/shirou/gopsutil/load",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "8Ta6PgEiGsHAqeFujG0M6XrvqJE=",
+			"path": "github.com/shirou/gopsutil/mem",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "YcpWJWsB+GfRKKUokcdMdafD42I=",
+			"path": "github.com/shirou/gopsutil/net",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "A4eSwEEjEofOQyB0pDWFEoJRB8E=",
+			"path": "github.com/shirou/gopsutil/process",
+			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
+			"revisionTime": "2016-03-22T21:55:16+09:00"
+		},
+		{
+			"checksumSHA1": "1eyDAmLQeWwdVKmfPzCGo28u4kw=",
+			"path": "github.com/shirou/w32",
+			"revision": "3c9377fc6748f222729a8270fe2775d149a249ad",
+			"revisionTime": "2016-02-04T09:35:29+09:00"
+		},
+		{
 			"path": "github.com/tsuru/commandmocker",
 			"revision": "be4aec17ebc7264c791bf01709bfd956475d2ee8",
 			"revisionTime": "2015-07-17T10:58:58-03:00"
