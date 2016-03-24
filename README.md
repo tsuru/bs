@@ -65,6 +65,7 @@ The following metrics are collected from bs's own host:
 * swap (total, used and free)
 * disk (total, used and free)
 * load (one, five and fifteen minutes)
+* net (bytes received and sent)
 * uptime (seconds)
 
 To be able to collect host metrics, the proc filesystem (`/proc`) must be mounted 
