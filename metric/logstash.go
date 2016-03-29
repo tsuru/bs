@@ -7,8 +7,8 @@ package metric
 import (
 	"encoding/json"
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"net"
-	"os"
 )
 
 func newLogStash() (statter, error) {
@@ -18,27 +18,11 @@ func newLogStash() (statter, error) {
 		defaultHost     = "localhost"
 		defaultProtocol = "udp"
 	)
-	client := os.Getenv("METRICS_LOGSTASH_CLIENT")
-	if client == "" {
-		client = defaultClient
-	}
-	port := os.Getenv("METRICS_LOGSTASH_PORT")
-	if port == "" {
-		port = defaultPort
-	}
-	host := os.Getenv("METRICS_LOGSTASH_HOST")
-	if host == "" {
-		host = defaultHost
-	}
-	protocol := os.Getenv("METRICS_LOGSTASH_PROTOCOL")
-	if protocol == "" {
-		protocol = defaultProtocol
-	}
 	return &logStash{
-		Client:   client,
-		Host:     host,
-		Port:     port,
-		Protocol: protocol,
+		Client:   config.StringEnvOrDefault(defaultClient, "METRICS_LOGSTASH_CLIENT"),
+		Host:     config.StringEnvOrDefault(defaultHost, "METRICS_LOGSTASH_HOST"),
+		Port:     config.StringEnvOrDefault(defaultPort, "METRICS_LOGSTASH_PORT"),
+		Protocol: config.StringEnvOrDefault(defaultProtocol, "METRICS_LOGSTASH_PROTOCOL"),
 	}, nil
 }
 

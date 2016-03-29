@@ -9,6 +9,7 @@ import (
 	"net"
 
 	"gopkg.in/check.v1"
+	"os"
 )
 
 func (s *S) TestSend(c *check.C) {
@@ -86,4 +87,38 @@ func (s *S) TestSendTCP(c *check.C) {
 	err = json.Unmarshal(data, &got)
 	c.Assert(err, check.IsNil)
 	c.Assert(got, check.DeepEquals, expected)
+}
+
+func (s *S) TestNewLogStasDefaults(c *check.C) {
+	os.Unsetenv("METRICS_LOGSTASH_CLIENT")
+	os.Unsetenv("METRICS_LOGSTASH_HOST")
+	os.Unsetenv("METRICS_LOGSTASH_PORT")
+	os.Unsetenv("METRICS_LOGSTASH_PROTOCOL")
+
+	st, err := newLogStash()
+	c.Assert(err, check.IsNil)
+	expected := &logStash{
+		Host:     "localhost",
+		Port:     "1984",
+		Client:   "tsuru",
+		Protocol: "udp",
+	}
+	c.Assert(st, check.DeepEquals, expected)
+}
+
+func (s *S) TestNewLogStashEnvs(c *check.C) {
+	os.Setenv("METRICS_LOGSTASH_CLIENT", "tsurutest")
+	os.Setenv("METRICS_LOGSTASH_HOST", "127.0.0.1")
+	os.Setenv("METRICS_LOGSTASH_PORT", "1983")
+	os.Setenv("METRICS_LOGSTASH_PROTOCOL", "tcp")
+
+	st, err := newLogStash()
+	c.Assert(err, check.IsNil)
+	expected := &logStash{
+		Host:     "127.0.0.1",
+		Port:     "1983",
+		Client:   "tsurutest",
+		Protocol: "tcp",
+	}
+	c.Assert(st, check.DeepEquals, expected)
 }
