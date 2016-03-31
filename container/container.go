@@ -69,6 +69,10 @@ func (c *InfoClient) GetClient() *docker.Client {
 	return c.client
 }
 
+func (c *InfoClient) ListContainers() ([]docker.APIContainers, error) {
+	return c.client.ListContainers(docker.ListContainersOptions{})
+}
+
 func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
 	return c.getContainer(containerId, false, []string{
 		"TSURU_APPNAME=",

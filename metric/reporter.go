@@ -18,7 +18,7 @@ type Reporter struct {
 }
 
 func (r *Reporter) Do() {
-	containers, err := r.listContainers()
+	containers, err := r.infoClient.ListContainers()
 	if err != nil {
 		bslog.Errorf("failed to list containers: %s", err)
 	}
@@ -27,10 +27,6 @@ func (r *Reporter) Do() {
 	if err != nil {
 		bslog.Errorf("failed to get host metrics: %s", err)
 	}
-}
-
-func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
-	return r.infoClient.GetClient().ListContainers(docker.ListContainersOptions{})
 }
 
 func (r *Reporter) getMetrics(containers []docker.APIContainers) {
