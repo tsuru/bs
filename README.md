@@ -202,7 +202,7 @@ tsuru will only try to write to `/`.
 
 ## Injected Environment Variables
 
-Tsuru will inject some environment variables when starting the bs container. Those *cannot* changed by the 
+Tsuru will inject some environment variables when starting the bs container. Those *cannot* be changed by the 
 `tsuru-admin bs-env-set` command and are documented here for completeness and development purposes.
 
 ### TSURU_ENDPOINT
