@@ -199,3 +199,23 @@ container.
 `HOSTCHECK_EXTRA_PATHS` is a comma separated list of paths where bs will try
 to write a test file to check whether the filesystem is writable. If not set
 tsuru will only try to write to `/`.
+
+## Injected Environment Variables
+
+Tsuru will inject some environment variables when starting the bs container. Those *cannot* changed by the 
+`tsuru-admin bs-env-set` command and are documented here for completeness and development purposes.
+
+### TSURU_ENDPOINT
+
+`TSURU_ENDPOINT` is the address to the tsuru api where logs will be forwarded when using `tsuru` as a log backend
+and where container status are going to be reported to.
+
+### DOCKER_ENDPOINT
+
+`DOCKER_ENDPOINT` is the docker endpoint from where the container metrics are going to be collected from.
+
+### SYSLOG_LISTEN_ADDRESS
+
+`SYSLOG_LISTEN_ADDRESS` is the local syslog server address that other container logs are being sent to be forwarded
+by bs.
+
