@@ -104,7 +104,7 @@ func main() {
 	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval)
 	err = mRunner.Start()
 	if err != nil {
-		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
+		bslog.Fatalf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
 		TsuruEndpoint:  config.Config.TsuruEndpoint,
@@ -113,11 +113,16 @@ func main() {
 		Interval:       config.Config.StatusInterval,
 	})
 	if err != nil {
-		bslog.Fatalf("Unable to initialize status reporter: %s\n", err)
+		bslog.Warnf("Unable to initialize status reporter: %s\n", err)
 	}
 	startSignalHandler(func(signal os.Signal) {
-		reporter.Stop()
+		if reporter != nil {
+			reporter.Stop()
+		}
 		mRunner.Stop()
 	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	reporter.Wait()
+	if reporter != nil {
+		reporter.Wait()
+	}
+	mRunner.Wait()
 }

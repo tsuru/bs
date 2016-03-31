@@ -15,7 +15,8 @@ import (
 type runner struct {
 	dockerEndpoint string
 	interval       time.Duration
-	finish         chan bool
+	abort          chan struct{}
+	exit           chan struct{}
 }
 
 var statters = map[string]func() (statter, error){
@@ -24,12 +25,16 @@ var statters = map[string]func() (statter, error){
 
 func NewRunner(dockerEndpoint string, interval time.Duration) *runner {
 	return &runner{
-		finish:         make(chan bool),
+		abort:          make(chan struct{}),
+		exit:           make(chan struct{}),
 		dockerEndpoint: dockerEndpoint,
 		interval:       interval,
 	}
 }
 
+// Start starts a reporter that will send metrics to a backend until there is
+// a message in the exit channel. It's possible to interrupt the runner by
+// sending a message in the abort channel.
 func (r *runner) Start() error {
 	client, err := container.NewClient(r.dockerEndpoint)
 	if err != nil {
@@ -52,7 +57,8 @@ func (r *runner) Start() error {
 		for {
 			reporter.Do()
 			select {
-			case <-r.finish:
+			case <-r.abort:
+				close(r.exit)
 				return
 			case <-time.After(r.interval):
 			}
@@ -62,6 +68,13 @@ func (r *runner) Start() error {
 	return nil
 }
 
+// Stop stops the runner.
 func (r *runner) Stop() {
-	r.finish <- true
+	close(r.abort)
+	<-r.exit
+}
+
+// Wait blocks until the runner stops.
+func (r *runner) Wait() {
+	<-r.exit
 }

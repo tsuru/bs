@@ -66,6 +66,9 @@ var errRouteNotFound = errors.New("route not found")
 // message in the exit channel in case it exits. It's possible to arbitrarily
 // interrupt the reporter by sending a message in the abort channel.
 func NewReporter(config *ReporterConfig) (*Reporter, error) {
+	if config.TsuruEndpoint == "" {
+		return nil, errors.New("tsuru endpoint must be set for status reporting")
+	}
 	abort := make(chan struct{})
 	exit := make(chan struct{})
 	infoClient, err := container.NewClient(config.DockerEndpoint)
