@@ -171,7 +171,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
 	}
-	contData, err := l.infoClient.GetContainer(contId)
+	contData, err := l.infoClient.GetAppContainer(contId, true)
 	if err != nil {
 		bslog.Debugf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
 		return

@@ -39,7 +39,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()
-			cont, err := r.infoClient.GetContainer(contID)
+			cont, err := r.infoClient.GetContainer(contID, true, []string{"TSURU_APPNAME", "TSURU_PROCESSNAME"})
 			if err != nil {
 				if err != container.ErrTsuruVariablesNotFound {
 					bslog.Errorf("cannot inspect container %q: %s", contID, err)

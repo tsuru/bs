@@ -158,7 +158,7 @@ func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) 
 	statuses := make([]containerStatus, 0, len(containers))
 	for _, c := range containers {
 		var status provision.Status
-		cont, err := r.infoClient.GetFreshContainer(c.ID)
+		cont, err := r.infoClient.GetAppContainer(c.ID, false)
 		if err == container.ErrTsuruVariablesNotFound {
 			continue
 		}

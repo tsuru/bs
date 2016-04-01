@@ -73,30 +73,30 @@ func (c *InfoClient) ListContainers() ([]docker.APIContainers, error) {
 	return c.client.ListContainers(docker.ListContainersOptions{})
 }
 
-func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
-	cont, err := c.getContainer(containerId, false)
+// GetContainer returns the container with the provided id if the container has the required
+// environment variable. It may use a cache to prevent calling the docker api.
+func (c *InfoClient) GetContainer(containerId string, useCache bool, requiredEnvs []string) (*Container, error) {
+	cont, err := c.getContainer(containerId, useCache)
 	if err != nil {
 		return nil, err
 	}
-	if cont.HasEnvs([]string{"TSURU_APPNAME", "TSURU_PROCESSNAME"}) {
-		return cont, nil
+	if len(requiredEnvs) > 0 {
+		if cont.HasEnvs(requiredEnvs) {
+			return cont, nil
+		}
+		return nil, ErrTsuruVariablesNotFound
 	}
-	return nil, ErrTsuruVariablesNotFound
+	return cont, nil
 }
 
-func (c *InfoClient) GetFreshContainer(containerId string) (*Container, error) {
-	cont, err := c.getContainer(containerId, true)
-	if err != nil {
-		return nil, err
-	}
-	if cont.HasEnvs([]string{"TSURU_APPNAME"}) {
-		return cont, nil
-	}
-	return nil, ErrTsuruVariablesNotFound
+// GetAppContainer returns the container with id containerId if that container
+// is an tsuru application. It may use a cache to prevent calling the docker api.
+func (c *InfoClient) GetAppContainer(containerId string, useCache bool) (*Container, error) {
+	return c.GetContainer(containerId, useCache, []string{"TSURU_APPNAME"})
 }
 
-func (c *InfoClient) getContainer(containerId string, refresh bool) (*Container, error) {
-	if !refresh {
+func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container, error) {
+	if useCache {
 		if val, ok := c.containerCache.Get(containerId); ok {
 			return val.(*Container), nil
 		}
