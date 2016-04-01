@@ -107,3 +107,15 @@ func (S) TestInfoClientGetContainerNotFound(c *check.C) {
 	_, err = client.GetContainer("xxxxxx")
 	c.Assert(err, check.ErrorMatches, "No such container: xxxxxx")
 }
+
+func (S) TestContainerHasEnvs(c *check.C) {
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"})
+	c.Assert(err, check.IsNil)
+	client, err := NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	cont, err := client.GetFreshContainer(id)
+	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME"}), check.Equals, true)
+	c.Assert(cont.HasEnvs([]string{"ENV"}), check.Equals, false)
+	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME", "ENV"}), check.Equals, false)
+}

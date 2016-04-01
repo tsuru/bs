@@ -74,19 +74,28 @@ func (c *InfoClient) ListContainers() ([]docker.APIContainers, error) {
 }
 
 func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
-	return c.getContainer(containerId, false, []string{
-		"TSURU_APPNAME=",
-		"TSURU_PROCESSNAME=",
-	})
+	cont, err := c.getContainer(containerId, false)
+	if err != nil {
+		return nil, err
+	}
+	if cont.HasEnvs([]string{"TSURU_APPNAME", "TSURU_PROCESSNAME"}) {
+		return cont, nil
+	}
+	return nil, ErrTsuruVariablesNotFound
 }
 
 func (c *InfoClient) GetFreshContainer(containerId string) (*Container, error) {
-	return c.getContainer(containerId, true, []string{
-		"TSURU_APPNAME=",
-	})
+	cont, err := c.getContainer(containerId, true)
+	if err != nil {
+		return nil, err
+	}
+	if cont.HasEnvs([]string{"TSURU_APPNAME"}) {
+		return cont, nil
+	}
+	return nil, ErrTsuruVariablesNotFound
 }
 
-func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []string) (*Container, error) {
+func (c *InfoClient) getContainer(containerId string, refresh bool) (*Container, error) {
 	if !refresh {
 		if val, ok := c.containerCache.Get(containerId); ok {
 			return val.(*Container), nil
@@ -97,27 +106,19 @@ func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []str
 		return nil, err
 	}
 	contData := Container{Container: *cont, client: c}
-	toFill := []*string{
-		&contData.AppName,
-		&contData.ProcessName,
+	toFill := map[string]*string{
+		"TSURU_APPNAME=":     &contData.AppName,
+		"TSURU_PROCESSNAME=": &contData.ProcessName,
 	}
-	remaining := len(wanted)
-	for _, val := range cont.Config.Env {
-		for i := range wanted {
-			if *toFill[i] != "" {
-				continue
-			}
-			if strings.HasPrefix(val, wanted[i]) {
-				remaining--
-				*toFill[i] = val[len(wanted[i]):]
+	for k, v := range toFill {
+		for _, env := range cont.Config.Env {
+			if strings.HasPrefix(env, k) {
+				*v = env[len(k):]
 			}
 		}
-		if remaining == 0 {
-			c.containerCache.Add(containerId, &contData)
-			return &contData, nil
-		}
 	}
-	return nil, ErrTsuruVariablesNotFound
+	c.containerCache.Add(containerId, &contData)
+	return &contData, nil
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {
@@ -141,4 +142,21 @@ func (c *Container) Stats() (*docker.Stats, error) {
 		return nil, err
 	}
 	return <-statsCh, nil
+}
+
+// HasEnvs checks if the container has the requiredEnvs variables set
+func (c *Container) HasEnvs(requiredEnvs []string) bool {
+	for _, env := range requiredEnvs {
+		hasEnv := false
+		for _, val := range c.Config.Env {
+			if strings.HasPrefix(val, env) {
+				hasEnv = true
+				break
+			}
+		}
+		if hasEnv == false {
+			return false
+		}
+	}
+	return true
 }
