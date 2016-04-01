@@ -176,11 +176,6 @@ The default value is `tsuru`.
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
 [tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
 
-### HOST_PROC
-
-`HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in the *bs* container.
-This environ must be set in order to get *bs* to send metrics about his host.
-
 ### BS_DEBUG
 
 `BS_DEBUG` is a boolean value used to determine whether debug logs will be
@@ -218,4 +213,9 @@ and where container status are going to be reported to.
 
 `SYSLOG_LISTEN_ADDRESS` is the local syslog server address that other container logs are being sent to be forwarded
 by bs.
+
+### HOST_PROC
+
+`HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in the *bs* container.
+
 
