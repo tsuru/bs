@@ -39,7 +39,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()
-			cont, err := r.infoClient.GetContainer(contID, true, []string{"TSURU_APPNAME", "TSURU_PROCESSNAME"})
+			cont, err := r.infoClient.GetContainer(contID, true, []string{})
 			if err != nil {
 				if err != container.ErrTsuruVariablesNotFound {
 					bslog.Errorf("cannot inspect container %q: %s", contID, err)
@@ -71,7 +71,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 
 func (r *Reporter) sendMetrics(container *container.Container, metrics map[string]float) error {
 	for key, value := range metrics {
-		err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
+		err := r.backend.Send(NewContainerInfo(container), key, value)
 		if err != nil {
 			bslog.Errorf("failed to send metrics for container %q: %s", container, err)
 			return err
@@ -90,7 +90,7 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 			value = conn.SourceIP + ":" + conn.SourcePort
 		}
 		if value != "" {
-			err := r.backend.SendConn(container.AppName, container.Config.Hostname, container.ProcessName, value)
+			err := r.backend.SendConn(NewContainerInfo(container), value)
 			if err != nil {
 				bslog.Errorf("failed to send connection metrics for container %q: %s", container, err)
 				return err

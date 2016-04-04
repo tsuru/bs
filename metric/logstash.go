@@ -33,29 +33,25 @@ type logStash struct {
 	Protocol string
 }
 
-func (s *logStash) Send(app, hostname, process, key string, value interface{}) error {
+func (s *logStash) Send(container ContainerInfo, key string, value interface{}) error {
 	message := map[string]interface{}{
-		"client":  s.Client,
-		"count":   1,
-		"metric":  key,
-		"value":   value,
-		"app":     app,
-		"host":    hostname,
-		"process": process,
+		"client": s.Client,
+		"count":  1,
+		"metric": key,
+		"value":  value,
 	}
+	s.appendInfo(message, container)
 	return s.send(message)
 }
 
-func (s *logStash) SendConn(app, hostname, process, host string) error {
+func (s *logStash) SendConn(container ContainerInfo, host string) error {
 	message := map[string]interface{}{
 		"client":     s.Client,
 		"count":      1,
 		"metric":     "connection",
 		"connection": host,
-		"app":        app,
-		"host":       hostname,
-		"process":    process,
 	}
+	s.appendInfo(message, container)
 	return s.send(message)
 }
 
@@ -68,6 +64,17 @@ func (s *logStash) SendHost(hostname, key string, value interface{}) error {
 		"host":   hostname,
 	}
 	return s.send(message)
+}
+
+func (s *logStash) appendInfo(message map[string]interface{}, container ContainerInfo) {
+	message["host"] = container.hostname
+	if container.app != "" {
+		message["app"] = container.app
+		message["process"] = container.process
+	} else {
+		message["container"] = container.name
+		message["image"] = container.image
+	}
 }
 
 func (s *logStash) send(message map[string]interface{}) error {

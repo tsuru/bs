@@ -25,7 +25,7 @@ func (s *S) TestSend(c *check.C) {
 		Port:     port,
 		Protocol: "udp",
 	}
-	err = st.Send("app", "hostname", "process", "key", "value")
+	err = st.Send(ContainerInfo{app: "app", hostname: "hostname", process: "process"}, "key", "value")
 	c.Assert(err, check.IsNil)
 	var data [246]byte
 	n, _, err := conn.ReadFrom(data[:])
@@ -40,6 +40,23 @@ func (s *S) TestSend(c *check.C) {
 		"process": "process",
 	}
 	var got map[string]interface{}
+	err = json.Unmarshal(data[:n], &got)
+	c.Assert(err, check.IsNil)
+	c.Assert(got, check.DeepEquals, expected)
+	err = st.Send(ContainerInfo{name: "container", hostname: "hostname", image: "image"}, "key", "value")
+	c.Assert(err, check.IsNil)
+	n, _, err = conn.ReadFrom(data[:])
+	c.Assert(err, check.IsNil)
+	expected = map[string]interface{}{
+		"count":     float64(1),
+		"client":    "test",
+		"metric":    "key",
+		"value":     "value",
+		"host":      "hostname",
+		"image":     "image",
+		"container": "container",
+	}
+	got = make(map[string]interface{})
 	err = json.Unmarshal(data[:n], &got)
 	c.Assert(err, check.IsNil)
 	c.Assert(got, check.DeepEquals, expected)
@@ -70,9 +87,8 @@ func (s *S) TestSendTCP(c *check.C) {
 		Port:     port,
 		Protocol: "tcp",
 	}
-	err = st.Send("app", "hostname", "process", "key", "value")
+	err = st.Send(ContainerInfo{app: "app", hostname: "hostname", process: "process"}, "key", "value")
 	c.Assert(err, check.IsNil)
-
 	data := <-dataCh
 	expected := map[string]interface{}{
 		"count":   float64(1),
