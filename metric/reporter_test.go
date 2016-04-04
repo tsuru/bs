@@ -25,12 +25,19 @@ func (s *S) SetUpTest(c *check.C) {
 	fakeStatter.reset()
 }
 
-func (s *S) TestSendMetrics(c *check.C) {
-	cont := container.Container{
-		Container:   docker.Container{Config: &docker.Config{Hostname: "afdb3737ff"}},
+func (s *S) createContainer() container.Container {
+	return container.Container{
+		Container: docker.Container{
+			Config:          &docker.Config{Hostname: "afdb3737ff"},
+			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.27"},
+		},
 		AppName:     "myapp",
 		ProcessName: "myprocess",
 	}
+}
+
+func (s *S) TestSendMetrics(c *check.C) {
+	cont := s.createContainer()
 	r := Reporter{backend: &fakeStatter}
 	metrics := map[string]float{"cpu": float(900), "mem": float(512)}
 	err := r.sendMetrics(&cont, metrics)
@@ -46,11 +53,7 @@ func (s *S) TestSendMetrics(c *check.C) {
 }
 
 func (s *S) TestSendMetricsFailure(c *check.C) {
-	cont := container.Container{
-		Container:   docker.Container{Config: &docker.Config{Hostname: "afdb3737ff"}},
-		AppName:     "myapp",
-		ProcessName: "myprocess",
-	}
+	cont := s.createContainer()
 	r := Reporter{backend: &fakeStatter}
 	prepErr := errors.New("something went wrong")
 	fakeStatter.prepareFailure(prepErr)
@@ -59,14 +62,7 @@ func (s *S) TestSendMetricsFailure(c *check.C) {
 }
 
 func (s *S) TestSendConnMetrics(c *check.C) {
-	cont := container.Container{
-		Container: docker.Container{
-			Config:          &docker.Config{Hostname: "afdb3737ff"},
-			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.27"},
-		},
-		AppName:     "myapp",
-		ProcessName: "myprocess",
-	}
+	cont := s.createContainer()
 	conns := []conn{
 		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375"},
 		{SourceIP: "172.17.42.1", SourcePort: "42418", DestinationIP: "172.17.0.27", DestinationPort: "4001"},
@@ -95,18 +91,11 @@ func (s *S) TestSendConnMetrics(c *check.C) {
 }
 
 func (s *S) TestSendConnMetricsFailure(c *check.C) {
-	cont := container.Container{
-		Container: docker.Container{
-			Config:          &docker.Config{Hostname: "afdb3737ff"},
-			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.3"},
-		},
-		AppName:     "myapp",
-		ProcessName: "myprocess",
-	}
+	cont := s.createContainer()
 	r := Reporter{backend: &fakeStatter}
 	prepErr := errors.New("something went wrong")
 	fakeStatter.prepareFailure(prepErr)
-	conns := []conn{{SourceIP: "172.17.0.3"}}
+	conns := []conn{{SourceIP: "172.17.0.27"}}
 	err := r.sendConnMetrics(&cont, conns)
 	c.Assert(err, check.Equals, prepErr)
 }
