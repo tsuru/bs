@@ -117,7 +117,7 @@ func (s *S) TestGetMetrics(c *check.C) {
 	r.getMetrics(containers)
 }
 
-func (s *S) TestSendSysMetrics(c *check.C) {
+func (s *S) TestSendHostMetrics(c *check.C) {
 	r := Reporter{backend: &fakeStatter}
 	metrics := map[string]float{"cpu": float(900), "mem": float(512)}
 	err := r.sendHostMetrics("hostname", metrics)
@@ -132,7 +132,7 @@ func (s *S) TestSendSysMetrics(c *check.C) {
 	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
 }
 
-func (s *S) TestSendSysMetricsFailure(c *check.C) {
+func (s *S) TestSendHostMetricsFailure(c *check.C) {
 	r := Reporter{backend: &fakeStatter}
 	prepErr := errors.New("something wen wrong")
 	fakeStatter.prepareFailure(prepErr)
