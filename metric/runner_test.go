@@ -17,45 +17,67 @@ import (
 type bogusContainer struct {
 	config docker.Config
 	state  docker.State
+	name   string
 }
 
 func (s *S) TestRunner(c *check.C) {
+	os.Setenv("METRICS_BACKEND", "fake")
+	defer os.Unsetenv("METRICS_BACKEND")
 	bogusContainers := []bogusContainer{
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp", "TSURU_PROCESSNAME=myprocess"}}, state: docker.State{Running: true}},
-		{config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1}},
+		{
+			name:   "CnonApp",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}},
+			state:  docker.State{Running: true},
+		},
+		{
+			name:   "Capp",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp", "TSURU_PROCESSNAME=myprocess"}},
+			state:  docker.State{Running: true},
+		},
+		{
+			name:   "Ctest",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}},
+			state:  docker.State{Running: false, ExitCode: -1},
+		},
 	}
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
-	dockerServer.PrepareStats(conts[0].ID, func(id string) docker.Stats {
-		s := docker.Stats{}
-		s.PreCPUStats.CPUUsage.TotalUsage = 50
-		s.PreCPUStats.SystemCPUUsage = 20
-		s.CPUStats.CPUUsage.TotalUsage = 100
-		s.CPUStats.SystemCPUUsage = 40
-		s.CPUStats.CPUUsage.PercpuUsage = []uint64{100}
-		return s
-	})
-	os.Setenv("METRICS_BACKEND", "fake")
-	defer os.Unsetenv("METRICS_BACKEND")
+	s.prepareStats(dockerServer, conts)
 	r := NewRunner(dockerServer.URL(), time.Second)
 	err := r.Start()
 	c.Assert(err, check.IsNil)
 	r.Stop()
-	var cpuStat *fakeStat
+	cpuStat := make([]*fakeStat, 0)
 	for i, stat := range fakeStatter.stats {
 		if stat.key == "cpu_max" {
-			cpuStat = &fakeStatter.stats[i]
+			cpuStat = append(cpuStat, &fakeStatter.stats[i])
 		}
 	}
-	c.Assert(cpuStat, check.NotNil)
-	expected := &fakeStat{
-		app:      "someapp",
-		hostname: conts[0].ID[:12],
-		process:  "myprocess",
-		key:      "cpu_max",
-		value:    float(250),
+	c.Assert(len(cpuStat), check.Equals, 2)
+	expected := []*fakeStat{
+		&fakeStat{
+			container: "nonApp",
+			image:     "tsuru/python",
+			hostname:  conts[0].ID[:12],
+			key:       "cpu_max",
+			value:     float(250),
+		},
+		&fakeStat{
+			container: "app",
+			app:       "someapp",
+			image:     "tsuru/python",
+			hostname:  conts[1].ID[:12],
+			process:   "myprocess",
+			key:       "cpu_max",
+			value:     float(250),
+		},
 	}
-	c.Assert(cpuStat, check.DeepEquals, expected)
+	if fakeStatter.stats[0].hostname != conts[0].ID[:12] {
+		expected[0], expected[1] = expected[1], expected[0]
+	}
+	for i, stat := range cpuStat {
+		c.Assert(stat, check.DeepEquals, expected[i])
+	}
 }
 
 func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*testing.DockerServer, []docker.Container) {
@@ -68,7 +90,7 @@ func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Reque
 		pullOpts := docker.PullImageOptions{Repository: bogus.config.Image}
 		err = client.PullImage(pullOpts, docker.AuthConfiguration{})
 		c.Assert(err, check.IsNil)
-		createOpts := docker.CreateContainerOptions{Config: &bogus.config}
+		createOpts := docker.CreateContainerOptions{Name: bogus.name, Config: &bogus.config}
 		container, err := client.CreateContainer(createOpts)
 		c.Assert(err, check.IsNil)
 		err = server.MutateContainer(container.ID, bogus.state)
@@ -76,4 +98,18 @@ func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Reque
 		createdContainers[i] = *container
 	}
 	return server, createdContainers
+}
+
+func (s *S) prepareStats(dockerServer *testing.DockerServer, containers []docker.Container) {
+	for _, container := range containers {
+		dockerServer.PrepareStats(container.ID, func(id string) docker.Stats {
+			s := docker.Stats{}
+			s.PreCPUStats.CPUUsage.TotalUsage = 50
+			s.PreCPUStats.SystemCPUUsage = 20
+			s.CPUStats.CPUUsage.TotalUsage = 100
+			s.CPUStats.SystemCPUUsage = 40
+			s.CPUStats.CPUUsage.PercpuUsage = []uint64{100}
+			return s
+		})
+	}
 }

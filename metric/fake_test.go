@@ -33,11 +33,13 @@ func (s *fake) Send(container ContainerInfo, key string, value interface{}) erro
 		return err
 	default:
 		stat := fakeStat{
-			app:      container.app,
-			hostname: container.hostname,
-			process:  container.process,
-			key:      key,
-			value:    value,
+			app:       container.app,
+			hostname:  container.hostname,
+			process:   container.process,
+			container: container.name,
+			image:     container.image,
+			key:       key,
+			value:     value,
 		}
 		s.stats = append(s.stats, stat)
 		return nil
