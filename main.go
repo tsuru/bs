@@ -101,7 +101,8 @@ func main() {
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
-	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval)
+	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval,
+		config.Config.MetricsBackend)
 	err = mRunner.Start()
 	if err != nil {
 		bslog.Fatalf("Unable to initialize metrics runner: %s\n", err)

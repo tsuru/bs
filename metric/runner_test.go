@@ -22,13 +22,11 @@ type bogusContainer struct {
 
 func (s *S) TestRunner(c *check.C) {
 	os.Unsetenv("CONTAINER_SELECTION_ENV")
-	os.Setenv("METRICS_BACKEND", "fake")
-	defer os.Unsetenv("METRICS_BACKEND")
 	bogusContainers := s.buildContainers()
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
-	r := NewRunner(dockerServer.URL(), time.Second)
+	r := NewRunner(dockerServer.URL(), time.Second, "fake")
 	err := r.Start()
 	c.Assert(err, check.IsNil)
 	r.Stop()
@@ -66,15 +64,13 @@ func (s *S) TestRunner(c *check.C) {
 }
 
 func (s *S) TestRunnerSelectionEnv(c *check.C) {
-	os.Setenv("METRICS_BACKEND", "fake")
-	defer os.Unsetenv("METRICS_BACKEND")
 	os.Setenv("CONTAINER_SELECTION_ENV", "TSURU_APPNAME")
 	defer os.Unsetenv("CONTAINER_SELECTION_ENV")
 	bogusContainers := s.buildContainers()
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
-	r := NewRunner(dockerServer.URL(), time.Second)
+	r := NewRunner(dockerServer.URL(), time.Second, "fake")
 	err := r.Start()
 	c.Assert(err, check.IsNil)
 	r.Stop()

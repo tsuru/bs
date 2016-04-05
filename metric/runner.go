@@ -15,6 +15,7 @@ import (
 type runner struct {
 	dockerEndpoint string
 	interval       time.Duration
+	metricsBackend string
 	abort          chan struct{}
 	exit           chan struct{}
 }
@@ -23,12 +24,13 @@ var statters = map[string]func() (statter, error){
 	"logstash": newLogStash,
 }
 
-func NewRunner(dockerEndpoint string, interval time.Duration) *runner {
+func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend string) *runner {
 	return &runner{
 		abort:          make(chan struct{}),
 		exit:           make(chan struct{}),
 		dockerEndpoint: dockerEndpoint,
 		interval:       interval,
+		metricsBackend: metricsBackend,
 	}
 }
 
@@ -40,11 +42,10 @@ func (r *runner) Start() error {
 	if err != nil {
 		return err
 	}
-	backendName := os.Getenv("METRICS_BACKEND")
 	containerSelectionEnv := os.Getenv("CONTAINER_SELECTION_ENV")
-	constructor := statters[backendName]
+	constructor := statters[r.metricsBackend]
 	if constructor == nil {
-		return fmt.Errorf("no metrics backend found with name %q", backendName)
+		return fmt.Errorf("no metrics backend found with name %q", r.metricsBackend)
 	}
 	backend, err := constructor()
 	if err != nil {

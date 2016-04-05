@@ -25,6 +25,7 @@ var Config struct {
 	TsuruEndpoint       string
 	TsuruToken          string
 	MetricsInterval     time.Duration
+	MetricsBackend      string
 	StatusInterval      time.Duration
 	SyslogListenAddress string
 	LogBackends         []string
@@ -42,6 +43,7 @@ func LoadConfig() {
 	Config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
 	Config.StatusInterval = SecondsEnvOrDefault(DefaultInterval, "STATUS_INTERVAL")
 	Config.MetricsInterval = SecondsEnvOrDefault(DefaultInterval, "METRICS_INTERVAL")
+	Config.MetricsBackend = os.Getenv("METRICS_BACKEND")
 	Config.LogBackends = StringsEnvOrDefault([]string{"tsuru", "syslog"}, "LOG_BACKENDS")
 }
 
