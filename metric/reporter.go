@@ -13,8 +13,9 @@ import (
 )
 
 type Reporter struct {
-	backend    statter
-	infoClient *container.InfoClient
+	backend               statter
+	infoClient            *container.InfoClient
+	containerSelectionEnv string
 }
 
 func (r *Reporter) Do() {
@@ -22,14 +23,18 @@ func (r *Reporter) Do() {
 	if err != nil {
 		bslog.Errorf("failed to list containers: %s", err)
 	}
-	r.getMetrics(containers)
+	var selectionEnvs []string
+	if r.containerSelectionEnv != "" {
+		selectionEnvs = []string{r.containerSelectionEnv}
+	}
+	r.getMetrics(containers, selectionEnvs)
 	err = r.getHostMetrics()
 	if err != nil {
 		bslog.Errorf("failed to get host metrics: %s", err)
 	}
 }
 
-func (r *Reporter) getMetrics(containers []docker.APIContainers) {
+func (r *Reporter) getMetrics(containers []docker.APIContainers, selectionEnvs []string) {
 	var wg sync.WaitGroup
 	conns, err := conntrack()
 	if err != nil {
@@ -39,7 +44,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()
-			cont, err := r.infoClient.GetContainer(contID, true, []string{})
+			cont, err := r.infoClient.GetContainer(contID, true, selectionEnvs)
 			if err != nil {
 				if err != container.ErrTsuruVariablesNotFound {
 					bslog.Errorf("cannot inspect container %q: %s", contID, err)

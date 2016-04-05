@@ -21,25 +21,10 @@ type bogusContainer struct {
 }
 
 func (s *S) TestRunner(c *check.C) {
+	os.Unsetenv("CONTAINER_SELECTION_ENV")
 	os.Setenv("METRICS_BACKEND", "fake")
 	defer os.Unsetenv("METRICS_BACKEND")
-	bogusContainers := []bogusContainer{
-		{
-			name:   "CnonApp",
-			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}},
-			state:  docker.State{Running: true},
-		},
-		{
-			name:   "Capp",
-			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp", "TSURU_PROCESSNAME=myprocess"}},
-			state:  docker.State{Running: true},
-		},
-		{
-			name:   "Ctest",
-			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}},
-			state:  docker.State{Running: false, ExitCode: -1},
-		},
-	}
+	bogusContainers := s.buildContainers()
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
@@ -80,6 +65,40 @@ func (s *S) TestRunner(c *check.C) {
 	}
 }
 
+func (s *S) TestRunnerSelectionEnv(c *check.C) {
+	os.Setenv("METRICS_BACKEND", "fake")
+	defer os.Unsetenv("METRICS_BACKEND")
+	os.Setenv("CONTAINER_SELECTION_ENV", "TSURU_APPNAME")
+	defer os.Unsetenv("CONTAINER_SELECTION_ENV")
+	bogusContainers := s.buildContainers()
+	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
+	defer dockerServer.Stop()
+	s.prepareStats(dockerServer, conts)
+	r := NewRunner(dockerServer.URL(), time.Second)
+	err := r.Start()
+	c.Assert(err, check.IsNil)
+	r.Stop()
+	cpuStat := make([]*fakeStat, 0)
+	for i, stat := range fakeStatter.stats {
+		if stat.key == "cpu_max" {
+			cpuStat = append(cpuStat, &fakeStatter.stats[i])
+		}
+	}
+	c.Assert(len(cpuStat), check.Equals, 1)
+	expected := []*fakeStat{
+		&fakeStat{
+			container: "app",
+			app:       "someapp",
+			image:     "tsuru/python",
+			hostname:  conts[1].ID[:12],
+			process:   "myprocess",
+			key:       "cpu_max",
+			value:     float(250),
+		},
+	}
+	c.Assert(cpuStat[0], check.DeepEquals, expected[0])
+}
+
 func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Request), c *check.C) (*testing.DockerServer, []docker.Container) {
 	server, err := testing.NewServer("127.0.0.1:0", nil, hook)
 	c.Assert(err, check.IsNil)
@@ -98,6 +117,26 @@ func (s *S) startDockerServer(containers []bogusContainer, hook func(*http.Reque
 		createdContainers[i] = *container
 	}
 	return server, createdContainers
+}
+
+func (s *S) buildContainers() []bogusContainer {
+	return []bogusContainer{
+		{
+			name:   "CnonApp",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}},
+			state:  docker.State{Running: true},
+		},
+		{
+			name:   "Capp",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp", "TSURU_PROCESSNAME=myprocess"}},
+			state:  docker.State{Running: true},
+		},
+		{
+			name:   "Ctest",
+			config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}},
+			state:  docker.State{Running: false, ExitCode: -1},
+		},
+	}
 }
 
 func (s *S) prepareStats(dockerServer *testing.DockerServer, containers []docker.Container) {

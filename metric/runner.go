@@ -41,6 +41,7 @@ func (r *runner) Start() error {
 		return err
 	}
 	backendName := os.Getenv("METRICS_BACKEND")
+	containerSelectionEnv := os.Getenv("CONTAINER_SELECTION_ENV")
 	constructor := statters[backendName]
 	if constructor == nil {
 		return fmt.Errorf("no metrics backend found with name %q", backendName)
@@ -50,8 +51,9 @@ func (r *runner) Start() error {
 		return err
 	}
 	reporter := &Reporter{
-		backend:    backend,
-		infoClient: client,
+		backend:               backend,
+		infoClient:            client,
+		containerSelectionEnv: containerSelectionEnv,
 	}
 	go func() {
 		for {

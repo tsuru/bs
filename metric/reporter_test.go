@@ -103,7 +103,7 @@ func (s *S) TestSendConnMetricsFailure(c *check.C) {
 func (s *S) TestGetMetrics(c *check.C) {
 	var containers []docker.APIContainers
 	r := &Reporter{}
-	r.getMetrics(containers)
+	r.getMetrics(containers, []string{})
 }
 
 func (s *S) TestSendHostMetrics(c *check.C) {

@@ -50,6 +50,8 @@ logs to other syslog servers, using the [configuration options described below](
 ## Metrics
 
 bs also collect metrics from containers and it's own host and send them to a metric database backend.
+By default, bs will collect and report metrics from all running containers, including its own container, 
+this behavior can be changed [by environment variable](#container_selection_env). 
 Currently the supported backend is `logstash`.
 
 The following metrics are collected from containers:
@@ -70,7 +72,8 @@ The following metrics are collected from bs's own host:
 
 To be able to collect host metrics, the proc filesystem (`/proc`) must be mounted 
 as a volume inside *bs* container and the `HOST_PROC` environment variable must 
-be set to it's path. The metric backend is configured by setting some enviroment variables in the *bs* container.
+be set to it's path, tsuru currently [injects this environ](https://github.com/tsuru/bs#injected-environment-variables). 
+The metric backend is configured by setting some enviroment variables in the *bs* container.
 For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables).
 
 ## Environment Variables
@@ -175,6 +178,13 @@ The default value is `tsuru`.
 
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
 [tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
+
+### CONTAINER_SELECTION_ENV
+
+`CONTAINER_SELECTION_ENV` is the environment variable that needs to be set on containers to have their
+metrics collected and reported by *bs*. *By default, bs will report metrics from every container running
+on its host*, including itself. For example, if `CONTAINER_SELECTION_ENV=TSURU_APPNAME` *bs* will only report metrics from
+containers that have the `TSURU_APPNAME` environ (tsuru application containers).
 
 ### BS_DEBUG
 
