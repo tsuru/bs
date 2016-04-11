@@ -37,19 +37,25 @@ func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend str
 // Start starts a reporter that will send metrics to a backend until there is
 // a message in the exit channel. It's possible to interrupt the runner by
 // sending a message in the abort channel.
-func (r *runner) Start() error {
+func (r *runner) Start() (err error) {
+	defer func() {
+		if err != nil {
+			close(r.exit)
+		}
+	}()
 	client, err := container.NewClient(r.dockerEndpoint)
 	if err != nil {
-		return err
+		return
 	}
 	containerSelectionEnv := os.Getenv("CONTAINER_SELECTION_ENV")
 	constructor := statters[r.metricsBackend]
 	if constructor == nil {
-		return fmt.Errorf("no metrics backend found with name %q", r.metricsBackend)
+		err = fmt.Errorf("no metrics backend found with name %q", r.metricsBackend)
+		return
 	}
 	backend, err := constructor()
 	if err != nil {
-		return err
+		return
 	}
 	reporter := &Reporter{
 		backend:               backend,
@@ -68,7 +74,7 @@ func (r *runner) Start() error {
 
 		}
 	}()
-	return nil
+	return
 }
 
 // Stop stops the runner.

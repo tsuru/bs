@@ -27,6 +27,11 @@ const (
 
 var printVersion bool
 
+type StopWaiter interface {
+	Stop()
+	Wait()
+}
+
 func init() {
 	flag.BoolVar(&printVersion, "version", false, "Print version and exit")
 }
@@ -105,7 +110,7 @@ func main() {
 		config.Config.MetricsBackend)
 	err = mRunner.Start()
 	if err != nil {
-		bslog.Fatalf("Unable to initialize metrics runner: %s\n", err)
+		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
 		TsuruEndpoint:  config.Config.TsuruEndpoint,
@@ -116,14 +121,21 @@ func main() {
 	if err != nil {
 		bslog.Warnf("Unable to initialize status reporter: %s\n", err)
 	}
-	startSignalHandler(func(signal os.Signal) {
-		if reporter != nil {
-			reporter.Stop()
-		}
-		mRunner.Stop()
-	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	monitorEl := []StopWaiter{&lf, mRunner}
 	if reporter != nil {
-		reporter.Wait()
+		monitorEl = append(monitorEl, reporter)
 	}
-	mRunner.Wait()
+	var signaled bool
+	startSignalHandler(func(signal os.Signal) {
+		signaled = true
+		for _, m := range monitorEl {
+			go m.Stop()
+		}
+	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	for _, m := range monitorEl {
+		m.Wait()
+	}
+	if !signaled {
+		bslog.Fatalf("Exiting bs because no service could be initialized.")
+	}
 }

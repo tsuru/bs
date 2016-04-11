@@ -38,6 +38,7 @@ type wsForwarder struct {
 	pingInterval time.Duration
 	pongInterval time.Duration
 	jsonEncoder  *json.Encoder
+	quitCh       <-chan bool
 }
 
 func (b *tsuruBackend) initialize() error {
@@ -105,6 +106,10 @@ func (b *tsuruBackend) stop() {
 	close(b.msgCh)
 }
 
+func (f *wsForwarder) initialize(quitCh <-chan bool) {
+	f.quitCh = quitCh
+}
+
 func (f *wsForwarder) connect() (net.Conn, error) {
 	config, err := websocket.NewConfig(f.url, "ws://localhost/")
 	if err != nil {
@@ -152,9 +157,9 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		return nil, err
 	}
 	lastPongTime := time.Now().UnixNano()
-	debugStopWg.Add(2)
+	stopWg.Add(2)
 	go func() {
-		defer debugStopWg.Done()
+		defer stopWg.Done()
 		defer client.Close()
 		for {
 			frame, err := ws.NewFrameReader()
@@ -169,9 +174,14 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		}
 	}()
 	go func() {
-		defer debugStopWg.Done()
+		defer stopWg.Done()
 		defer client.Close()
-		for range time.Tick(f.pingInterval) {
+		for {
+			select {
+			case <-time.After(f.pingInterval):
+			case <-f.quitCh:
+				return
+			}
 			err := f.writeWithDeadline(ws, pingWriter, []byte{'z'})
 			if err != nil {
 				bslog.Errorf("[log forwarder] ping: %s", err)
