@@ -10,8 +10,8 @@ bs runs inside a dedicated container on each Docker node and collects
 information about all its sibling containers running on the same Docker node.
 
 It also creates a syslog server, which is responsible for receiving all logs
-from sibling containers. bs will then send these log entries to tsuru API and is
-also capable of forwarding log entries to multiple remote syslog endpoints.
+from sibling containers. bs will then send these log entries to tsuru API and
+is also capable of forwarding log entries to multiple remote syslog endpoints.
 
 The sections below describe in details all the features of bs. The
 [configuration](https://github.com/tsuru/tsuru/blob/master/docs/reference/config.rst#dockerbsimage)
@@ -45,20 +45,27 @@ syslog protocol.
 
 When receiving the logs, bs will forward them to the tsuru API, so users can
 check their logs using the `tsuru app-log` command. It can also forward the
-logs to other syslog servers, using the [configuration options described below](#log_backends).
+logs to other syslog servers, using the [configuration options described
+below](#log_backends).
 
 ## Metrics
 
-bs also collect metrics from containers and it's own host and send them to a metric database backend.
-By default, bs will collect and report metrics from all running containers, including its own container, 
-this behavior can be changed [by environment variable](#container_selection_env). 
-Currently the supported backend is `logstash`.
+bs also collect metrics from containers and it's own host and send them to a
+metric database backend. By default, bs will collect and report metrics from
+all running containers, including its own container, this behavior can be
+changed [by environment variable](#container_selection_env). Currently the
+supported backend is `logstash`.
 
 The following metrics are collected from containers:
 
 * cpu_max
 * mem_max
 * mem_pct_max
+* mem_limit
+* swap
+* swap_limit
+* netrx
+* nettx
 
 The following metrics are collected from bs's own host:
 
@@ -70,16 +77,19 @@ The following metrics are collected from bs's own host:
 * net (bytes received and sent)
 * uptime (seconds)
 
-To be able to collect host metrics, the proc filesystem (`/proc`) must be mounted 
-as a volume inside *bs* container and the `HOST_PROC` environment variable must 
-be set to it's path, tsuru currently [injects this environ](https://github.com/tsuru/bs#injected-environment-variables). 
-The metric backend is configured by setting some enviroment variables in the *bs* container.
-For more details check the [bs enviroment variables](https://github.com/tsuru/bs#environment-variables).
+To be able to collect host metrics, the proc filesystem (`/proc`) must be
+mounted as a volume inside *bs* container and the `HOST_PROC` environment
+variable must be set to it's path, tsuru currently [injects this
+environ](https://github.com/tsuru/bs#injected-environment-variables). The
+metric backend is configured by setting some enviroment variables in the *bs*
+container. For more details check the [bs enviroment
+variables](https://github.com/tsuru/bs#environment-variables).
 
 ## Environment Variables
 
-It's possible to set environment variables in started bs containers. This can be
-done using the `tsuru-admin bs-env-set` command.
+It's possible to set environment variables in started bs containers. This can
+be done using the `tsuru-admin node-container-update big-sibling --env
+NAME=VALUE` command.
 
 Some variables can be used to configure how the default bs application will
 behave. A custom bs image can also make use of set variables to change their
@@ -155,12 +165,13 @@ reporting from bs to the metric backend. The default value is 60 seconds.
 
 ### METRICS_BACKEND
 
-`METRICS_BACKEND` is the metric backend. Currently the supported backend is `logstash`.
+`METRICS_BACKEND` is the metric backend. Currently the supported backend is
+`logstash`.
 
 ### METRICS_LOGSTASH_CLIENT
 
-`METRICS_LOGSTASH_CLIENT` is the client name used to identify who is sending the metric.
-The default value is `tsuru`.
+`METRICS_LOGSTASH_CLIENT` is the client name used to identify who is sending
+the metric. The default value is `tsuru`.
 
 ### METRICS_LOGSTASH_PORT
 
@@ -168,23 +179,28 @@ The default value is `tsuru`.
 
 ### METRICS_LOGSTASH_HOST
 
-`METRICS_LOGSTASH_HOST` is the `Logstash` host. The default value is `localhost`.
+`METRICS_LOGSTASH_HOST` is the `Logstash` host. The default value is
+`localhost`.
 
 ### METRICS_LOGSTASH_PROTOCOL
 
-`METRICS_LOGSTASH_PROTOCOL` is the `Logstash` protocol. Supported protocols are `udp` and `tcp`. The default value is `udp`.
+`METRICS_LOGSTASH_PROTOCOL` is the `Logstash` protocol. Supported protocols
+are `udp` and `tcp`. The default value is `udp`.
 
 ### METRICS_ELASTICSEARCH_HOST
 
-`METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used by
-[tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show graphics with the metrics data.
+`METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used
+by [tsuru-dashboard](https://github.com/tsuru/tsuru-dashboard) to show
+graphics with the metrics data.
 
 ### CONTAINER_SELECTION_ENV
 
-`CONTAINER_SELECTION_ENV` is the environment variable that needs to be set on containers to have their
-metrics collected and reported by *bs*. *By default, bs will report metrics from every container running
-on its host*, including itself. For example, if `CONTAINER_SELECTION_ENV=TSURU_APPNAME` *bs* will only report metrics from
-containers that have the `TSURU_APPNAME` environ (tsuru application containers).
+`CONTAINER_SELECTION_ENV` is the environment variable that needs to be set on
+containers to have their metrics collected and reported by *bs*. *By default,
+bs will report metrics from every container running on its host*, including
+itself. For example, if `CONTAINER_SELECTION_ENV=TSURU_APPNAME` *bs* will only
+report metrics from containers that have the `TSURU_APPNAME` environ (tsuru
+application containers).
 
 ### BS_DEBUG
 
@@ -207,25 +223,29 @@ tsuru will only try to write to `/`.
 
 ## Injected Environment Variables
 
-Tsuru will inject some environment variables when starting the bs container. Those *cannot* be changed by the 
-`tsuru-admin bs-env-set` command and are documented here for completeness and development purposes.
+Tsuru will inject some environment variables when starting the bs container.
+Those *should not* be changed by the `tsuru-admin node-container-update`
+command and are documented here for completeness and development purposes.
 
 ### TSURU_ENDPOINT
 
-`TSURU_ENDPOINT` is the address to the tsuru api where logs will be forwarded when using `tsuru` as a log backend
-and where container status are going to be reported to.
+`TSURU_ENDPOINT` is the address to the tsuru api where logs will be forwarded
+when using `tsuru` as a log backend and where container status are going to be
+reported to.
 
 ### DOCKER_ENDPOINT
 
-`DOCKER_ENDPOINT` is the docker endpoint from where the container metrics are going to be collected from.
+`DOCKER_ENDPOINT` is the docker endpoint from where the container metrics are
+going to be collected from.
 
 ### SYSLOG_LISTEN_ADDRESS
 
-`SYSLOG_LISTEN_ADDRESS` is the local syslog server address that other container logs are being sent to be forwarded
-by bs.
+`SYSLOG_LISTEN_ADDRESS` is the local syslog server address that other
+container logs are being sent to be forwarded by bs.
 
 ### HOST_PROC
 
-`HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in the *bs* container.
+`HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in
+the *bs* container.
 
 
