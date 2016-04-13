@@ -13,8 +13,8 @@ format:
 
 check-format:
 	go get golang.org/x/tools/cmd/goimports
-	bash -c 'test -z $$(gofmt -s -l $(dirs))'
-	bash -c 'test -z $$(goimports -srcdir . -l $(dirs))'
+	bash -c 'result=$$(gofmt -s -l $(dirs)); test -z $$result || (echo $$result && exit 1)'
+	bash -c 'result=$$(goimports -srcdir . -l $(dirs)); test -z $$result || (echo $$result && exit 1)'
 
 run:
 	go run main.go
