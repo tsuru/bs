@@ -6,9 +6,10 @@ package metric
 
 import (
 	"encoding/json"
+	"net"
+
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
-	"net"
 )
 
 func newLogStash() (statter, error) {

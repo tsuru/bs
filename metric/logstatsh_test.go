@@ -7,9 +7,9 @@ package metric
 import (
 	"encoding/json"
 	"net"
+	"os"
 
 	"gopkg.in/check.v1"
-	"os"
 )
 
 func (s *S) TestSend(c *check.C) {

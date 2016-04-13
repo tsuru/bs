@@ -6,13 +6,14 @@ package metric
 
 import (
 	"errors"
+	"os"
+
 	cpu "github.com/shirou/gopsutil/cpu"
 	disk "github.com/shirou/gopsutil/disk"
 	host "github.com/shirou/gopsutil/host"
 	load "github.com/shirou/gopsutil/load"
 	mem "github.com/shirou/gopsutil/mem"
 	net "github.com/shirou/gopsutil/net"
-	"os"
 )
 
 type HostClient struct{}

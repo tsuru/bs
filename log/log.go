@@ -11,11 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/mcuadros/go-syslog.v2"
+
 	"github.com/jeromer/syslogparser"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
-	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
 const (

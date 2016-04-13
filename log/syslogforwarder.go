@@ -6,13 +6,13 @@ package log
 
 import (
 	"fmt"
-	"github.com/tsuru/bs/bslog"
 	"net"
 	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
 )
 

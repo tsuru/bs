@@ -5,9 +5,10 @@
 package log
 
 import (
+	"time"
+
 	"github.com/jeromer/syslogparser"
 	"gopkg.in/check.v1"
-	"time"
 )
 
 func (s *S) TestLenientFormatGetParser(c *check.C) {

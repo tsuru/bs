@@ -5,8 +5,9 @@
 package metric
 
 import (
-	"gopkg.in/check.v1"
 	"os"
+
+	"gopkg.in/check.v1"
 )
 
 var _ = check.Suite(&H{})

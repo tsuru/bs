@@ -38,14 +38,14 @@ func (s *S) TestRunner(c *check.C) {
 	}
 	c.Assert(len(cpuStat), check.Equals, 2)
 	expected := []*fakeStat{
-		&fakeStat{
+		{
 			container: "nonApp",
 			image:     "tsuru/python",
 			hostname:  conts[0].ID[:12],
 			key:       "cpu_max",
 			value:     float(250),
 		},
-		&fakeStat{
+		{
 			container: "app",
 			app:       "someapp",
 			image:     "tsuru/python",
@@ -82,7 +82,7 @@ func (s *S) TestRunnerSelectionEnv(c *check.C) {
 	}
 	c.Assert(len(cpuStat), check.Equals, 1)
 	expected := []*fakeStat{
-		&fakeStat{
+		{
 			container: "app",
 			app:       "someapp",
 			image:     "tsuru/python",
