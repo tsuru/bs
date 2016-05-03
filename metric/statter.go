@@ -28,8 +28,13 @@ func NewContainerInfo(container *container.Container) ContainerInfo {
 	}
 }
 
+type HostInfo struct {
+	Name  string
+	Addrs []string
+}
+
 type statter interface {
 	Send(container ContainerInfo, key string, value interface{}) error
 	SendConn(container ContainerInfo, host string) error
-	SendHost(hostname, key string, value interface{}) error
+	SendHost(host HostInfo, key string, value interface{}) error
 }

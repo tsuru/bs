@@ -56,13 +56,14 @@ func (s *logStash) SendConn(container ContainerInfo, host string) error {
 	return s.send(message)
 }
 
-func (s *logStash) SendHost(hostname, key string, value interface{}) error {
+func (s *logStash) SendHost(host HostInfo, key string, value interface{}) error {
 	message := map[string]interface{}{
 		"client": s.Client,
 		"count":  1,
 		"metric": "host_" + key,
 		"value":  value,
-		"host":   hostname,
+		"host":   host.Name,
+		"addr":   host.Addrs,
 	}
 	return s.send(message)
 }

@@ -50,8 +50,8 @@ func (s *fake) SendConn(container ContainerInfo, host string) error {
 	return s.Send(container, "connection", host)
 }
 
-func (s *fake) SendHost(hostname, key string, value interface{}) error {
-	data := ContainerInfo{app: "sysapp", process: "-", hostname: hostname}
+func (s *fake) SendHost(host HostInfo, key string, value interface{}) error {
+	data := ContainerInfo{app: "sysapp", process: "-", hostname: host.Name}
 	return s.Send(data, key, value)
 }
 

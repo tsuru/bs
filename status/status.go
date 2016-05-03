@@ -18,6 +18,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
+	node "github.com/tsuru/bs/node"
 	"github.com/tsuru/tsuru/provision"
 )
 
@@ -76,7 +77,7 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 		return nil, err
 	}
 	checks := NewCheckCollection(infoClient.GetClient())
-	addrs, err := findNodeAddrs()
+	addrs, err := node.GetNodeAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("[status reporter] unable to get network addresses: %s", err)
 	}
@@ -257,30 +258,4 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 		}
 	}
 	return nil
-}
-
-func findNodeAddrs() ([]string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return nil, err
-	}
-	addrsRet := make([]string, 0, len(addrs))
-	for _, a := range addrs {
-		var addrStr string
-		switch v := a.(type) {
-		case *net.IPNet:
-			addrStr = v.IP.String()
-		case *net.IPAddr:
-			addrStr = v.IP.String()
-		default:
-			ip := net.ParseIP(strings.SplitN(a.String(), "/", 2)[0])
-			if ip != nil {
-				addrStr = ip.String()
-			}
-		}
-		if addrStr != "" {
-			addrsRet = append(addrsRet, addrStr)
-		}
-	}
-	return addrsRet, nil
 }

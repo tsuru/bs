@@ -10,6 +10,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
+	"github.com/tsuru/bs/node"
 )
 
 type Reporter struct {
@@ -118,8 +119,13 @@ func (r *Reporter) getHostMetrics() error {
 	if err != nil {
 		return err
 	}
+	addrs, err := node.GetNodeAddrs()
+	if err != nil {
+		return err
+	}
+	hostInfo := HostInfo{Name: hostname, Addrs: addrs}
 	for _, metric := range metrics {
-		err := r.sendHostMetrics(hostname, metric)
+		err := r.sendHostMetrics(hostInfo, metric)
 		if err != nil {
 			return err
 		}
@@ -127,9 +133,9 @@ func (r *Reporter) getHostMetrics() error {
 	return nil
 }
 
-func (r *Reporter) sendHostMetrics(hostname string, metrics map[string]float) error {
+func (r *Reporter) sendHostMetrics(hostInfo HostInfo, metrics map[string]float) error {
 	for key, value := range metrics {
-		err := r.backend.SendHost(hostname, key, value)
+		err := r.backend.SendHost(hostInfo, key, value)
 		if err != nil {
 			bslog.Errorf("failed to send host metric %s: %s", key, err)
 			return err
