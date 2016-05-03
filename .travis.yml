@@ -23,3 +23,10 @@ services:
 matrix:
   allow_failures:
     - go: tip
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+  slack:
+    rooms:
+      secure: Aggj8tmev1E88LTUn5bGnKowhHUmIjZzm4ici+DZ8Vg+Bz81SzyzECJik6mAwQh33QXE5UVkshzFC/QdnITPWglih9vm+UazT9f4tH6cLVtrhU6jBMGMwMWU4oe1J/5VI2WaPYFbu3+LOaniIkYUCelYK/wgjvuZnHBTh07W3mircDRV/0VwTnpcLIw1V0eDVGcJ2KPH+AEDbZAvjaF/Hp5VXUIYi7t1CSYJKNd2RuHPFq3XCwIu2xep7xduB2lJe3KTIr7IKjIlaRsr2Fhl22hQX3dJamSPFF4hdBKEYZ5IMFidm5a6sqTKELAIKygknCzf/oh+8mHeVZ7mmVdHtVu6Vk3LQVzq8ZeB5APBSgrZqvBc7584FbK3KcKYPFeax+mnk1tlopRgRd4Y0MTuW9lGGl4gkKRb803nfG4pwSYtaJaW9vcqRgbMkJ7dx0Eb1nHTZB1KXNyZH5vlDZmKFHeYgEarCUOsvX7p7ZP7RZzILb29fWpYeKf4+IqV1uTZgRP6+MtKPN58Vxq3IPjQawrbuOXD7I3Kwa0B1tSvsd+DR12Q30mLCOvL7Nb32+ZesVWbsCC5csJE0ovVtR/ES0Y8IRVw2KrcBG5Emvx0xnsLRrAl3NSRyKSrNOowemcFEr0LMhLSrJJ9yI1O+pk2JsBzahbNkXyCy1aNa82nw04=
