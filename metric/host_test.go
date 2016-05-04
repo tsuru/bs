@@ -101,8 +101,8 @@ func (h *H) TestGetHostNetworkUsage(c *check.C) {
 }
 
 func (h *H) assertNetworkUsage(c *check.C, net map[string]float) {
-	c.Assert(net["net_bytes_recv"], check.Not(check.Equals), float(0))
-	c.Assert(net["net_bytes_sent"], check.Not(check.Equals), float(0))
+	c.Assert(net["netrx"], check.Not(check.Equals), float(0))
+	c.Assert(net["nettx"], check.Not(check.Equals), float(0))
 }
 
 func (h *H) assertCpuTimes(c *check.C, cpu map[string]float) {

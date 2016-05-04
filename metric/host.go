@@ -130,8 +130,8 @@ func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {
 		return nil, err
 	}
 	stats := map[string]float{
-		"net_bytes_recv": float(netStat[0].BytesRecv),
-		"net_bytes_sent": float(netStat[0].BytesSent),
+		"netrx": float(netStat[0].BytesRecv),
+		"nettx": float(netStat[0].BytesSent),
 	}
 	return stats, nil
 }
