@@ -17,6 +17,7 @@ type Reporter struct {
 	backend               statter
 	infoClient            *container.InfoClient
 	containerSelectionEnv string
+	hostClient            *HostClient
 }
 
 func (r *Reporter) Do() {
@@ -107,15 +108,14 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 }
 
 func (r *Reporter) getHostMetrics() error {
-	hostClient, err := NewHostClient()
+	if r.hostClient == nil {
+		return nil
+	}
+	metrics, err := r.hostClient.GetHostMetrics()
 	if err != nil {
 		return err
 	}
-	metrics, err := hostClient.GetHostMetrics()
-	if err != nil {
-		return err
-	}
-	hostname, err := hostClient.GetHostname()
+	hostname, err := r.hostClient.GetHostname()
 	if err != nil {
 		return err
 	}

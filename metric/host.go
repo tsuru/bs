@@ -16,7 +16,9 @@ import (
 	net "github.com/shirou/gopsutil/net"
 )
 
-type HostClient struct{}
+type HostClient struct {
+	lastCPUStats *cpu.CPUTimesStat
+}
 
 func NewHostClient() (*HostClient, error) {
 	proc := os.Getenv("HOST_PROC")
@@ -113,15 +115,29 @@ func (h *HostClient) getHostCpuTimes() (map[string]float, error) {
 	if err != nil {
 		return nil, err
 	}
-	cpuTotal := float(cpuStats[0].Total())
-	stats := map[string]float{
-		"cpu_user":   float(cpuStats[0].User) / cpuTotal,
-		"cpu_sys":    float(cpuStats[0].System) / cpuTotal,
-		"cpu_idle":   float(cpuStats[0].Idle) / cpuTotal,
-		"cpu_stolen": float(cpuStats[0].Stolen) / cpuTotal,
-		"cpu_wait":   float(cpuStats[0].Iowait) / cpuTotal,
-	}
+	stats := h.calculateCpuPercent(&cpuStats[0])
+	h.lastCPUStats = &cpuStats[0]
 	return stats, nil
+}
+
+func (h *HostClient) calculateCpuPercent(currentCpuStats *cpu.CPUTimesStat) map[string]float {
+	var user, sys, idle, stolen, wait float64
+	if h.lastCPUStats != nil {
+		deltaTotal := currentCpuStats.Total() - h.lastCPUStats.Total()
+		user = (currentCpuStats.User - h.lastCPUStats.User) / deltaTotal
+		sys = (currentCpuStats.System - h.lastCPUStats.System) / deltaTotal
+		idle = (currentCpuStats.Idle - h.lastCPUStats.Idle) / deltaTotal
+		stolen = (currentCpuStats.Stolen - h.lastCPUStats.Stolen) / deltaTotal
+		wait = (currentCpuStats.Iowait - h.lastCPUStats.Iowait) / deltaTotal
+	}
+	stats := map[string]float{
+		"cpu_user":   float(user),
+		"cpu_sys":    float(sys),
+		"cpu_idle":   float(idle),
+		"cpu_stolen": float(stolen),
+		"cpu_wait":   float(wait),
+	}
+	return stats
 }
 
 func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {

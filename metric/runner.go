@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 )
 
@@ -57,10 +58,16 @@ func (r *runner) Start() (err error) {
 	if err != nil {
 		return
 	}
+	hostClient, err := NewHostClient()
+	if err != nil {
+		bslog.Warnf("Failed to create host client: %s", err)
+		err = nil
+	}
 	reporter := &Reporter{
 		backend:               backend,
 		infoClient:            client,
 		containerSelectionEnv: containerSelectionEnv,
+		hostClient:            hostClient,
 	}
 	go func() {
 		for {
