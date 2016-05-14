@@ -10,22 +10,22 @@ package log
     machine lineparser;
     write data;
 }%%
-
 func parseLogLine(data []byte) ([][]byte, bool, bool) {
-    parts := make([][]byte, 6)
+    parts := make([][]byte, 8)
     start := 0
-    pIdx := 0
+    pIdx := -1
     cs, p, pe := 0, 0, len(data)
     eof := pe
     withMsg := false
     withPID := false
     %%{
-        action di { start = p }
-        action dd { parts[pIdx] = data[start:p]; pIdx++ }
+        action di { pIdx++; start = p }
+        action dd { parts[pIdx] = data[start:p] }
         action msgok { withMsg = true }
         action withpid { withPID = true }
         main :=
           '<' ( digit )+ >di %dd '>' space* ( any - space )+ >di %dd space+
+          ( ( digit+ space digit+ ':' digit+ ':' digit+ ) >di %dd space+ )?
           ( any - space )+ >di %dd space+ ( any - space - '[' - ']' )+ >di %dd
           ('[' ( digit )+ >di %dd >withpid ']')? ':' space+ ( any )+ >di %dd >msgok;
         write init;

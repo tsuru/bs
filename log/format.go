@@ -6,6 +6,7 @@ package log
 
 import (
 	"bufio"
+	"bytes"
 	"strconv"
 	"strings"
 	"time"
@@ -40,11 +41,24 @@ func (p *LenientParser) Parse() error {
 	if err != nil {
 		return p.defaultParsers()
 	}
-	ts, err := time.Parse(time.RFC3339, string(groups[1]))
-	if err != nil {
-		return p.defaultParsers()
-	}
+	var ts time.Time
 	contentIdx := 4
+	hostIdx := 2
+	if len(groups[6]) == 0 {
+		ts, err = time.Parse(time.RFC3339, string(groups[1]))
+		if err != nil {
+			return p.defaultParsers()
+		}
+	} else {
+		hostIdx = 4
+		contentIdx = 6
+		dt := string(bytes.Join(groups[1:4], []byte{' '}))
+		ts, err = time.Parse(time.Stamp, dt)
+		if err != nil {
+			return p.defaultParsers()
+		}
+		ts = ts.AddDate(time.Now().Year(), 0, 0)
+	}
 	if withPID {
 		contentIdx++
 	}
@@ -53,8 +67,8 @@ func (p *LenientParser) Parse() error {
 		"facility":  priority / 8,
 		"severity":  priority % 8,
 		"timestamp": ts,
-		"hostname":  string(groups[2]),
-		"tag":       string(groups[3]),
+		"hostname":  string(groups[hostIdx]),
+		"tag":       string(groups[hostIdx+1]),
 		"content":   string(groups[contentIdx]),
 	}
 	return nil
