@@ -28,3 +28,9 @@ publish-local: _build
 	docker build -t 127.0.0.1:5000/tsuru/bs .
 	docker push 127.0.0.1:5000/tsuru/bs
 
+viewparser:
+	@ragel -pV log/parser.rl > parser.dot
+	@dot -Tpng parser.dot > parser.png
+	@rm parser.dot
+	@open -W parser.png
+	@rm parser.png
