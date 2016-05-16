@@ -136,6 +136,7 @@ func (h *HostClient) calculateCpuPercent(currentCpuStats *cpu.CPUTimesStat) map[
 		"cpu_idle":   float(idle),
 		"cpu_stolen": float(stolen),
 		"cpu_wait":   float(wait),
+		"cpu_busy":   float(user + sys),
 	}
 	return stats
 }

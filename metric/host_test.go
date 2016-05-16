@@ -106,7 +106,7 @@ func (h *H) assertNetworkUsage(c *check.C, net map[string]float) {
 }
 
 func (h *H) assertCpuTimes(c *check.C, cpu map[string]float) {
-	c.Assert(cpu, check.HasLen, 5)
+	c.Assert(cpu, check.HasLen, 6)
 }
 
 func (h *H) assertLoad(c *check.C, load map[string]float) {
