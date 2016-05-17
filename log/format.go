@@ -33,8 +33,8 @@ type LenientParser struct {
 }
 
 func (p *LenientParser) Parse() error {
-	groups, withMsg, withPID := parseLogLine(p.line)
-	if !withMsg {
+	groups := parseLogLine(p.line)
+	if len(groups) != 7 || len(groups[6]) == 0 {
 		return p.defaultParsers()
 	}
 	priority, err := strconv.Atoi(string(groups[0]))
@@ -42,34 +42,27 @@ func (p *LenientParser) Parse() error {
 		return p.defaultParsers()
 	}
 	var ts time.Time
-	contentIdx := 4
-	hostIdx := 2
-	if len(groups[6]) == 0 {
+	if len(groups[2]) == 0 {
 		ts, err = time.Parse(time.RFC3339, string(groups[1]))
 		if err != nil {
 			return p.defaultParsers()
 		}
 	} else {
-		hostIdx = 4
-		contentIdx = 6
-		dt := string(bytes.Join(groups[1:4], []byte{' '}))
+		dt := string(bytes.Join(groups[1:3], []byte{' '}))
 		ts, err = time.Parse(time.Stamp, dt)
 		if err != nil {
 			return p.defaultParsers()
 		}
 		ts = ts.AddDate(time.Now().Year(), 0, 0)
 	}
-	if withPID {
-		contentIdx++
-	}
 	p.logParts = syslogparser.LogParts{
 		"priority":  priority,
 		"facility":  priority / 8,
 		"severity":  priority % 8,
 		"timestamp": ts,
-		"hostname":  string(groups[hostIdx]),
-		"tag":       string(groups[hostIdx+1]),
-		"content":   string(groups[contentIdx]),
+		"hostname":  string(groups[3]),
+		"tag":       string(groups[4]),
+		"content":   string(groups[6]),
 	}
 	return nil
 }

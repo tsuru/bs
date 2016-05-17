@@ -42,8 +42,19 @@ func (s *S) BenchmarkLenientParserParseNewFormat(c *check.C) {
 	}
 }
 
+func (s *S) BenchmarkLenientParserParseUnixFormat(c *check.C) {
+	logLine := []byte("<30>May 13 21:10:17 docker/00dfa98fe8e0[10798]: hey")
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		lp := LenientParser{line: logLine}
+		lp.Parse()
+	}
+}
+
 func (s *S) TestLenientParserParse(c *check.C) {
 	examples := []string{
+		"<30>May 13 21:10:17 docker/00dfa98fe8e0[10798]: hey",
+		"<30>May 13 21:10:17 docker/00dfa98fe8e0: hey",
 		"<30> May 13 21:10:17 vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[10798]: hey",
 		"<30> May 13 21:10:17 vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0: hey",
 		"<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey",
@@ -57,10 +68,19 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"facility":     3,
 			"severity":     6,
 			"timestamp":    time.Date(time.Now().Year(), 5, 13, 21, 10, 17, 0, time.UTC),
-			"hostname":     "vagrant-ubuntu-trusty-64",
+			"hostname":     "",
 			"tag":          "docker/00dfa98fe8e0",
 			"content":      "hey",
-			"rawmsg":       []byte(examples[0]),
+			"container_id": "00dfa98fe8e0",
+		},
+		{
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Date(time.Now().Year(), 5, 13, 21, 10, 17, 0, time.UTC),
+			"hostname":     "",
+			"tag":          "docker/00dfa98fe8e0",
+			"content":      "hey",
 			"container_id": "00dfa98fe8e0",
 		},
 		{
@@ -71,7 +91,16 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"hostname":     "vagrant-ubuntu-trusty-64",
 			"tag":          "docker/00dfa98fe8e0",
 			"content":      "hey",
-			"rawmsg":       []byte(examples[1]),
+			"container_id": "00dfa98fe8e0",
+		},
+		{
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Date(time.Now().Year(), 5, 13, 21, 10, 17, 0, time.UTC),
+			"hostname":     "vagrant-ubuntu-trusty-64",
+			"tag":          "docker/00dfa98fe8e0",
+			"content":      "hey",
 			"container_id": "00dfa98fe8e0",
 		},
 		{
@@ -82,7 +111,6 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"hostname":     "vagrant-ubuntu-trusty-64",
 			"tag":          "docker/00dfa98fe8e0",
 			"content":      "hey",
-			"rawmsg":       []byte(examples[2]),
 			"container_id": "00dfa98fe8e0",
 		},
 		{
@@ -93,7 +121,6 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"hostname":     "vagrant-ubuntu-trusty-64",
 			"tag":          "docker/00dfa98fe8e0",
 			"content":      "hey",
-			"rawmsg":       []byte(examples[3]),
 			"container_id": "00dfa98fe8e0",
 		},
 		{
@@ -104,7 +131,6 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"hostname":     "hostname",
 			"tag":          "tag/my_id",
 			"content":      "content",
-			"rawmsg":       []byte(examples[4]),
 			"container_id": "my_id",
 		},
 		{
@@ -121,7 +147,6 @@ func (s *S) TestLenientParserParse(c *check.C) {
 			"msg_id":          "-",
 			"structured_data": "-",
 			"version":         1,
-			"rawmsg":          []byte(examples[5]),
 		},
 	}
 	for i, line := range examples {
@@ -129,6 +154,7 @@ func (s *S) TestLenientParserParse(c *check.C) {
 		err := lp.Parse()
 		c.Assert(err, check.IsNil, check.Commentf("error in %d", i))
 		parts := lp.Dump()
+		expected[i]["rawmsg"] = []byte(line)
 		c.Check(parts, check.DeepEquals, expected[i], check.Commentf("error in %d", i))
 	}
 }

@@ -10,26 +10,26 @@ package log
     machine lineparser;
     write data;
 }%%
-func parseLogLine(data []byte) ([][]byte, bool, bool) {
-    parts := make([][]byte, 8)
-    start := 0
-    pIdx := -1
+func parseLogLine(data []byte) [][]byte {
+    entries := make([][]byte, 7)
+    starts := make([]int, 7)
     cs, p, pe := 0, 0, len(data)
     eof := pe
-    withMsg := false
-    withPID := false
+    push := func(v int) {
+        starts[v] = p
+        entries[v] = nil
+    }
+    pop := func(v int) {
+        entries[v] = data[starts[v]:p]
+    }
     %%{
-        action di { pIdx++; start = p }
-        action dd { parts[pIdx] = data[start:p] }
-        action msgok { withMsg = true }
-        action withpid { withPID = true }
         main :=
-          '<' ( digit )+ >di %dd '>' space* ( any - space )+ >di %dd space+
-          ( ( digit+ space digit+ ':' digit+ ':' digit+ ) >di %dd space+ )?
-          ( any - space )+ >di %dd space+ ( any - space - '[' - ']' )+ >di %dd
-          ('[' ( digit )+ >di %dd >withpid ']')? ':' space+ ( any )+ >di %dd >msgok;
+          '<' ( digit )+ >{push(0)} %{pop(0)} '>' space* ( any - space )+ >{push(1)} %{pop(1)} space+
+          ( ( digit+ space digit+ ':' digit+ ':' digit+ ) >{push(2)} %{pop(2)} space+ )?
+          (( alpha|digit|'-'|'.'|':' )+ >{push(3)} %{pop(3)} space+)? ( any - space - '[' - ']' )+ >{push(4)} %{pop(4)}
+          ('[' ( digit )+ >{push(5)} %{pop(5)} ']')? ':' space+ ( any )+ >{push(6)} %{pop(6)};
         write init;
         write exec;
     }%%
-    return parts, withMsg, withPID
+    return entries
 }
