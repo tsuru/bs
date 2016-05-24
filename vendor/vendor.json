@@ -15,6 +15,12 @@
 			"revisionTime": "2015-05-20T15:46:26-04:00"
 		},
 		{
+			"checksumSHA1": "y+bM8zNs62zFYd3RXhb3yjWfYF0=",
+			"path": "github.com/ajg/form",
+			"revision": "e7b99d6ea9c58e7bb6b2c1059b9ba748cdff22b0",
+			"revisionTime": "2016-04-29T22:15:17Z"
+		},
+		{
 			"checksumSHA1": "mswe275heIklTKj7mPTnVzAFoMk=",
 			"path": "github.com/docker/docker/opts",
 			"revision": "1691fe6d23b083c67aea120f05c4797220388d59",
