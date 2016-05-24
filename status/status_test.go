@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ajg/form"
 	"github.com/fsouza/go-dockerclient"
 	dtesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
@@ -67,6 +68,7 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Log(logOutput.String())
 	req := <-requests
 	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
+	c.Assert(req.request.Header.Get("Content-Type"), check.Equals, "application/x-www-form-urlencoded")
 	c.Assert(req.request.URL.Path, check.Equals, "/node/status")
 	c.Assert(req.request.Method, check.Equals, "POST")
 	expected := hostStatus{
@@ -79,7 +81,7 @@ func (s S) TestReportStatus(c *check.C) {
 		},
 	}
 	var input hostStatus
-	err = json.Unmarshal(req.body, &input)
+	err = form.DecodeString(&input, string(req.body))
 	c.Assert(err, check.IsNil)
 	c.Assert(input.Checks, check.HasLen, 2)
 	c.Assert(len(input.Addrs) > 0, check.Equals, true)

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ajg/form"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
@@ -189,17 +190,16 @@ func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) 
 }
 
 func (r *Reporter) updateNode(payload *hostStatus) (*http.Response, error) {
-	var body bytes.Buffer
-	err := json.NewEncoder(&body).Encode(payload)
+	bodyContent, err := form.EncodeToString(payload)
 	if err != nil {
 		return nil, err
 	}
 	url := fmt.Sprintf("%s/node/status", strings.TrimRight(r.config.TsuruEndpoint, "/"))
-	request, err := http.NewRequest("POST", url, &body)
+	request, err := http.NewRequest("POST", url, strings.NewReader(bodyContent))
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Add("Authorization", "bearer "+r.config.TsuruToken)
 	resp, err := r.httpClient.Do(request)
 	if err != nil {
