@@ -10,26 +10,33 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
+	"github.com/tsuru/bs/node"
 )
 
 type Reporter struct {
-	backend    statter
-	infoClient *container.InfoClient
+	backend               statter
+	infoClient            *container.InfoClient
+	containerSelectionEnv string
+	hostClient            *HostClient
 }
 
 func (r *Reporter) Do() {
-	containers, err := r.listContainers()
+	containers, err := r.infoClient.ListContainers()
 	if err != nil {
 		bslog.Errorf("failed to list containers: %s", err)
 	}
-	r.getMetrics(containers)
+	var selectionEnvs []string
+	if r.containerSelectionEnv != "" {
+		selectionEnvs = []string{r.containerSelectionEnv}
+	}
+	r.getMetrics(containers, selectionEnvs)
+	err = r.getHostMetrics()
+	if err != nil {
+		bslog.Errorf("failed to get host metrics: %s", err)
+	}
 }
 
-func (r *Reporter) listContainers() ([]docker.APIContainers, error) {
-	return r.infoClient.GetClient().ListContainers(docker.ListContainersOptions{})
-}
-
-func (r *Reporter) getMetrics(containers []docker.APIContainers) {
+func (r *Reporter) getMetrics(containers []docker.APIContainers, selectionEnvs []string) {
 	var wg sync.WaitGroup
 	conns, err := conntrack()
 	if err != nil {
@@ -39,7 +46,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()
-			cont, err := r.infoClient.GetContainer(contID)
+			cont, err := r.infoClient.GetContainer(contID, true, selectionEnvs)
 			if err != nil {
 				if err != container.ErrTsuruVariablesNotFound {
 					bslog.Errorf("cannot inspect container %q: %s", contID, err)
@@ -71,7 +78,7 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers) {
 
 func (r *Reporter) sendMetrics(container *container.Container, metrics map[string]float) error {
 	for key, value := range metrics {
-		err := r.backend.Send(container.AppName, container.Config.Hostname, container.ProcessName, key, value)
+		err := r.backend.Send(NewContainerInfo(container), key, value)
 		if err != nil {
 			bslog.Errorf("failed to send metrics for container %q: %s", container, err)
 			return err
@@ -90,11 +97,48 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 			value = conn.SourceIP + ":" + conn.SourcePort
 		}
 		if value != "" {
-			err := r.backend.SendConn(container.AppName, container.Config.Hostname, container.ProcessName, value)
+			err := r.backend.SendConn(NewContainerInfo(container), value)
 			if err != nil {
 				bslog.Errorf("failed to send connection metrics for container %q: %s", container, err)
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (r *Reporter) getHostMetrics() error {
+	if r.hostClient == nil {
+		return nil
+	}
+	metrics, err := r.hostClient.GetHostMetrics()
+	if err != nil {
+		return err
+	}
+	hostname, err := r.hostClient.GetHostname()
+	if err != nil {
+		return err
+	}
+	addrs, err := node.GetNodeAddrs()
+	if err != nil {
+		return err
+	}
+	hostInfo := HostInfo{Name: hostname, Addrs: addrs}
+	for _, metric := range metrics {
+		err := r.sendHostMetrics(hostInfo, metric)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Reporter) sendHostMetrics(hostInfo HostInfo, metrics map[string]float) error {
+	for key, value := range metrics {
+		err := r.backend.SendHost(hostInfo, key, value)
+		if err != nil {
+			bslog.Errorf("failed to send host metric %s: %s", key, err)
+			return err
 		}
 	}
 	return nil

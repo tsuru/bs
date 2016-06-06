@@ -7,9 +7,9 @@ package metric
 import (
 	"encoding/json"
 	"net"
-	"os"
 
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 )
 
 func newLogStash() (statter, error) {
@@ -19,27 +19,11 @@ func newLogStash() (statter, error) {
 		defaultHost     = "localhost"
 		defaultProtocol = "udp"
 	)
-	client := os.Getenv("METRICS_LOGSTASH_CLIENT")
-	if client == "" {
-		client = defaultClient
-	}
-	port := os.Getenv("METRICS_LOGSTASH_PORT")
-	if port == "" {
-		port = defaultPort
-	}
-	host := os.Getenv("METRICS_LOGSTASH_HOST")
-	if host == "" {
-		host = defaultHost
-	}
-	protocol := os.Getenv("METRICS_LOGSTASH_PROTOCOL")
-	if protocol == "" {
-		protocol = defaultProtocol
-	}
 	return &logStash{
-		Client:   client,
-		Host:     host,
-		Port:     port,
-		Protocol: protocol,
+		Client:   config.StringEnvOrDefault(defaultClient, "METRICS_LOGSTASH_CLIENT"),
+		Host:     config.StringEnvOrDefault(defaultHost, "METRICS_LOGSTASH_HOST"),
+		Port:     config.StringEnvOrDefault(defaultPort, "METRICS_LOGSTASH_PORT"),
+		Protocol: config.StringEnvOrDefault(defaultProtocol, "METRICS_LOGSTASH_PROTOCOL"),
 	}, nil
 }
 
@@ -50,30 +34,49 @@ type logStash struct {
 	Protocol string
 }
 
-func (s *logStash) Send(app, hostname, process, key string, value interface{}) error {
+func (s *logStash) Send(container ContainerInfo, key string, value interface{}) error {
 	message := map[string]interface{}{
-		"client":  s.Client,
-		"count":   1,
-		"metric":  key,
-		"value":   value,
-		"app":     app,
-		"host":    hostname,
-		"process": process,
+		"client": s.Client,
+		"count":  1,
+		"metric": key,
+		"value":  value,
 	}
+	s.appendInfo(message, container)
 	return s.send(message)
 }
 
-func (s *logStash) SendConn(app, hostname, process, host string) error {
+func (s *logStash) SendConn(container ContainerInfo, host string) error {
 	message := map[string]interface{}{
 		"client":     s.Client,
 		"count":      1,
 		"metric":     "connection",
 		"connection": host,
-		"app":        app,
-		"host":       hostname,
-		"process":    process,
+	}
+	s.appendInfo(message, container)
+	return s.send(message)
+}
+
+func (s *logStash) SendHost(host HostInfo, key string, value interface{}) error {
+	message := map[string]interface{}{
+		"client": s.Client,
+		"count":  1,
+		"metric": "host_" + key,
+		"value":  value,
+		"host":   host.Name,
+		"addr":   host.Addrs,
 	}
 	return s.send(message)
+}
+
+func (s *logStash) appendInfo(message map[string]interface{}, container ContainerInfo) {
+	message["host"] = container.hostname
+	if container.app != "" {
+		message["app"] = container.app
+		message["process"] = container.process
+	} else {
+		message["container"] = container.name
+		message["image"] = container.image
+	}
 }
 
 func (s *logStash) send(message map[string]interface{}) error {

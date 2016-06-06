@@ -6,6 +6,7 @@ package log
 
 import (
 	"bufio"
+	"bytes"
 	"strconv"
 	"strings"
 	"time"
@@ -32,30 +33,36 @@ type LenientParser struct {
 }
 
 func (p *LenientParser) Parse() error {
-	groups, withMsg, withPID := parseLogLine(p.line)
-	if !withMsg {
+	groups := parseLogLine(p.line)
+	if len(groups) != 7 || len(groups[6]) == 0 {
 		return p.defaultParsers()
 	}
 	priority, err := strconv.Atoi(string(groups[0]))
 	if err != nil {
 		return p.defaultParsers()
 	}
-	ts, err := time.Parse(time.RFC3339, string(groups[1]))
-	if err != nil {
-		return p.defaultParsers()
-	}
-	contentIdx := 4
-	if withPID {
-		contentIdx++
+	var ts time.Time
+	if len(groups[2]) == 0 {
+		ts, err = time.Parse(time.RFC3339, string(groups[1]))
+		if err != nil {
+			return p.defaultParsers()
+		}
+	} else {
+		dt := string(bytes.Join(groups[1:3], []byte{' '}))
+		ts, err = time.Parse(time.Stamp, dt)
+		if err != nil {
+			return p.defaultParsers()
+		}
+		ts = ts.AddDate(time.Now().Year(), 0, 0)
 	}
 	p.logParts = syslogparser.LogParts{
 		"priority":  priority,
 		"facility":  priority / 8,
 		"severity":  priority % 8,
 		"timestamp": ts,
-		"hostname":  string(groups[2]),
-		"tag":       string(groups[3]),
-		"content":   string(groups[contentIdx]),
+		"hostname":  string(groups[3]),
+		"tag":       string(groups[4]),
+		"content":   string(groups[6]),
 	}
 	return nil
 }

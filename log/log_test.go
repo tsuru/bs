@@ -91,7 +91,7 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	defer lf.stop()
+	defer lf.stopWait()
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -135,7 +135,7 @@ func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	defer lf.stop()
+	defer lf.stopWait()
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -203,7 +203,7 @@ func testLogForwarderWSForwarder(
 	_, err = conn.Write([]byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg2\n", s.id)))
 	c.Assert(err, check.IsNil)
 	time.Sleep(2 * time.Second)
-	lf.stop()
+	lf.stopWait()
 	serverMut.Lock()
 	parts := strings.Split(body.String(), "\n")
 	c.Assert(req, check.NotNil)
@@ -296,7 +296,7 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 		lf.Handle(logParts, 1, nil)
 	}
 	c.StopTimer()
-	lf.stop()
+	lf.stopWait()
 }
 
 func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
@@ -338,7 +338,7 @@ func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
 	}
 	<-done
 	c.StopTimer()
-	lf.stop()
+	lf.stopWait()
 }
 
 func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
@@ -387,7 +387,7 @@ func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
 	<-done[0]
 	<-done[1]
 	c.StopTimer()
-	lf.stop()
+	lf.stopWait()
 }
 
 func (s *S) TestLogForwarderOverflow(c *check.C) {
@@ -404,7 +404,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
-	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1")
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
 	lf := LogForwarder{
@@ -427,7 +427,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 		"container_id": s.id,
 	}
 	wg := sync.WaitGroup{}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -437,7 +437,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 		}()
 	}
 	wg.Wait()
-	lf.stop()
+	lf.stopWait()
 	c.Assert(logBuf.String(), check.Matches, `(?s).*\[ERROR\] Dropping log messages to tsuru due to full channel buffer.*`)
 }
 
@@ -465,7 +465,7 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
 	time.Sleep(time.Second)
-	lf.stop()
+	lf.stopWait()
 	logParts := strings.Split(logBuf.String(), "\n")
 	for _, part := range logParts {
 		c.Check(part, check.Not(check.Matches), `.*no pong response in.*`)
@@ -521,6 +521,6 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 	case <-time.After(5 * time.Second):
 		c.Fatal("timeout after 5 seconds")
 	}
-	lf.stop()
+	lf.stopWait()
 	c.Assert(logBuf.String(), check.Matches, `(?s).*no pong response in.*`)
 }

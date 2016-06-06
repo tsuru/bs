@@ -1,4 +1,4 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -7,15 +7,19 @@ package status
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/ajg/form"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
+	node "github.com/tsuru/bs/node"
 	"github.com/tsuru/tsuru/provision"
 )
 
@@ -41,8 +45,16 @@ type Reporter struct {
 	config     *ReporterConfig
 	abort      chan<- struct{}
 	exit       <-chan struct{}
+	checks     *checkCollection
+	addrs      []string
 	infoClient *container.InfoClient
 	httpClient *http.Client
+}
+
+type hostStatus struct {
+	Addrs  []string
+	Units  []containerStatus
+	Checks []hostCheckResult
 }
 
 const (
@@ -50,15 +62,25 @@ const (
 	fullTimeout = 1 * time.Minute
 )
 
+var errRouteNotFound = errors.New("route not found")
+
 // NewReporter starts the status reporter. It will run intermitently, sending a
 // message in the exit channel in case it exits. It's possible to arbitrarily
 // interrupt the reporter by sending a message in the abort channel.
 func NewReporter(config *ReporterConfig) (*Reporter, error) {
+	if config.TsuruEndpoint == "" {
+		return nil, errors.New("tsuru endpoint must be set for status reporting")
+	}
 	abort := make(chan struct{})
 	exit := make(chan struct{})
 	infoClient, err := container.NewClient(config.DockerEndpoint)
 	if err != nil {
 		return nil, err
+	}
+	checks := NewCheckCollection(infoClient.GetClient())
+	addrs, err := node.GetNodeAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("[status reporter] unable to get network addresses: %s", err)
 	}
 	transport := http.Transport{
 		Dial: (&net.Dialer{
@@ -72,6 +94,8 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 		abort:      abort,
 		exit:       exit,
 		infoClient: infoClient,
+		checks:     checks,
+		addrs:      addrs,
 		httpClient: &http.Client{
 			Transport: &transport,
 			Timeout:   fullTimeout,
@@ -79,12 +103,12 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 	}
 	go func(abort <-chan struct{}) {
 		for {
+			reporter.reportStatus()
 			select {
 			case <-abort:
 				close(exit)
 				return
 			case <-time.After(reporter.config.Interval):
-				reporter.reportStatus()
 			}
 		}
 	}(abort)
@@ -108,36 +132,45 @@ func (r *Reporter) reportStatus() {
 	opts := docker.ListContainersOptions{All: true}
 	containers, err := client.ListContainers(opts)
 	if err != nil {
-		bslog.Errorf("failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
+		bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
 		return
 	}
-	resp, err := r.updateUnits(containers)
+	containerStatuses := r.retrieveContainerStatuses(containers)
+	hostChecks := r.checks.Run()
+	hostData := &hostStatus{
+		Addrs:  r.addrs,
+		Units:  containerStatuses,
+		Checks: hostChecks,
+	}
+	resp, err := r.updateNode(hostData)
+	if err == errRouteNotFound {
+		resp, err = r.updateUnits(hostData.Units)
+	}
 	if err != nil {
-		bslog.Errorf("failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
-		return
-	}
-	if len(resp) == 0 {
+		bslog.Errorf("[status reporter] failed to send data to the tsuru server at %q: %s", r.config.TsuruEndpoint, err)
 		return
 	}
 	err = r.handleTsuruResponse(resp)
 	if err != nil {
-		bslog.Errorf("failed to handle tsuru response: %s", err)
+		bslog.Errorf("[status reporter] failed to handle tsuru response: %s", err)
 	}
 }
 
-func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, error) {
-	payload := make([]containerStatus, 0, len(containers))
+func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) []containerStatus {
+	statuses := make([]containerStatus, 0, len(containers))
 	for _, c := range containers {
 		var status provision.Status
-		cont, err := r.infoClient.GetFreshContainer(c.ID)
+		cont, err := r.infoClient.GetAppContainer(c.ID, false)
 		if err == container.ErrTsuruVariablesNotFound {
 			continue
 		}
 		if err != nil {
-			bslog.Errorf("failed to inspect container %q: %s", c.ID, err)
+			bslog.Errorf("[status reporter] failed to inspect container %q: %s", c.ID, err)
 			status = provision.StatusError
 		} else {
-			if cont.Container.State.Restarting {
+			if cont.Container.State.Restarting ||
+				cont.Container.State.Dead ||
+				cont.Container.State.RemovalInProgress {
 				status = provision.StatusError
 			} else if cont.Container.State.Running {
 				status = provision.StatusStarted
@@ -151,11 +184,34 @@ func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, e
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		payload = append(payload, containerStatus{ID: c.ID, Name: name, Status: status.String()})
+		statuses = append(statuses, containerStatus{ID: c.ID, Name: name, Status: status.String()})
 	}
-	if len(payload) == 0 {
-		return nil, nil
+	return statuses
+}
+
+func (r *Reporter) updateNode(payload *hostStatus) (*http.Response, error) {
+	bodyContent, err := form.EncodeToString(payload)
+	if err != nil {
+		return nil, err
 	}
+	url := fmt.Sprintf("%s/node/status", strings.TrimRight(r.config.TsuruEndpoint, "/"))
+	request, err := http.NewRequest("POST", url, strings.NewReader(bodyContent))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Add("Authorization", "bearer "+r.config.TsuruToken)
+	resp, err := r.httpClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, errRouteNotFound
+	}
+	return resp, nil
+}
+
+func (r *Reporter) updateUnits(payload []containerStatus) (*http.Response, error) {
 	var body bytes.Buffer
 	err := json.NewEncoder(&body).Encode(payload)
 	if err != nil {
@@ -172,18 +228,25 @@ func (r *Reporter) updateUnits(containers []docker.APIContainers) ([]respUnit, e
 	if err != nil {
 		return nil, err
 	}
-	var statusResp []respUnit
-	defer resp.Body.Close()
-	err = json.NewDecoder(resp.Body).Decode(&statusResp)
-	if err != nil {
-		return nil, err
-	}
-	return statusResp, nil
+	return resp, err
 }
 
-func (r *Reporter) handleTsuruResponse(resp []respUnit) error {
-	goneUnits := make([]string, 0, len(resp))
-	for _, unit := range resp {
+func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
+	var statusResp []respUnit
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected response from tsuru %d: %s", resp.StatusCode, string(body))
+	}
+	err := json.NewDecoder(resp.Body).Decode(&statusResp)
+	if err != nil {
+		return fmt.Errorf("unable to parse tsuru response: %s", err)
+	}
+	if len(statusResp) == 0 {
+		return nil
+	}
+	goneUnits := make([]string, 0, len(statusResp))
+	for _, unit := range statusResp {
 		if !unit.Found {
 			goneUnits = append(goneUnits, unit.ID)
 		}
@@ -191,9 +254,9 @@ func (r *Reporter) handleTsuruResponse(resp []respUnit) error {
 	client := r.infoClient.GetClient()
 	for _, id := range goneUnits {
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
-		err := client.RemoveContainer(opts)
+		err = client.RemoveContainer(opts)
 		if err != nil {
-			bslog.Errorf("[ERROR] failed to remove container %q: %s", id, err)
+			bslog.Errorf("[status reporter] failed to remove invalid container %q: %s", id, err)
 		}
 	}
 	return nil

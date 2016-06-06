@@ -8,15 +8,15 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/mcuadros/go-syslog.v2"
 
 	"github.com/jeromer/syslogparser"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
-	"gopkg.in/mcuadros/go-syslog.v2"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	debugStopWg sync.WaitGroup
+	stopWg      sync.WaitGroup
 	logBackends = map[string]func() logBackend{
 		"syslog": func() logBackend { return &syslogBackend{} },
 		"tsuru":  func() logBackend { return &tsuruBackend{} },
@@ -63,13 +63,18 @@ type logBackend interface {
 func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
 	ch := make(chan *LogMessage, bufferSize)
 	quit := make(chan bool)
+	if initializable, ok := forwarder.(interface {
+		initialize(<-chan bool)
+	}); ok {
+		initializable.initialize(quit)
+	}
 	conn, err := forwarder.connect()
 	if err != nil {
 		return nil, nil, err
 	}
-	debugStopWg.Add(1)
+	stopWg.Add(1)
 	go func() {
-		defer debugStopWg.Done()
+		defer stopWg.Done()
 		var err error
 		for {
 			select {
@@ -105,14 +110,13 @@ func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMes
 func (l *LogForwarder) Start() (err error) {
 	defer func() {
 		if err != nil {
-			l.stop()
+			l.stopWait()
 		}
 	}()
 	if len(l.EnabledBackends) == 1 && l.EnabledBackends[0] == noneBackend {
 		return
 	}
 	for _, backendName := range l.EnabledBackends {
-		backendName = strings.TrimSpace(backendName)
 		constructor := logBackends[backendName]
 		if constructor == nil {
 			return fmt.Errorf("invalid log backend: %s", backendName)
@@ -151,17 +155,25 @@ func (l *LogForwarder) Start() (err error) {
 	return l.server.Boot()
 }
 
-func (l *LogForwarder) stop() {
-	if l.server != nil {
-		l.server.Kill()
-	}
+func (l *LogForwarder) Wait() {
 	if l.server != nil {
 		l.server.Wait()
+	}
+	stopWg.Wait()
+}
+
+func (l *LogForwarder) Stop() {
+	if l.server != nil {
+		l.server.Kill()
 	}
 	for _, backend := range l.backends {
 		backend.stop()
 	}
-	debugStopWg.Wait()
+}
+
+func (l *LogForwarder) stopWait() {
+	l.Stop()
+	l.Wait()
 }
 
 func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
@@ -173,7 +185,7 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
 	}
-	contData, err := l.infoClient.GetContainer(contId)
+	contData, err := l.infoClient.GetAppContainer(contId, true)
 	if err != nil {
 		bslog.Debugf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
 		return

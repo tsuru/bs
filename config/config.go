@@ -25,6 +25,7 @@ var Config struct {
 	TsuruEndpoint       string
 	TsuruToken          string
 	MetricsInterval     time.Duration
+	MetricsBackend      string
 	StatusInterval      time.Duration
 	SyslogListenAddress string
 	LogBackends         []string
@@ -42,12 +43,8 @@ func LoadConfig() {
 	Config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
 	Config.StatusInterval = SecondsEnvOrDefault(DefaultInterval, "STATUS_INTERVAL")
 	Config.MetricsInterval = SecondsEnvOrDefault(DefaultInterval, "METRICS_INTERVAL")
-	logBackends := StringEnvOrDefault("tsuru,syslog", "LOG_BACKENDS")
-	if logBackends != "" {
-		Config.LogBackends = strings.Split(logBackends, ",")
-	} else {
-		Config.LogBackends = nil
-	}
+	Config.MetricsBackend = os.Getenv("METRICS_BACKEND")
+	Config.LogBackends = StringsEnvOrDefault([]string{"tsuru", "syslog"}, "LOG_BACKENDS")
 }
 
 func envOrDefault(convert func(string) interface{}, defaultValue interface{}, envs ...string) interface{} {
@@ -61,7 +58,7 @@ func envOrDefault(convert func(string) interface{}, defaultValue interface{}, en
 			return converted
 		}
 	}
-	if defaultValue != reflect.Zero(reflect.ValueOf(defaultValue).Type()).Interface() {
+	if defaultValue != nil && !reflect.DeepEqual(defaultValue, reflect.Zero(reflect.ValueOf(defaultValue).Type()).Interface()) {
 		bslog.Warnf("invalid value for %s. Using the default value of %v", strings.Join(envs, " or "), defaultValue)
 	}
 	return defaultValue
@@ -74,6 +71,23 @@ func StringEnvOrDefault(defaultValue string, envs ...string) string {
 		}
 		return v
 	}, defaultValue, envs...).(string)
+}
+
+func StringsEnvOrDefault(defaultValue []string, envs ...string) []string {
+	value := envOrDefault(func(v string) interface{} {
+		if v == "" {
+			return nil
+		}
+		parts := strings.Split(v, ",")
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+		return parts
+	}, defaultValue, envs...)
+	if value != nil {
+		return value.([]string)
+	}
+	return nil
 }
 
 func IntEnvOrDefault(defaultValue int, envs ...string) int {

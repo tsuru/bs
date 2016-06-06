@@ -13,11 +13,13 @@ func init() {
 }
 
 type fakeStat struct {
-	app      string
-	hostname string
-	process  string
-	key      string
-	value    interface{}
+	container string
+	image     string
+	app       string
+	hostname  string
+	process   string
+	key       string
+	value     interface{}
 }
 
 type fake struct {
@@ -25,25 +27,32 @@ type fake struct {
 	failures chan error
 }
 
-func (s *fake) Send(app, hostname, process, key string, value interface{}) error {
+func (s *fake) Send(container ContainerInfo, key string, value interface{}) error {
 	select {
 	case err := <-s.failures:
 		return err
 	default:
 		stat := fakeStat{
-			app:      app,
-			hostname: hostname,
-			process:  process,
-			key:      key,
-			value:    value,
+			app:       container.app,
+			hostname:  container.hostname,
+			process:   container.process,
+			container: container.name,
+			image:     container.image,
+			key:       key,
+			value:     value,
 		}
 		s.stats = append(s.stats, stat)
 		return nil
 	}
 }
 
-func (s *fake) SendConn(app, hostname, process, host string) error {
-	return s.Send(app, hostname, process, "connection", host)
+func (s *fake) SendConn(container ContainerInfo, host string) error {
+	return s.Send(container, "connection", host)
+}
+
+func (s *fake) SendHost(host HostInfo, key string, value interface{}) error {
+	data := ContainerInfo{app: "sysapp", process: "-", hostname: host.Name}
+	return s.Send(data, key, value)
 }
 
 func (s *fake) prepareFailure(err error) {

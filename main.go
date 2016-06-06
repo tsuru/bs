@@ -27,6 +27,11 @@ const (
 
 var printVersion bool
 
+type StopWaiter interface {
+	Stop()
+	Wait()
+}
+
 func init() {
 	flag.BoolVar(&printVersion, "version", false, "Print version and exit")
 }
@@ -101,7 +106,8 @@ func main() {
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
-	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval)
+	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval,
+		config.Config.MetricsBackend)
 	err = mRunner.Start()
 	if err != nil {
 		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
@@ -113,11 +119,23 @@ func main() {
 		Interval:       config.Config.StatusInterval,
 	})
 	if err != nil {
-		bslog.Fatalf("Unable to initialize status reporter: %s\n", err)
+		bslog.Warnf("Unable to initialize status reporter: %s\n", err)
 	}
+	monitorEl := []StopWaiter{&lf, mRunner}
+	if reporter != nil {
+		monitorEl = append(monitorEl, reporter)
+	}
+	var signaled bool
 	startSignalHandler(func(signal os.Signal) {
-		reporter.Stop()
-		mRunner.Stop()
+		signaled = true
+		for _, m := range monitorEl {
+			go m.Stop()
+		}
 	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	reporter.Wait()
+	for _, m := range monitorEl {
+		m.Wait()
+	}
+	if !signaled {
+		bslog.Fatalf("Exiting bs because no service could be initialized.")
+	}
 }

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ajg/form"
 	"github.com/fsouza/go-dockerclient"
 	dtesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
@@ -67,6 +68,87 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Log(logOutput.String())
 	req := <-requests
 	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
+	c.Assert(req.request.Header.Get("Content-Type"), check.Equals, "application/x-www-form-urlencoded")
+	c.Assert(req.request.URL.Path, check.Equals, "/node/status")
+	c.Assert(req.request.Method, check.Equals, "POST")
+	expected := hostStatus{
+		Units: []containerStatus{
+			{ID: containers[0].ID, Status: "started", Name: "x1"},
+			{ID: containers[1].ID, Status: "stopped", Name: "x2"},
+			{ID: containers[2].ID, Status: "error", Name: "x3"},
+			{ID: containers[3].ID, Status: "started", Name: "x4"},
+			{ID: containers[5].ID, Status: "created", Name: "x6"},
+		},
+	}
+	var input hostStatus
+	err = form.DecodeString(&input, string(req.body))
+	c.Assert(err, check.IsNil)
+	c.Assert(input.Checks, check.HasLen, 2)
+	c.Assert(len(input.Addrs) > 0, check.Equals, true)
+	input.Checks = nil
+	input.Addrs = nil
+	c.Assert(input, check.DeepEquals, expected)
+	dockerClient, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	apiContainers, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
+	c.Assert(err, check.IsNil)
+	ids := make([]string, len(apiContainers))
+	for i, cont := range apiContainers {
+		ids[i] = cont.ID
+	}
+	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID}
+	sort.Strings(ids)
+	sort.Strings(expectedIDs)
+	c.Assert(ids, check.DeepEquals, expectedIDs)
+}
+
+func (s S) TestReportStatus404OnHostStatus(c *check.C) {
+	var logOutput bytes.Buffer
+	bslog.Logger = log.New(&logOutput, "", 0)
+	defer func() { bslog.Logger = log.New(os.Stderr, "", log.LstdFlags) }()
+	bogusContainers := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+		{name: "x2", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false, ExitCode: -1, StartedAt: time.Now().Add(-time.Hour)}},
+		{name: "x3", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true, Restarting: true, ExitCode: -1}},
+		{name: "x4", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+		{name: "x5", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
+		{name: "x6", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false}},
+	}
+	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
+	defer dockerServer.Stop()
+	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":true}]`
+	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[5].ID))
+	var resp http.Response
+	resp.StatusCode = http.StatusOK
+	resp.Body = ioutil.NopCloser(buf)
+	resp.Header = make(http.Header)
+	resp.Header.Set("Content-Type", "application/json")
+	tsuruServer, requests := s.startTsuruServer(func(req *http.Request) *http.Response {
+		if req.URL.Path != "/units/status" {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Header:     make(http.Header),
+				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+			}
+		}
+		return &resp
+	})
+	defer tsuruServer.Close()
+	reporter, err := NewReporter(&ReporterConfig{
+		Interval:       10 * time.Minute,
+		DockerEndpoint: dockerServer.URL(),
+		TsuruEndpoint:  tsuruServer.URL,
+		TsuruToken:     "some-token",
+	})
+	c.Assert(err, check.IsNil)
+	reporter.Stop()
+	reporter.reportStatus()
+	c.Log(logOutput.String())
+	reqInvalid := <-requests
+	c.Assert(reqInvalid.request.Method, check.Equals, "POST")
+	c.Assert(reqInvalid.request.URL.Path, check.Equals, "/node/status")
+	req := <-requests
+	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
 	c.Assert(req.request.URL.Path, check.Equals, "/units/status")
 	c.Assert(req.request.Method, check.Equals, "POST")
 	var input []containerStatus
@@ -99,12 +181,19 @@ type tsuruRequest struct {
 	body    []byte
 }
 
-func (S) startTsuruServer(resp *http.Response) (*httptest.Server, <-chan tsuruRequest) {
-	reqchan := make(chan tsuruRequest, 1)
+func (S) startTsuruServer(respOrFunc interface{}) (*httptest.Server, <-chan tsuruRequest) {
+	reqchan := make(chan tsuruRequest, 10)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		b, _ := ioutil.ReadAll(r.Body)
 		reqchan <- tsuruRequest{request: r, body: b}
+		var resp *http.Response
+		switch v := respOrFunc.(type) {
+		case *http.Response:
+			resp = v
+		case func(*http.Request) *http.Response:
+			resp = v(r)
+		}
 		for k, values := range resp.Header {
 			for _, value := range values {
 				w.Header().Add(k, value)

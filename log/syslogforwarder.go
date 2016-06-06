@@ -6,14 +6,13 @@ package log
 
 import (
 	"fmt"
-	"github.com/tsuru/bs/bslog"
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
 )
 
@@ -33,11 +32,10 @@ type syslogForwarder struct {
 
 func (b *syslogBackend) initialize() error {
 	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_SYSLOG_BUFFER_SIZE", "LOG_BUFFER_SIZE")
-	forwarders := config.StringEnvOrDefault("", "LOG_SYSLOG_FORWARD_ADDRESSES", "SYSLOG_FORWARD_ADDRESSES")
-	if forwarders == "" {
+	forwardAddresses := config.StringsEnvOrDefault(nil, "LOG_SYSLOG_FORWARD_ADDRESSES", "SYSLOG_FORWARD_ADDRESSES")
+	if len(forwardAddresses) == 0 {
 		return nil
 	}
-	forwardAddresses := strings.Split(forwarders, ",")
 	syslogTimezone := config.StringEnvOrDefault("", "LOG_SYSLOG_TIMEZONE", "SYSLOG_TIMEZONE")
 	b.syslogLocation = time.Local
 	if syslogTimezone != "" {

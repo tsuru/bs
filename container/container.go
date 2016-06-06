@@ -69,21 +69,34 @@ func (c *InfoClient) GetClient() *docker.Client {
 	return c.client
 }
 
-func (c *InfoClient) GetContainer(containerId string) (*Container, error) {
-	return c.getContainer(containerId, false, []string{
-		"TSURU_APPNAME=",
-		"TSURU_PROCESSNAME=",
-	})
+func (c *InfoClient) ListContainers() ([]docker.APIContainers, error) {
+	return c.client.ListContainers(docker.ListContainersOptions{})
 }
 
-func (c *InfoClient) GetFreshContainer(containerId string) (*Container, error) {
-	return c.getContainer(containerId, true, []string{
-		"TSURU_APPNAME=",
-	})
+// GetContainer returns the container with the provided id if the container has the required
+// environment variable. It may use a cache to prevent calling the docker api.
+func (c *InfoClient) GetContainer(containerId string, useCache bool, requiredEnvs []string) (*Container, error) {
+	cont, err := c.getContainer(containerId, useCache)
+	if err != nil {
+		return nil, err
+	}
+	if len(requiredEnvs) > 0 {
+		if cont.HasEnvs(requiredEnvs) {
+			return cont, nil
+		}
+		return nil, ErrTsuruVariablesNotFound
+	}
+	return cont, nil
 }
 
-func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []string) (*Container, error) {
-	if !refresh {
+// GetAppContainer returns the container with id containerId if that container
+// is an tsuru application. It may use a cache to prevent calling the docker api.
+func (c *InfoClient) GetAppContainer(containerId string, useCache bool) (*Container, error) {
+	return c.GetContainer(containerId, useCache, []string{"TSURU_APPNAME"})
+}
+
+func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container, error) {
+	if useCache {
 		if val, ok := c.containerCache.Get(containerId); ok {
 			return val.(*Container), nil
 		}
@@ -93,27 +106,19 @@ func (c *InfoClient) getContainer(containerId string, refresh bool, wanted []str
 		return nil, err
 	}
 	contData := Container{Container: *cont, client: c}
-	toFill := []*string{
-		&contData.AppName,
-		&contData.ProcessName,
+	toFill := map[string]*string{
+		"TSURU_APPNAME=":     &contData.AppName,
+		"TSURU_PROCESSNAME=": &contData.ProcessName,
 	}
-	remaining := len(wanted)
-	for _, val := range cont.Config.Env {
-		for i := range wanted {
-			if *toFill[i] != "" {
-				continue
-			}
-			if strings.HasPrefix(val, wanted[i]) {
-				remaining--
-				*toFill[i] = val[len(wanted[i]):]
+	for k, v := range toFill {
+		for _, env := range cont.Config.Env {
+			if strings.HasPrefix(env, k) {
+				*v = env[len(k):]
 			}
 		}
-		if remaining == 0 {
-			c.containerCache.Add(containerId, &contData)
-			return &contData, nil
-		}
 	}
-	return nil, ErrTsuruVariablesNotFound
+	c.containerCache.Add(containerId, &contData)
+	return &contData, nil
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {
@@ -137,4 +142,21 @@ func (c *Container) Stats() (*docker.Stats, error) {
 		return nil, err
 	}
 	return <-statsCh, nil
+}
+
+// HasEnvs checks if the container has the requiredEnvs variables set
+func (c *Container) HasEnvs(requiredEnvs []string) bool {
+	for _, env := range requiredEnvs {
+		hasEnv := false
+		for _, val := range c.Config.Env {
+			if strings.HasPrefix(val, env) {
+				hasEnv = true
+				break
+			}
+		}
+		if hasEnv == false {
+			return false
+		}
+	}
+	return true
 }
