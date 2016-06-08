@@ -6,6 +6,7 @@ package metric
 
 import (
 	"errors"
+	"github.com/tsuru/bs/bslog"
 	"os"
 
 	cpu "github.com/shirou/gopsutil/cpu"
@@ -19,6 +20,8 @@ import (
 type HostClient struct {
 	lastCPUStats *cpu.CPUTimesStat
 }
+
+var errEth0InterfaceNotFound = errors.New("eth0 interface not found")
 
 func NewHostClient() (*HostClient, error) {
 	proc := os.Getenv("HOST_PROC")
@@ -42,6 +45,10 @@ func (h *HostClient) GetHostMetrics() ([]map[string]float, error) {
 	for _, collector := range collectors {
 		metric, err := collector()
 		if err != nil {
+			if err == errEth0InterfaceNotFound {
+				bslog.Warnf("Skipping network metrics: %s", err)
+				continue
+			}
 			return nil, err
 		}
 		metrics = append(metrics, metric)
@@ -142,15 +149,20 @@ func (h *HostClient) calculateCpuPercent(currentCpuStats *cpu.CPUTimesStat) map[
 }
 
 func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {
-	netStat, err := net.NetIOCounters(false)
+	netStat, err := net.NetIOCounters(true)
 	if err != nil {
 		return nil, err
 	}
-	stats := map[string]float{
-		"netrx": float(netStat[0].BytesRecv),
-		"nettx": float(netStat[0].BytesSent),
+	for _, netInterface := range netStat {
+		if netInterface.Name == "eth0" {
+			stats := map[string]float{
+				"netrx": float(netInterface.BytesRecv),
+				"nettx": float(netInterface.BytesSent),
+			}
+			return stats, nil
+		}
 	}
-	return stats, nil
+	return nil, errEth0InterfaceNotFound
 }
 
 func (h *HostClient) GetHostname() (string, error) {
