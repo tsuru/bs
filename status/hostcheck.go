@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
@@ -23,7 +24,8 @@ type hostCheck interface {
 }
 
 type checkCollection struct {
-	checks map[string]hostCheck
+	checks  map[string]hostCheck
+	timeout time.Duration
 }
 
 type hostCheckResult struct {
@@ -35,12 +37,14 @@ type hostCheckResult struct {
 var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
 
 func NewCheckCollection(client *docker.Client) *checkCollection {
+	hostCheckTimeout := config.SecondsEnvOrDefault(60, "HOSTCHECK_TIMEOUT")
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
 	checkColl := &checkCollection{
 		checks: map[string]hostCheck{
 			"writableRoot":    &writableCheck{path: "/"},
 			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: "ok"},
 		},
+		timeout: hostCheckTimeout,
 	}
 	extraPaths := config.StringsEnvOrDefault(nil, "HOSTCHECK_EXTRA_PATHS")
 	for i, p := range extraPaths {
@@ -51,16 +55,31 @@ func NewCheckCollection(client *docker.Client) *checkCollection {
 
 func (c *checkCollection) Run() []hostCheckResult {
 	result := make([]hostCheckResult, len(c.checks))
+	errCh := make(chan error, 1)
 	i := 0
-	for name, c := range c.checks {
-		check := hostCheckResult{Name: name}
-		err := c.Run()
-		check.Successful = err == nil
-		if err != nil {
-			bslog.Errorf("[host check] failure running %q check: %s", name, err)
-			check.Err = err.Error()
+	for name, check := range c.checks {
+		checkResult := hostCheckResult{Name: name}
+		go func() {
+			errCh <- check.Run()
+		}()
+		var timeoutCh <-chan time.Time
+		if c.timeout > 0 {
+			timeoutCh = time.After(c.timeout)
 		}
-		result[i] = check
+		select {
+		case err := <-errCh:
+			checkResult.Successful = err == nil
+			if err != nil {
+				bslog.Errorf("[host check] failure running %q check: %s", name, err)
+				checkResult.Err = err.Error()
+			}
+		case <-timeoutCh:
+			checkResult.Successful = false
+			errMsg := fmt.Sprintf("[host check] timeout running %q check", name)
+			bslog.Errorf(errMsg)
+			checkResult.Err = errMsg
+		}
+		result[i] = checkResult
 		i++
 	}
 	return result

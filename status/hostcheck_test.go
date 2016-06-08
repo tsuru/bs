@@ -5,10 +5,10 @@
 package status
 
 import (
-	"os"
-
+	"fmt"
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/check.v1"
+	"os"
 )
 
 func (s S) TestNewCheckCollection(c *check.C) {
@@ -90,4 +90,14 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 	err = contCheck.Run()
 	c.Assert(err, check.IsNil)
 	<-done
+}
+
+func (s S) TestCheckTimeout(c *check.C) {
+	os.Setenv("HOSTCHECK_TIMEOUT", "0.000000001")
+	checkColl := NewCheckCollection(nil)
+	results := checkColl.Run()
+	for _, result := range results {
+		c.Assert(result.Successful, check.Equals, false)
+		c.Assert(result.Err, check.Equals, fmt.Sprintf("[host check] timeout running %q check", result.Name))
+	}
 }
