@@ -24,8 +24,9 @@ type hostCheck interface {
 }
 
 type checkCollection struct {
-	checks  map[string]hostCheck
-	timeout time.Duration
+	checks      map[string]hostCheck
+	timeout     time.Duration
+	errChannels map[string]chan error
 }
 
 type hostCheckResult struct {
@@ -37,14 +38,15 @@ type hostCheckResult struct {
 var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
 
 func NewCheckCollection(client *docker.Client) *checkCollection {
-	hostCheckTimeout := config.SecondsEnvOrDefault(60, "HOSTCHECK_TIMEOUT")
+	hostCheckTimeout := config.SecondsEnvOrDefault(0, "HOSTCHECK_TIMEOUT")
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
 	checkColl := &checkCollection{
 		checks: map[string]hostCheck{
 			"writableRoot":    &writableCheck{path: "/"},
 			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: "ok"},
 		},
-		timeout: hostCheckTimeout,
+		timeout:     hostCheckTimeout,
+		errChannels: make(map[string]chan error),
 	}
 	extraPaths := config.StringsEnvOrDefault(nil, "HOSTCHECK_EXTRA_PATHS")
 	for i, p := range extraPaths {
@@ -55,24 +57,27 @@ func NewCheckCollection(client *docker.Client) *checkCollection {
 
 func (c *checkCollection) Run() []hostCheckResult {
 	result := make([]hostCheckResult, len(c.checks))
-	errCh := make(chan error, 1)
 	i := 0
 	for name, check := range c.checks {
 		checkResult := hostCheckResult{Name: name}
-		go func() {
-			errCh <- check.Run()
-		}()
+		if c.errChannels[name] == nil {
+			c.errChannels[name] = make(chan error)
+			go func(hc hostCheck, errCh chan error) {
+				errCh <- hc.Run()
+			}(check, c.errChannels[name])
+		}
 		var timeoutCh <-chan time.Time
 		if c.timeout > 0 {
 			timeoutCh = time.After(c.timeout)
 		}
 		select {
-		case err := <-errCh:
+		case err := <-c.errChannels[name]:
 			checkResult.Successful = err == nil
 			if err != nil {
 				bslog.Errorf("[host check] failure running %q check: %s", name, err)
 				checkResult.Err = err.Error()
 			}
+			c.errChannels[name] = nil
 		case <-timeoutCh:
 			checkResult.Successful = false
 			errMsg := fmt.Sprintf("[host check] timeout running %q check", name)

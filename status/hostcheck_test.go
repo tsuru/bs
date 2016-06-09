@@ -6,9 +6,10 @@ package status
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/check.v1"
-	"os"
 )
 
 func (s S) TestNewCheckCollection(c *check.C) {

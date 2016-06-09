@@ -6,8 +6,9 @@ package metric
 
 import (
 	"errors"
-	"github.com/tsuru/bs/bslog"
 	"os"
+
+	"github.com/tsuru/bs/bslog"
 
 	cpu "github.com/shirou/gopsutil/cpu"
 	disk "github.com/shirou/gopsutil/disk"

@@ -221,6 +221,13 @@ container.
 to write a test file to check whether the filesystem is writable. If not set
 tsuru will only try to write to `/`.
 
+### HOSTCHECK_TIMEOUT
+
+`HOSTCHECK_TIMEOUT` is the timeout, in seconds, for each check done on the
+host. If the check takes more than the time specified in this environment
+variable, the check will be considered a failure. The default value is `0`,
+which means no timeout.
+
 ## Injected Environment Variables
 
 Tsuru will inject some environment variables when starting the bs container.
