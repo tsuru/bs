@@ -441,6 +441,84 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	c.Assert(logBuf.String(), check.Matches, `(?s).*\[ERROR\] Dropping log messages to tsuru due to full channel buffer.*`)
 }
 
+func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
+	prevLog := bslog.Logger
+	logBuf := bytes.NewBuffer(nil)
+	bslog.Logger = log.New(logBuf, "", 0)
+	bslog.Debug = true
+	defer func() {
+		bslog.Logger = prevLog
+		bslog.Debug = false
+	}()
+	var body bytes.Buffer
+	var serverMut sync.Mutex
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		serverMut.Lock()
+		defer serverMut.Unlock()
+		io.Copy(&body, ws)
+	}))
+	defer srv.Close()
+	os.Setenv("BS_DEBUG", "true")
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	parts := []syslogparser.LogParts{
+		{
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+			"hostname":     "ubuntu-trusty-64",
+			"tag":          "docker/" + s.id,
+			"proc_id":      "4843",
+			"content":      "",
+			"rawmsg":       []byte{},
+			"container_id": s.id,
+		},
+		{
+			"priority":     30,
+			"facility":     3,
+			"severity":     6,
+			"timestamp":    time.Time{},
+			"hostname":     "ubuntu-trusty-64",
+			"tag":          "docker/" + s.id,
+			"proc_id":      "4843",
+			"content":      "hey",
+			"rawmsg":       []byte{},
+			"container_id": s.id,
+		},
+	}
+	expected := []func(){
+		func() {
+			serverMut.Lock()
+			c.Assert(body.String(), check.Equals, "")
+			serverMut.Unlock()
+			c.Assert(logBuf.String(), check.Not(check.Matches), `(?s).*\[log forwarder\] invalid message.*`)
+		},
+		func() {
+			serverMut.Lock()
+			c.Assert(body.String(), check.Equals, "")
+			serverMut.Unlock()
+			c.Assert(logBuf.String(), check.Matches, `(?s).*\[log forwarder\] invalid message.*`)
+		},
+	}
+	var err error
+	for i, p := range parts {
+		lf := LogForwarder{
+			EnabledBackends: []string{"tsuru"},
+			BindAddress:     "udp://0.0.0.0:59317",
+			DockerEndpoint:  s.dockerServer.URL(),
+		}
+		err = lf.Start()
+		c.Assert(err, check.IsNil)
+		lf.Handle(p, 0, nil)
+		lf.stopWait()
+		expected[i]()
+	}
+}
+
 func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	prevLog := bslog.Logger
 	logBuf := bytes.NewBuffer(nil)

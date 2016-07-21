@@ -181,6 +181,18 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 		bslog.Debugf("[log forwarder] ignored msg %#v error processing: %s", logParts, err)
 		return
 	}
+	content, _ := logParts["content"].(string)
+	if content == "" {
+		// Silently ignored as docker sometimes will send messages with empty
+		// content.
+		return
+	}
+	ts, _ := logParts["timestamp"].(time.Time)
+	priority, _ := logParts["priority"].(int)
+	if ts.IsZero() || priority == 0 {
+		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
+		return
+	}
 	contId, _ := logParts["container_id"].(string)
 	if contId == "" {
 		contId, _ = logParts["hostname"].(string)
@@ -188,13 +200,6 @@ func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err 
 	contData, err := l.infoClient.GetAppContainer(contId, true)
 	if err != nil {
 		bslog.Debugf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
-		return
-	}
-	ts, _ := logParts["timestamp"].(time.Time)
-	priority, _ := logParts["priority"].(int)
-	content, _ := logParts["content"].(string)
-	if ts.IsZero() || priority == 0 || content == "" {
-		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
 		return
 	}
 	for _, backend := range l.backends {
