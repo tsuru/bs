@@ -4,6 +4,8 @@
 
 package metric
 
+import "sync"
+
 var fakeStatter fake
 
 func init() {
@@ -23,11 +25,14 @@ type fakeStat struct {
 }
 
 type fake struct {
+	mu       sync.Mutex
 	stats    []fakeStat
 	failures chan error
 }
 
 func (s *fake) Send(container ContainerInfo, key string, value interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	select {
 	case err := <-s.failures:
 		return err
