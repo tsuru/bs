@@ -7,6 +7,7 @@ package log
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -67,9 +68,14 @@ func (p *LenientParser) Parse() error {
 	return nil
 }
 
-func (p *LenientParser) defaultParsers() error {
+func (p *LenientParser) defaultParsers() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered panic parsing, invalid message %q: %v", string(p.line), r)
+		}
+	}()
 	p.subParser = rfc3164.NewParser(p.line)
-	err := p.subParser.Parse()
+	err = p.subParser.Parse()
 	if err == nil {
 		return nil
 	}
