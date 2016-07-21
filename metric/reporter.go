@@ -80,7 +80,7 @@ func (r *Reporter) sendMetrics(container *container.Container, metrics map[strin
 	for key, value := range metrics {
 		err := r.backend.Send(NewContainerInfo(container), key, value)
 		if err != nil {
-			bslog.Errorf("failed to send metrics for container %q: %s", container, err)
+			bslog.Errorf("failed to send metrics for container %#v: %s", container, err)
 			return err
 		}
 	}
@@ -99,7 +99,7 @@ func (r *Reporter) sendConnMetrics(container *container.Container, conns []conn)
 		if value != "" {
 			err := r.backend.SendConn(NewContainerInfo(container), value)
 			if err != nil {
-				bslog.Errorf("failed to send connection metrics for container %q: %s", container, err)
+				bslog.Errorf("failed to send connection metrics for container %#v: %s", container, err)
 				return err
 			}
 		}
