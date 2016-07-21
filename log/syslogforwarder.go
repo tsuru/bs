@@ -115,9 +115,6 @@ func (b *syslogBackend) stop() {
 	for _, ch := range b.quitChans {
 		close(ch)
 	}
-	for _, ch := range b.msgChans {
-		close(ch)
-	}
 }
 
 func (f *syslogForwarder) connect() (net.Conn, error) {

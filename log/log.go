@@ -90,10 +90,16 @@ func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMes
 					continue
 				}
 			}
-			for msg := range ch {
-				err = forwarder.process(conn, msg)
-				if err != nil {
-					break
+		loop:
+			for {
+				select {
+				case <-quit:
+					break loop
+				case msg := <-ch:
+					err = forwarder.process(conn, msg)
+					if err != nil {
+						break loop
+					}
 				}
 			}
 			forwarder.close(conn)

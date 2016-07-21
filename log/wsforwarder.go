@@ -103,7 +103,6 @@ func (b *tsuruBackend) sendMessage(priority int, ts time.Time, contId, appName, 
 
 func (b *tsuruBackend) stop() {
 	close(b.quitCh)
-	close(b.msgCh)
 }
 
 func (f *wsForwarder) initialize(quitCh <-chan bool) {
