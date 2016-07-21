@@ -35,7 +35,7 @@ type LenientParser struct {
 
 func (p *LenientParser) Parse() error {
 	groups := parseLogLine(p.line)
-	if len(groups) != 7 || len(groups[6]) == 0 {
+	if len(groups) != 7 {
 		return p.defaultParsers()
 	}
 	priority, err := strconv.Atoi(string(groups[0]))
