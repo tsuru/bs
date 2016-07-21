@@ -132,6 +132,7 @@ func (S) TestContainerHasEnvs(c *check.C) {
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	cont, err := client.GetAppContainer(id, false)
+	c.Assert(err, check.IsNil)
 	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME"}), check.Equals, true)
 	c.Assert(cont.HasEnvs([]string{"ENV"}), check.Equals, false)
 	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME", "ENV"}), check.Equals, false)

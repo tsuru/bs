@@ -73,11 +73,12 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 		defer close(done)
 	out:
 		for {
-			conts, err := client.ListContainers(docker.ListContainersOptions{})
-			c.Assert(err, check.IsNil)
+			conts, inErr := client.ListContainers(docker.ListContainersOptions{})
+			c.Assert(inErr, check.IsNil)
 			for _, co := range conts {
 				if co.ID != conts[0].ID && co.Status != "Exit 0" {
-					err = client.StopContainer(co.ID, 10)
+					inErr = client.StopContainer(co.ID, 10)
+					c.Assert(inErr, check.IsNil)
 					break out
 				}
 			}
