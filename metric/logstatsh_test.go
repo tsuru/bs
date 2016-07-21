@@ -70,12 +70,12 @@ func (s *S) TestSendTCP(c *check.C) {
 	dataCh := make(chan []byte, 1)
 
 	go func() {
-		client, err := conn.Accept()
-		c.Assert(err, check.IsNil)
+		client, innerErr := conn.Accept()
+		c.Assert(innerErr, check.IsNil)
 		defer client.Close()
 		var data [264]byte
-		n, err := client.Read(data[:])
-		c.Assert(err, check.IsNil)
+		n, innerErr := client.Read(data[:])
+		c.Assert(innerErr, check.IsNil)
 		dataCh <- data[:n]
 	}()
 

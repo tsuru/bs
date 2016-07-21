@@ -87,7 +87,7 @@ func (s *logStash) send(message map[string]interface{}) error {
 	defer conn.Close()
 	data, err := json.Marshal(message)
 	if err != nil {
-		bslog.Errorf("unable to marshal metrics data json. Wrote %d bytes before error: %s", err)
+		bslog.Errorf("unable to marshal metrics data json: %s", err)
 		return err
 	}
 	bytesWritten, err := conn.Write(data)
