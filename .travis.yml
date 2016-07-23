@@ -2,11 +2,12 @@ language: go
 sudo: required
 go:
   - 1.5.4
-  - 1.6.2
+  - 1.6.3
+  - 1.7rc3
   - tip
 env:
   global:
-    - GO_FOR_RELEASE=1.6.2
+    - GO_FOR_RELEASE=1.6.3
     - GO15VENDOREXPERIMENT=1
   matrix:
     - GOARCH=amd64
