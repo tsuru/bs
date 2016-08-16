@@ -5,7 +5,7 @@
 package status
 
 import (
-	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/fsouza/go-dockerclient"
@@ -68,22 +68,7 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 	dockerServer, conts := s.startDockerServer(baseConts, nil, c)
 	client, err := docker.NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
-	done := make(chan bool)
-	go func() {
-		defer close(done)
-	out:
-		for {
-			conts, inErr := client.ListContainers(docker.ListContainersOptions{})
-			c.Assert(inErr, check.IsNil)
-			for _, co := range conts {
-				if co.ID != conts[0].ID && co.Status != "Exit 0" {
-					inErr = client.StopContainer(co.ID, 10)
-					c.Assert(inErr, check.IsNil)
-					break out
-				}
-			}
-		}
-	}()
+	done := stopContainer(client, conts[0].ID, c)
 	contCheck := createContainerCheck{
 		client:     client,
 		baseContID: conts[0].ID,
@@ -94,12 +79,78 @@ func (s S) TestCreateContainerCheckRun(c *check.C) {
 	<-done
 }
 
-func (s S) TestCheckTimeout(c *check.C) {
-	os.Setenv("HOSTCHECK_TIMEOUT", "0.000000001")
-	checkColl := NewCheckCollection(nil)
+func (s S) TestCheckCollectionRun(c *check.C) {
+	baseConts := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+	}
+	dockerServer, conts := s.startDockerServer(baseConts, nil, c)
+	client, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	done := stopContainer(client, conts[0].ID, c)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
+	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
+	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
+	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
+	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	checkColl := NewCheckCollection(client)
 	results := checkColl.Run()
 	for _, result := range results {
-		c.Assert(result.Successful, check.Equals, false)
-		c.Assert(result.Err, check.Equals, fmt.Sprintf("[host check] timeout running %q check", result.Name))
+		c.Assert(result.Err, check.Equals, "")
+		c.Assert(result.Successful, check.Equals, true)
 	}
+	<-done
+}
+
+func (s S) TestCheckCollectionRunTimeout(c *check.C) {
+	baseConts := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+	}
+	dockerServer, _ := s.startDockerServer(baseConts, nil, c)
+	client, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_TIMEOUT", "1")
+	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
+	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
+	defer os.Unsetenv("HOSTCHECK_TIMEOUT")
+	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
+	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
+	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	checkColl := NewCheckCollection(client)
+	results := checkColl.Run()
+	resultsMap := map[string]hostCheckResult{}
+	for _, result := range results {
+		resultsMap[result.Name] = result
+	}
+	c.Assert(resultsMap, check.DeepEquals, map[string]hostCheckResult{
+		"writableRoot":    {Name: "writableRoot", Err: "", Successful: true},
+		"createContainer": {Name: "createContainer", Err: "[host check] timeout running \"createContainer\" check", Successful: false},
+	})
+}
+
+func stopContainer(client *docker.Client, exceptID string, c *check.C) chan bool {
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+	out:
+		for {
+			listedConts, inErr := client.ListContainers(docker.ListContainersOptions{})
+			c.Assert(inErr, check.IsNil)
+			for _, co := range listedConts {
+				if co.ID != exceptID && co.Status != "Exit 0" {
+					inErr = client.StopContainer(co.ID, 10)
+					c.Assert(inErr, check.IsNil)
+					break out
+				}
+			}
+		}
+	}()
+	return done
 }

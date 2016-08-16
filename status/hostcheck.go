@@ -40,10 +40,12 @@ var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
 func NewCheckCollection(client *docker.Client) *checkCollection {
 	hostCheckTimeout := config.SecondsEnvOrDefault(0, "HOSTCHECK_TIMEOUT")
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
+	rootPathOverride := config.StringEnvOrDefault("/", "HOSTCHECK_ROOT_PATH_OVERRIDE")
+	containerCheckMessage := config.StringEnvOrDefault("ok", "HOSTCHECK_CONTAINER_MESSAGE")
 	checkColl := &checkCollection{
 		checks: map[string]hostCheck{
-			"writableRoot":    &writableCheck{path: "/"},
-			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: "ok"},
+			"writableRoot":    &writableCheck{path: rootPathOverride},
+			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: containerCheckMessage},
 		},
 		timeout:     hostCheckTimeout,
 		errChannels: make(map[string]chan error),
