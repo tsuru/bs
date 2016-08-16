@@ -9,14 +9,12 @@ test:
 dirs = `go list -f '{{.Dir}}/*.go' ./... | grep -v vendor`
 format:
 	gofmt -s -w $(dirs)
-	# Disable goimports pending on https://go-review.googlesource.com/#/c/22020
-	# goimports -srcdir . -w $(dirs)
+	goimports -srcdir . -w $(dirs)
 
 check-format:
 	bash -c 'result=$$(gofmt -s -l $(dirs)); test -z $$result || (echo $$result && exit 1)'
-	# Disable goimports pending on https://go-review.googlesource.com/#/c/22020
-	# go get golang.org/x/tools/cmd/goimports
-	# bash -c 'result=$$(goimports -srcdir . -l $(dirs)); test -z $$result || (echo $$result && exit 1)'
+	go get golang.org/x/tools/cmd/goimports
+	bash -c 'result=$$(goimports -srcdir . -l $(dirs)); test -z $$result || (echo $$result && exit 1)'
 
 run:
 	go run main.go
