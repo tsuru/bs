@@ -6,30 +6,40 @@ package metric
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/load"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
 	"github.com/tsuru/bs/bslog"
-
-	cpu "github.com/shirou/gopsutil/cpu"
-	disk "github.com/shirou/gopsutil/disk"
-	host "github.com/shirou/gopsutil/host"
-	load "github.com/shirou/gopsutil/load"
-	mem "github.com/shirou/gopsutil/mem"
-	net "github.com/shirou/gopsutil/net"
+	"github.com/tsuru/bs/config"
 )
 
 type HostClient struct {
+	ifaceName    string
 	lastCPUStats *cpu.CPUTimesStat
 }
 
-var errEth0InterfaceNotFound = errors.New("eth0 interface not found")
+type errInterfaceNotFound struct {
+	name string
+}
+
+func (e errInterfaceNotFound) Error() string {
+	return fmt.Sprintf("interface %s not found", e.name)
+}
 
 func NewHostClient() (*HostClient, error) {
 	proc := os.Getenv("HOST_PROC")
 	if proc == "" {
 		return nil, errors.New("HOST_PROC must be set to be able to send host metrics")
 	}
-	return &HostClient{}, nil
+	return &HostClient{
+		ifaceName: config.StringEnvOrDefault("eth0", "METRICS_NETWORK_INTERFACE"),
+	}, nil
 }
 
 func (h *HostClient) GetHostMetrics() ([]map[string]float, error) {
@@ -46,7 +56,7 @@ func (h *HostClient) GetHostMetrics() ([]map[string]float, error) {
 	for _, collector := range collectors {
 		metric, err := collector()
 		if err != nil {
-			if err == errEth0InterfaceNotFound {
+			if _, ok := err.(errInterfaceNotFound); ok {
 				bslog.Warnf("Skipping network metrics: %s", err)
 				continue
 			}
@@ -155,7 +165,7 @@ func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {
 		return nil, err
 	}
 	for _, netInterface := range netStat {
-		if netInterface.Name == "eth0" {
+		if netInterface.Name == h.ifaceName {
 			stats := map[string]float{
 				"netrx": float(netInterface.BytesRecv),
 				"nettx": float(netInterface.BytesSent),
@@ -163,7 +173,7 @@ func (h *HostClient) getHostNetworkUsage() (map[string]float, error) {
 			return stats, nil
 		}
 	}
-	return nil, errEth0InterfaceNotFound
+	return nil, errInterfaceNotFound{name: h.ifaceName}
 }
 
 func (h *HostClient) GetHostname() (string, error) {

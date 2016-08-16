@@ -5,7 +5,9 @@
 package metric
 
 import (
+	"net"
 	"os"
+	"strings"
 
 	"gopkg.in/check.v1"
 )
@@ -15,6 +17,14 @@ var _ = check.Suite(&H{})
 type H struct{}
 
 func (h *H) SetUpTest(c *check.C) {
+	ifaces, err := net.Interfaces()
+	c.Assert(err, check.IsNil)
+	for _, iface := range ifaces {
+		if strings.HasPrefix(iface.Name, "lo") {
+			os.Setenv("METRICS_NETWORK_INTERFACE", iface.Name)
+			break
+		}
+	}
 	os.Setenv("HOST_PROC", "/proc")
 }
 
@@ -101,8 +111,7 @@ func (h *H) TestGetHostNetworkUsage(c *check.C) {
 }
 
 func (h *H) assertNetworkUsage(c *check.C, net map[string]float) {
-	c.Assert(net["netrx"], check.Not(check.Equals), float(0))
-	c.Assert(net["nettx"], check.Not(check.Equals), float(0))
+	c.Assert(net["netrx"] != 0 || net["nettx"] != 0, check.Equals, true)
 }
 
 func (h *H) assertCpuTimes(c *check.C, cpu map[string]float) {
