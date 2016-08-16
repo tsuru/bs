@@ -14,7 +14,7 @@ env:
 install:
   - true
 script:
-  - go test ./...
+  - go test -race ./...
   - make check-format
   - go build -ldflags "-linkmode external -extldflags -static"
 after_success:
