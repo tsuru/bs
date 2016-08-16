@@ -55,7 +55,7 @@ func (s *S) TestRunner(c *check.C) {
 			value:     float(250),
 		},
 	}
-	if fakeStatter.stats[0].hostname != conts[0].ID[:12] {
+	if cpuStat[0].hostname != conts[0].ID[:12] {
 		expected[0], expected[1] = expected[1], expected[0]
 	}
 	for i, stat := range cpuStat {
