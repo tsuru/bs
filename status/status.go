@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ajg/form"
@@ -49,6 +50,8 @@ type Reporter struct {
 	addrs      []string
 	infoClient *container.InfoClient
 	httpClient *http.Client
+	mu         sync.Mutex
+	removeMap  map[string]chan struct{}
 }
 
 type hostStatus struct {
@@ -100,6 +103,7 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 			Transport: &transport,
 			Timeout:   fullTimeout,
 		},
+		removeMap: make(map[string]chan struct{}),
 	}
 	go func(abort <-chan struct{}) {
 		for {
@@ -231,6 +235,39 @@ func (r *Reporter) updateUnits(payload []containerStatus) (*http.Response, error
 	return resp, err
 }
 
+func (r *Reporter) tryRemoveContainer(id string) {
+	r.mu.Lock()
+	if _, inSet := r.removeMap[id]; inSet {
+		r.mu.Unlock()
+		return
+	}
+	ch := make(chan struct{})
+	r.removeMap[id] = ch
+	r.mu.Unlock()
+	go func() {
+		defer func() {
+			close(ch)
+			r.mu.Lock()
+			delete(r.removeMap, id)
+			r.mu.Unlock()
+		}()
+		client := r.infoClient.GetClient()
+		opts := docker.RemoveContainerOptions{ID: id, Force: true}
+		err := client.RemoveContainer(opts)
+		if err != nil {
+			bslog.Errorf("[status reporter] failed to remove invalid container %q: %s", id, err)
+		}
+	}()
+}
+
+func (r *Reporter) waitPendingRemovals() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, ch := range r.removeMap {
+		<-ch
+	}
+}
+
 func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 	var statusResp []respUnit
 	defer resp.Body.Close()
@@ -242,21 +279,9 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 	if err != nil {
 		return fmt.Errorf("unable to parse tsuru response: %s", err)
 	}
-	if len(statusResp) == 0 {
-		return nil
-	}
-	goneUnits := make([]string, 0, len(statusResp))
 	for _, unit := range statusResp {
 		if !unit.Found {
-			goneUnits = append(goneUnits, unit.ID)
-		}
-	}
-	client := r.infoClient.GetClient()
-	for _, id := range goneUnits {
-		opts := docker.RemoveContainerOptions{ID: id, Force: true}
-		err = client.RemoveContainer(opts)
-		if err != nil {
-			bslog.Errorf("[status reporter] failed to remove invalid container %q: %s", id, err)
+			r.tryRemoveContainer(unit.ID)
 		}
 	}
 	return nil

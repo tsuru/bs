@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"sort"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -88,6 +89,7 @@ func (s S) TestReportStatus(c *check.C) {
 	input.Checks = nil
 	input.Addrs = nil
 	c.Assert(input, check.DeepEquals, expected)
+	reporter.waitPendingRemovals()
 	dockerClient, err := docker.NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	apiContainers, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
@@ -162,6 +164,7 @@ func (s S) TestReportStatus404OnHostStatus(c *check.C) {
 	err = json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
 	c.Assert(input, check.DeepEquals, expected)
+	reporter.waitPendingRemovals()
 	dockerClient, err := docker.NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	apiContainers, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
@@ -174,6 +177,61 @@ func (s S) TestReportStatus404OnHostStatus(c *check.C) {
 	sort.Strings(ids)
 	sort.Strings(expectedIDs)
 	c.Assert(ids, check.DeepEquals, expectedIDs)
+}
+
+func (s S) TestReportStatusMultipleRemovals(c *check.C) {
+	bogusContainers := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+		{name: "x2", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+		{name: "x3", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+	}
+	toBlock := make(chan bool)
+	var deleteCount int32
+	dockerServer, conts := s.startDockerServer(bogusContainers, func(r *http.Request) {
+		if r.Method == "DELETE" {
+			atomic.AddInt32(&deleteCount, 1)
+			<-toBlock
+		}
+	}, c)
+	defer dockerServer.Stop()
+	var statusResp []respUnit
+	for _, cont := range conts {
+		statusResp = append(statusResp, respUnit{ID: cont.ID, Found: false})
+	}
+	data, err := json.Marshal(statusResp)
+	c.Assert(err, check.IsNil)
+	var resp http.Response
+	resp.StatusCode = http.StatusOK
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	resp.Header = make(http.Header)
+	resp.Header.Set("Content-Type", "application/json")
+	tsuruServer, _ := s.startTsuruServer(&resp)
+	defer tsuruServer.Close()
+	reporter, err := NewReporter(&ReporterConfig{
+		Interval:       10 * time.Minute,
+		DockerEndpoint: dockerServer.URL(),
+		TsuruEndpoint:  tsuruServer.URL,
+		TsuruToken:     "some-token",
+	})
+	c.Assert(err, check.IsNil)
+	reporter.Stop()
+	reporter.reportStatus()
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	reporter.reportStatus()
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	reporter.reportStatus()
+	close(toBlock)
+	reporter.waitPendingRemovals()
+	c.Assert(deleteCount, check.Equals, int32(3))
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	reporter.reportStatus()
+	reporter.waitPendingRemovals()
+	c.Assert(deleteCount, check.Equals, int32(6))
+	dockerClient, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	apiContainers, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
+	c.Assert(err, check.IsNil)
+	c.Assert(apiContainers, check.HasLen, 0)
 }
 
 type tsuruRequest struct {
