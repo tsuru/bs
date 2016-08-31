@@ -13,7 +13,11 @@ import (
 	"github.com/tsuru/bs/metric"
 )
 
-func newLogStash() (metric.Backend, error) {
+func init() {
+	metric.Register("logstash", new)
+}
+
+func new() (metric.Backend, error) {
 	const (
 		defaultClient   = "tsuru"
 		defaultPort     = "1984"

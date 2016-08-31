@@ -22,6 +22,13 @@ func Test(t *testing.T) {
 
 type S struct{}
 
+func (s *S) TestShouldBeRegisteredAsLogstash(c *check.C) {
+	r, err := metric.Get("logstash")
+	c.Assert(err, check.IsNil)
+	_, ok := r.(*logStash)
+	c.Assert(ok, check.Equals, true)
+}
+
 func (s *S) TestSend(c *check.C) {
 	addr := net.UDPAddr{IP: net.ParseIP("127.0.0.1")}
 	conn, err := net.ListenUDP("udp", &addr)
@@ -133,7 +140,7 @@ func (s *S) TestNewLogStasDefaults(c *check.C) {
 	os.Unsetenv("METRICS_LOGSTASH_PORT")
 	os.Unsetenv("METRICS_LOGSTASH_PROTOCOL")
 
-	st, err := newLogStash()
+	st, err := new()
 	c.Assert(err, check.IsNil)
 	expected := &logStash{
 		Host:     "localhost",
@@ -150,7 +157,7 @@ func (s *S) TestNewLogStashEnvs(c *check.C) {
 	os.Setenv("METRICS_LOGSTASH_PORT", "1983")
 	os.Setenv("METRICS_LOGSTASH_PROTOCOL", "tcp")
 
-	st, err := newLogStash()
+	st, err := new()
 	c.Assert(err, check.IsNil)
 	expected := &logStash{
 		Host:     "127.0.0.1",
