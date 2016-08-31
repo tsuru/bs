@@ -21,10 +21,6 @@ type runner struct {
 	exit           chan struct{}
 }
 
-var backends = map[string]func() (Backend, error){
-// "logstash": newLogStash,
-}
-
 func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend string) *runner {
 	return &runner{
 		abort:          make(chan struct{}),

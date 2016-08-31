@@ -33,6 +33,15 @@ type HostInfo struct {
 	Addrs []string
 }
 
+type backendFactory func() (Backend, error)
+
+var backends = make(map[string]backendFactory)
+
+// Register registers a new Backend
+func Register(name string, b backendFactory) {
+	backends[name] = b
+}
+
 type Backend interface {
 	Send(container ContainerInfo, key string, value interface{}) error
 	SendConn(container ContainerInfo, host string) error
