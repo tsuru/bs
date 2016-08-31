@@ -9,7 +9,7 @@ import "sync"
 var fakeStatter fake
 
 func init() {
-	statters["fake"] = func() (Backend, error) {
+	backends["fake"] = func() (Backend, error) {
 		return &fakeStatter, nil
 	}
 }

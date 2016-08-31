@@ -21,7 +21,7 @@ type runner struct {
 	exit           chan struct{}
 }
 
-var statters = map[string]func() (Backend, error){
+var backends = map[string]func() (Backend, error){
 // "logstash": newLogStash,
 }
 
@@ -49,7 +49,7 @@ func (r *runner) Start() (err error) {
 		return
 	}
 	containerSelectionEnv := os.Getenv("CONTAINER_SELECTION_ENV")
-	constructor := statters[r.metricsBackend]
+	constructor := backends[r.metricsBackend]
 	if constructor == nil {
 		err = fmt.Errorf("no metrics backend found with name %q", r.metricsBackend)
 		return
