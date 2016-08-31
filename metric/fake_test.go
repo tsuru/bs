@@ -9,9 +9,9 @@ import "sync"
 var fakeBackend fake
 
 func init() {
-	backends["fake"] = func() (Backend, error) {
+	Register("fake", func() (Backend, error) {
 		return &fakeBackend, nil
-	}
+	})
 }
 
 type fakeStat struct {
