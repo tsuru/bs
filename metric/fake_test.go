@@ -6,11 +6,11 @@ package metric
 
 import "sync"
 
-var fakeStatter fake
+var fakeBackend fake
 
 func init() {
 	backends["fake"] = func() (Backend, error) {
-		return &fakeStatter, nil
+		return &fakeBackend, nil
 	}
 }
 

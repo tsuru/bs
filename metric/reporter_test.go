@@ -22,7 +22,7 @@ func Test(t *testing.T) {
 type S struct{}
 
 func (s *S) SetUpTest(c *check.C) {
-	fakeStatter.reset()
+	fakeBackend.reset()
 }
 
 func (s *S) createContainer() container.Container {
@@ -38,7 +38,7 @@ func (s *S) createContainer() container.Container {
 
 func (s *S) TestSendMetrics(c *check.C) {
 	cont := s.createContainer()
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	metrics := map[string]float{"cpu": float(900), "mem": float(512)}
 	err := r.sendMetrics(&cont, metrics)
 	c.Assert(err, check.IsNil)
@@ -46,17 +46,17 @@ func (s *S) TestSendMetrics(c *check.C) {
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "cpu", value: float(900)},
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "mem", value: float(512)},
 	}
-	if fakeStatter.stats[0].key != "cpu" {
+	if fakeBackend.stats[0].key != "cpu" {
 		expected[0], expected[1] = expected[1], expected[0]
 	}
-	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
+	c.Assert(fakeBackend.stats, check.DeepEquals, expected)
 }
 
 func (s *S) TestSendMetricsFailure(c *check.C) {
 	cont := s.createContainer()
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	prepErr := errors.New("something went wrong")
-	fakeStatter.prepareFailure(prepErr)
+	fakeBackend.prepareFailure(prepErr)
 	err := r.sendMetrics(&cont, map[string]float{"cpu": float(256)})
 	c.Assert(err, check.Equals, prepErr)
 }
@@ -77,7 +77,7 @@ func (s *S) TestSendConnMetrics(c *check.C) {
 		{SourceIP: "172.17.0.27", SourcePort: "39492", DestinationIP: "192.168.50.4", DestinationPort: "8080"},
 		{SourceIP: "10.211.55.2", SourcePort: "51370", DestinationIP: "10.211.55.184", DestinationPort: "22"},
 	}
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	err := r.sendConnMetrics(&cont, conns)
 	c.Assert(err, check.IsNil)
 	expected := []fakeStat{
@@ -87,14 +87,14 @@ func (s *S) TestSendConnMetrics(c *check.C) {
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "172.17.42.1:4001"},
 		{app: "myapp", hostname: "afdb3737ff", process: "myprocess", key: "connection", value: "192.168.50.4:8080"},
 	}
-	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
+	c.Assert(fakeBackend.stats, check.DeepEquals, expected)
 }
 
 func (s *S) TestSendConnMetricsFailure(c *check.C) {
 	cont := s.createContainer()
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	prepErr := errors.New("something went wrong")
-	fakeStatter.prepareFailure(prepErr)
+	fakeBackend.prepareFailure(prepErr)
 	conns := []conn{{SourceIP: "172.17.0.27"}}
 	err := r.sendConnMetrics(&cont, conns)
 	c.Assert(err, check.Equals, prepErr)
@@ -107,7 +107,7 @@ func (s *S) TestGetMetrics(c *check.C) {
 }
 
 func (s *S) TestSendHostMetrics(c *check.C) {
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	metrics := map[string]float{"cpu": float(900), "mem": float(512)}
 	hostInfo := HostInfo{Name: "hostname"}
 	err := r.sendHostMetrics(hostInfo, metrics)
@@ -116,16 +116,16 @@ func (s *S) TestSendHostMetrics(c *check.C) {
 		{app: "sysapp", hostname: "hostname", process: "-", key: "cpu", value: float(900)},
 		{app: "sysapp", hostname: "hostname", process: "-", key: "mem", value: float(512)},
 	}
-	if fakeStatter.stats[0].key != "cpu" {
+	if fakeBackend.stats[0].key != "cpu" {
 		expected[0], expected[1] = expected[1], expected[0]
 	}
-	c.Assert(fakeStatter.stats, check.DeepEquals, expected)
+	c.Assert(fakeBackend.stats, check.DeepEquals, expected)
 }
 
 func (s *S) TestSendHostMetricsFailure(c *check.C) {
-	r := Reporter{backend: &fakeStatter}
+	r := Reporter{backend: &fakeBackend}
 	prepErr := errors.New("something wen wrong")
-	fakeStatter.prepareFailure(prepErr)
+	fakeBackend.prepareFailure(prepErr)
 	metrics := map[string]float{"cpu": float(900)}
 	hostInfo := HostInfo{Name: "hostname"}
 	err := r.sendHostMetrics(hostInfo, metrics)

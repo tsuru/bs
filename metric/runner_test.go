@@ -31,9 +31,9 @@ func (s *S) TestRunner(c *check.C) {
 	c.Assert(err, check.IsNil)
 	r.Stop()
 	cpuStat := make([]*fakeStat, 0)
-	for i, stat := range fakeStatter.stats {
+	for i, stat := range fakeBackend.stats {
 		if stat.key == "cpu_max" {
-			cpuStat = append(cpuStat, &fakeStatter.stats[i])
+			cpuStat = append(cpuStat, &fakeBackend.stats[i])
 		}
 	}
 	c.Assert(len(cpuStat), check.Equals, 2)
@@ -75,9 +75,9 @@ func (s *S) TestRunnerSelectionEnv(c *check.C) {
 	c.Assert(err, check.IsNil)
 	r.Stop()
 	cpuStat := make([]*fakeStat, 0)
-	for i, stat := range fakeStatter.stats {
+	for i, stat := range fakeBackend.stats {
 		if stat.key == "cpu_max" {
-			cpuStat = append(cpuStat, &fakeStatter.stats[i])
+			cpuStat = append(cpuStat, &fakeBackend.stats[i])
 		}
 	}
 	c.Assert(len(cpuStat), check.Equals, 1)
