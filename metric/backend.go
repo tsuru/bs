@@ -33,7 +33,7 @@ type HostInfo struct {
 	Addrs []string
 }
 
-type Statter interface {
+type Backend interface {
 	Send(container ContainerInfo, key string, value interface{}) error
 	SendConn(container ContainerInfo, host string) error
 	SendHost(host HostInfo, key string, value interface{}) error

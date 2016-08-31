@@ -21,7 +21,7 @@ type runner struct {
 	exit           chan struct{}
 }
 
-var statters = map[string]func() (Statter, error){
+var statters = map[string]func() (Backend, error){
 // "logstash": newLogStash,
 }
 
