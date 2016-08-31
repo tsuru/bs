@@ -4,7 +4,11 @@
 
 package metric
 
-import "github.com/tsuru/bs/container"
+import (
+	"fmt"
+
+	"github.com/tsuru/bs/container"
+)
 
 type ContainerInfo struct {
 	Name     string
@@ -40,6 +44,19 @@ var backends = make(map[string]backendFactory)
 // Register registers a new Backend
 func Register(name string, b backendFactory) {
 	backends[name] = b
+}
+
+// Get gets the named backend
+func Get(name string) (Backend, error) {
+	factory, ok := backends[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown backend: %q.", name)
+	}
+	r, err := factory()
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 type Backend interface {
