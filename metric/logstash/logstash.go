@@ -1,8 +1,8 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package metric
+package logstash
 
 import (
 	"encoding/json"
@@ -10,9 +10,10 @@ import (
 
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
+	"github.com/tsuru/bs/metric"
 )
 
-func newLogStash() (statter, error) {
+func newLogStash() (metric.Statter, error) {
 	const (
 		defaultClient   = "tsuru"
 		defaultPort     = "1984"
@@ -34,7 +35,7 @@ type logStash struct {
 	Protocol string
 }
 
-func (s *logStash) Send(container ContainerInfo, key string, value interface{}) error {
+func (s *logStash) Send(container metric.ContainerInfo, key string, value interface{}) error {
 	message := map[string]interface{}{
 		"client": s.Client,
 		"count":  1,
@@ -45,7 +46,7 @@ func (s *logStash) Send(container ContainerInfo, key string, value interface{}) 
 	return s.send(message)
 }
 
-func (s *logStash) SendConn(container ContainerInfo, host string) error {
+func (s *logStash) SendConn(container metric.ContainerInfo, host string) error {
 	message := map[string]interface{}{
 		"client":     s.Client,
 		"count":      1,
@@ -56,7 +57,7 @@ func (s *logStash) SendConn(container ContainerInfo, host string) error {
 	return s.send(message)
 }
 
-func (s *logStash) SendHost(host HostInfo, key string, value interface{}) error {
+func (s *logStash) SendHost(host metric.HostInfo, key string, value interface{}) error {
 	message := map[string]interface{}{
 		"client": s.Client,
 		"count":  1,
@@ -68,14 +69,14 @@ func (s *logStash) SendHost(host HostInfo, key string, value interface{}) error 
 	return s.send(message)
 }
 
-func (s *logStash) appendInfo(message map[string]interface{}, container ContainerInfo) {
-	message["host"] = container.hostname
-	if container.app != "" {
-		message["app"] = container.app
-		message["process"] = container.process
+func (s *logStash) appendInfo(message map[string]interface{}, container metric.ContainerInfo) {
+	message["host"] = container.Hostname
+	if container.App != "" {
+		message["app"] = container.App
+		message["process"] = container.Process
 	} else {
-		message["container"] = container.name
-		message["image"] = container.image
+		message["container"] = container.Name
+		message["image"] = container.Image
 	}
 }
 

@@ -7,11 +7,11 @@ package metric
 import "github.com/tsuru/bs/container"
 
 type ContainerInfo struct {
-	name     string
-	image    string
-	hostname string
-	app      string
-	process  string
+	Name     string
+	Image    string
+	Hostname string
+	App      string
+	Process  string
 }
 
 func NewContainerInfo(container *container.Container) ContainerInfo {
@@ -20,11 +20,11 @@ func NewContainerInfo(container *container.Container) ContainerInfo {
 		name = container.Name[1:]
 	}
 	return ContainerInfo{
-		name:     name,
-		image:    container.Config.Image,
-		hostname: container.Config.Hostname,
-		process:  container.ProcessName,
-		app:      container.AppName,
+		Name:     name,
+		Image:    container.Config.Image,
+		Hostname: container.Config.Hostname,
+		Process:  container.ProcessName,
+		App:      container.AppName,
 	}
 }
 
@@ -33,7 +33,7 @@ type HostInfo struct {
 	Addrs []string
 }
 
-type statter interface {
+type Statter interface {
 	Send(container ContainerInfo, key string, value interface{}) error
 	SendConn(container ContainerInfo, host string) error
 	SendHost(host HostInfo, key string, value interface{}) error

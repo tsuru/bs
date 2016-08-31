@@ -21,8 +21,8 @@ type runner struct {
 	exit           chan struct{}
 }
 
-var statters = map[string]func() (statter, error){
-	"logstash": newLogStash,
+var statters = map[string]func() (Statter, error){
+// "logstash": newLogStash,
 }
 
 func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend string) *runner {

@@ -9,7 +9,7 @@ import "sync"
 var fakeStatter fake
 
 func init() {
-	statters["fake"] = func() (statter, error) {
+	statters["fake"] = func() (Statter, error) {
 		return &fakeStatter, nil
 	}
 }
@@ -38,11 +38,11 @@ func (s *fake) Send(container ContainerInfo, key string, value interface{}) erro
 		return err
 	default:
 		stat := fakeStat{
-			app:       container.app,
-			hostname:  container.hostname,
-			process:   container.process,
-			container: container.name,
-			image:     container.image,
+			app:       container.App,
+			hostname:  container.Hostname,
+			process:   container.Process,
+			container: container.Name,
+			image:     container.Image,
 			key:       key,
 			value:     value,
 		}
@@ -56,7 +56,7 @@ func (s *fake) SendConn(container ContainerInfo, host string) error {
 }
 
 func (s *fake) SendHost(host HostInfo, key string, value interface{}) error {
-	data := ContainerInfo{app: "sysapp", process: "-", hostname: host.Name}
+	data := ContainerInfo{App: "sysapp", Process: "-", Hostname: host.Name}
 	return s.Send(data, key, value)
 }
 

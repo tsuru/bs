@@ -14,7 +14,7 @@ import (
 )
 
 type Reporter struct {
-	backend               statter
+	backend               Statter
 	infoClient            *container.InfoClient
 	containerSelectionEnv string
 	hostClient            *HostClient

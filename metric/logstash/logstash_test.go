@@ -1,16 +1,26 @@
-// Copyright 2015 bs authors. All rights reserved.
+// Copyright 2016 bs authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package metric
+package logstash
 
 import (
 	"encoding/json"
 	"net"
 	"os"
+	"testing"
 
+	"github.com/tsuru/bs/metric"
 	"gopkg.in/check.v1"
 )
+
+var _ = check.Suite(&S{})
+
+func Test(t *testing.T) {
+	check.TestingT(t)
+}
+
+type S struct{}
 
 func (s *S) TestSend(c *check.C) {
 	addr := net.UDPAddr{IP: net.ParseIP("127.0.0.1")}
@@ -25,7 +35,11 @@ func (s *S) TestSend(c *check.C) {
 		Port:     port,
 		Protocol: "udp",
 	}
-	err = st.Send(ContainerInfo{app: "app", hostname: "hostname", process: "process"}, "key", "value")
+	err = st.Send(metric.ContainerInfo{
+		App:      "app",
+		Hostname: "hostname",
+		Process:  "process",
+	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	var data [246]byte
 	n, _, err := conn.ReadFrom(data[:])
@@ -43,7 +57,11 @@ func (s *S) TestSend(c *check.C) {
 	err = json.Unmarshal(data[:n], &got)
 	c.Assert(err, check.IsNil)
 	c.Assert(got, check.DeepEquals, expected)
-	err = st.Send(ContainerInfo{name: "container", hostname: "hostname", image: "image"}, "key", "value")
+	err = st.Send(metric.ContainerInfo{
+		Name:     "container",
+		Hostname: "hostname",
+		Image:    "image",
+	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	n, _, err = conn.ReadFrom(data[:])
 	c.Assert(err, check.IsNil)
@@ -87,7 +105,11 @@ func (s *S) TestSendTCP(c *check.C) {
 		Port:     port,
 		Protocol: "tcp",
 	}
-	err = st.Send(ContainerInfo{app: "app", hostname: "hostname", process: "process"}, "key", "value")
+	err = st.Send(metric.ContainerInfo{
+		App:      "app",
+		Hostname: "hostname",
+		Process:  "process",
+	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	data := <-dataCh
 	expected := map[string]interface{}{
