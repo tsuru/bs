@@ -11,12 +11,12 @@ import (
 
 func new() (metric.Backend, error) {
 	return &prometheus{
-		FilePath: config.StringEnvOrDefault("", "METRICS_PROMETHEUS_FILEPATH"),
+		Path: config.StringEnvOrDefault("", "METRICS_PROMETHEUS_PATH"),
 	}, nil
 }
 
 type prometheus struct {
-	FilePath string
+	Path string
 }
 
 func (s *prometheus) Send(container metric.ContainerInfo, key string, value interface{}) error {
