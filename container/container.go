@@ -155,7 +155,7 @@ func (c *Container) HasEnvs(requiredEnvs []string) bool {
 				break
 			}
 		}
-		if hasEnv == false {
+		if !hasEnv {
 			return false
 		}
 	}

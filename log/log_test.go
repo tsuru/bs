@@ -563,18 +563,18 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 		defer close(done)
 		buf := make([]byte, 1024)
 		for {
-			frame, err := ws.NewFrameReader()
-			if err == io.EOF {
+			frame, hErr := ws.NewFrameReader()
+			if hErr == io.EOF {
 				break
 			}
 			if frame.PayloadType() != websocket.PingFrame &&
 				frame.PayloadType() != websocket.PongFrame {
-				frameReader, err := ws.HandleFrame(frame)
+				frameReader, hErr := ws.HandleFrame(frame)
 				if frameReader == nil {
 					continue
 				}
-				_, err = frameReader.Read(buf)
-				if err == io.EOF {
+				_, hErr = frameReader.Read(buf)
+				if hErr == io.EOF {
 					if trailer := frameReader.TrailerReader(); trailer != nil {
 						io.Copy(ioutil.Discard, trailer)
 					}

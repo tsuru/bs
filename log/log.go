@@ -44,7 +44,6 @@ type LogForwarder struct {
 	EnabledBackends []string
 	infoClient      *container.InfoClient
 	server          *syslog.Server
-	nextNotifyTsuru *time.Timer
 	backends        []logBackend
 }
 
@@ -79,7 +78,7 @@ func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMes
 		for {
 			select {
 			case <-quit:
-				break
+				return
 			default:
 			}
 			if conn == nil {
@@ -128,7 +127,7 @@ func (l *LogForwarder) Start() (err error) {
 			return fmt.Errorf("invalid log backend: %s", backendName)
 		}
 		backend := constructor()
-		err := backend.initialize()
+		err = backend.initialize()
 		if err != nil {
 			return fmt.Errorf("unable to initialize log backend %q: %s", backendName, err)
 		}

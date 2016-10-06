@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-// Overriden by tests with tls enabled.
+// Overridden by tests with tls enabled.
 var testTlsConfig *tls.Config
 
 type tsuruBackend struct {

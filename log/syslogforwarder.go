@@ -17,17 +17,16 @@ import (
 )
 
 type syslogBackend struct {
-	forwardAddresses []string
-	syslogLocation   *time.Location
-	msgChans         []chan<- *LogMessage
-	quitChans        []chan<- bool
-	bufferPool       sync.Pool
-	nextNotify       *time.Timer
+	syslogLocation *time.Location
+	msgChans       []chan<- *LogMessage
+	quitChans      []chan<- bool
+	bufferPool     sync.Pool
+	nextNotify     *time.Timer
 }
 
 type syslogForwarder struct {
 	url        *url.URL
-	bufferPool sync.Pool
+	bufferPool *sync.Pool
 }
 
 func (b *syslogBackend) initialize() error {
@@ -59,7 +58,7 @@ func (b *syslogBackend) initialize() error {
 		}
 		forwardChan, quitChan, err := processMessages(&syslogForwarder{
 			url:        forwardUrl,
-			bufferPool: b.bufferPool,
+			bufferPool: &b.bufferPool,
 		}, bufferSize)
 		if err != nil {
 			return err
