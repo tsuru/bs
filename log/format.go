@@ -50,7 +50,7 @@ func (p *LenientParser) Parse() error {
 		}
 	} else {
 		dt := string(bytes.Join(groups[1:3], []byte{' '}))
-		ts, err = time.Parse(time.Stamp, dt)
+		ts, err = time.ParseInLocation(time.Stamp, dt, time.Local)
 		if err != nil {
 			return p.defaultParsers()
 		}
