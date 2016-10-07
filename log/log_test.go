@@ -26,11 +26,11 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
-	"github.com/jeromer/syslogparser"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 	"gopkg.in/check.v1"
+	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
 
 var _ = check.Suite(&S{})
@@ -284,7 +284,7 @@ func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	logParts := syslogparser.LogParts{
+	logParts := format.LogParts{
 		"container_id": s.id,
 		"hostname":     "myhost",
 		"timestamp":    time.Now(),
@@ -325,7 +325,7 @@ func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	logParts := syslogparser.LogParts{
+	logParts := format.LogParts{
 		"container_id": s.id,
 		"hostname":     "myhost",
 		"timestamp":    time.Now(),
@@ -373,7 +373,7 @@ func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
-	logParts := syslogparser.LogParts{
+	logParts := format.LogParts{
 		"container_id": s.id,
 		"hostname":     "myhost",
 		"timestamp":    time.Now(),
@@ -414,7 +414,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	logParts := syslogparser.LogParts{
+	logParts := format.LogParts{
 		"priority":     30,
 		"facility":     3,
 		"severity":     6,
@@ -464,7 +464,7 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
-	parts := []syslogparser.LogParts{
+	parts := []format.LogParts{
 		{
 			"priority":     30,
 			"facility":     3,

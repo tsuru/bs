@@ -11,12 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/mcuadros/go-syslog.v2"
-
-	"github.com/jeromer/syslogparser"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
+	"gopkg.in/mcuadros/go-syslog.v2"
+	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
 
 const (
@@ -181,7 +180,7 @@ func (l *LogForwarder) stopWait() {
 	l.Wait()
 }
 
-func (l *LogForwarder) Handle(logParts syslogparser.LogParts, msgLen int64, err error) {
+func (l *LogForwarder) Handle(logParts format.LogParts, msgLen int64, err error) {
 	if err != nil {
 		bslog.Debugf("[log forwarder] ignored msg %#v error processing: %s", logParts, err)
 		return

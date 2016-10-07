@@ -164,31 +164,10 @@
 			"revisionTime": "2016-01-06T20:16:19-02:00"
 		},
 		{
-			"path": "github.com/jeromer/syslogparser",
-			"revision": "812866d0389ae7e1f5a0110d47dea20224fc776f",
-			"revisionTime": "2013-12-30T12:47:00-08:00"
-		},
-		{
-			"path": "github.com/jeromer/syslogparser/rfc3164",
-			"revision": "812866d0389ae7e1f5a0110d47dea20224fc776f",
-			"revisionTime": "2013-12-30T12:47:00-08:00"
-		},
-		{
-			"path": "github.com/jeromer/syslogparser/rfc5424",
-			"revision": "812866d0389ae7e1f5a0110d47dea20224fc776f",
-			"revisionTime": "2013-12-30T12:47:00-08:00"
-		},
-		{
 			"checksumSHA1": "3AoPMXlmVq2+iWMpsdJZkcUKHB8=",
 			"path": "github.com/opencontainers/runc/libcontainer/user",
 			"revision": "419d5be191c18eff75a3d0b2a16e20c7a9eb71db",
 			"revisionTime": "2016-05-19T15:00:36Z"
-		},
-		{
-			"checksumSHA1": "1Q7OlfQ1RJyLl5PhUfxJx31n6Fo=",
-			"path": "github.com/shirou/gopsutil",
-			"revision": "be06a94d4487f6562f3c8dbfa6e51689406e0c61",
-			"revisionTime": "2016-03-22T21:55:16+09:00"
 		},
 		{
 			"checksumSHA1": "1DWWlWUBnTV/Z84fNih6JEzMw30=",
@@ -391,14 +370,34 @@
 			"revisionTime": "2014-10-24T11:38:53-02:00"
 		},
 		{
+			"checksumSHA1": "MKssg9Cf21/fv8QP5fwyMM05Rso=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2",
-			"revision": "6cba2bfcf64a025c899aa3be061161d2b89d8b54",
-			"revisionTime": "2015-07-16T15:34:00+02:00"
+			"revision": "bf5898e4125405be828b846aac76b25701887513",
+			"revisionTime": "2016-10-07T20:38:02Z"
 		},
 		{
+			"checksumSHA1": "cCSjCUbzXN88zL80ulZAg5iVr/Y=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2/format",
-			"revision": "6cba2bfcf64a025c899aa3be061161d2b89d8b54",
-			"revisionTime": "2015-07-16T15:34:00+02:00"
+			"revision": "bf5898e4125405be828b846aac76b25701887513",
+			"revisionTime": "2016-10-07T20:38:02Z"
+		},
+		{
+			"checksumSHA1": "vTfr6a5y9D7tYzYWQUZebomOkBs=",
+			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser",
+			"revision": "bf5898e4125405be828b846aac76b25701887513",
+			"revisionTime": "2016-10-07T20:38:02Z"
+		},
+		{
+			"checksumSHA1": "P25L0Jjo6CtxTkNKQpWoLWJWnPM=",
+			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc3164",
+			"revision": "bf5898e4125405be828b846aac76b25701887513",
+			"revisionTime": "2016-10-07T20:38:02Z"
+		},
+		{
+			"checksumSHA1": "eBx0t9XBJz+OC2k69iFwraxni9o=",
+			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc5424",
+			"revision": "bf5898e4125405be828b846aac76b25701887513",
+			"revisionTime": "2016-10-07T20:38:02Z"
 		},
 		{
 			"origin": "github.com/tsuru/tsuru/vendor/gopkg.in/mgo.v2",

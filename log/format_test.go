@@ -7,8 +7,8 @@ package log
 import (
 	"time"
 
-	"github.com/jeromer/syslogparser"
 	"gopkg.in/check.v1"
+	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
 
 func (s *S) TestLenientFormatGetParser(c *check.C) {
@@ -67,7 +67,7 @@ func (s *S) TestLenientParserParse(c *check.C) {
 		"<165>1 2003-08-24T05:14:15.000003Z 192.0.2.1 myproc 8710 - - ",
 		"<165>1 2003-08-24T05:14:15.000003Z 192.0.2.1 myproc 8710 - - content",
 	}
-	expected := []syslogparser.LogParts{
+	expected := []format.LogParts{
 		{
 			"priority":     27,
 			"facility":     3,

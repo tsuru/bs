@@ -12,14 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeromer/syslogparser"
-	"github.com/jeromer/syslogparser/rfc3164"
-	"github.com/jeromer/syslogparser/rfc5424"
+	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
 
 type LenientFormat struct{}
 
-func (LenientFormat) GetParser(line []byte) syslogparser.LogParser {
+func (LenientFormat) GetParser(line []byte) format.LogParser {
 	return &LenientParser{line: line}
 }
 
@@ -29,8 +27,8 @@ func (LenientFormat) GetSplitFunc() bufio.SplitFunc {
 
 type LenientParser struct {
 	line      []byte
-	logParts  syslogparser.LogParts
-	subParser syslogparser.LogParser
+	logParts  format.LogParts
+	subParser format.LogParser
 }
 
 func (p *LenientParser) Parse() error {
@@ -56,7 +54,7 @@ func (p *LenientParser) Parse() error {
 		}
 		ts = ts.AddDate(time.Now().Year(), 0, 0)
 	}
-	p.logParts = syslogparser.LogParts{
+	p.logParts = format.LogParts{
 		"priority":  priority,
 		"facility":  priority / 8,
 		"severity":  priority % 8,
@@ -68,22 +66,25 @@ func (p *LenientParser) Parse() error {
 	return nil
 }
 
+func (p *LenientParser) Location(*time.Location) {
+}
+
 func (p *LenientParser) defaultParsers() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("recovered panic parsing with %T, invalid message %q: %v", p.subParser, string(p.line), r)
 		}
 	}()
-	p.subParser = rfc3164.NewParser(p.line)
+	p.subParser = (&format.RFC5424{}).GetParser(p.line)
 	err = p.subParser.Parse()
 	if err == nil {
 		return nil
 	}
-	p.subParser = rfc5424.NewParser(p.line)
+	p.subParser = (&format.RFC3164{}).GetParser(p.line)
 	return p.subParser.Parse()
 }
 
-func (p *LenientParser) Dump() syslogparser.LogParts {
+func (p *LenientParser) Dump() format.LogParts {
 	if p.subParser != nil {
 		p.logParts = p.subParser.Dump()
 	}

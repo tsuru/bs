@@ -5,10 +5,11 @@ package rfc5424
 
 import (
 	"fmt"
-	"github.com/jeromer/syslogparser"
 	"math"
 	"strconv"
 	"time"
+
+	"gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser"
 )
 
 const (
@@ -74,6 +75,10 @@ func NewParser(buff []byte) *Parser {
 		cursor: 0,
 		l:      len(buff),
 	}
+}
+
+func (p *Parser) Location(location *time.Location) {
+	// Ignore as RFC5424 syslog always has a timezone
 }
 
 func (p *Parser) Parse() error {
@@ -525,6 +530,10 @@ func toNSec(sec float64) (int, error) {
 func parseStructuredData(buff []byte, cursor *int, l int) (string, error) {
 	var sdData string
 	var found bool
+
+	if *cursor >= l {
+		return "-", nil
+	}
 
 	if buff[*cursor] == NILVALUE {
 		*cursor++
