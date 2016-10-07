@@ -18,6 +18,7 @@ import (
 	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/log"
 	"github.com/tsuru/bs/metric"
+	_ "github.com/tsuru/bs/metric/logstash"
 	"github.com/tsuru/bs/status"
 )
 
