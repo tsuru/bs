@@ -602,3 +602,35 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 	lf.stopWait()
 	c.Assert(logBuf.String(), check.Matches, `(?s).*no pong response in.*`)
 }
+
+func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
+	os.Setenv("myenv", "myvalue")
+	os.Setenv("LOG_SYSLOG_MESSAGE_EXTRA_START", "#val1")
+	os.Setenv("LOG_SYSLOG_MESSAGE_EXTRA_END", "#val2 #${myenv}")
+	defer os.Unsetenv("LOG_SYSLOG_MESSAGE_EXTRA_START")
+	defer os.Unsetenv("LOG_SYSLOG_MESSAGE_EXTRA_END")
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	udpConn, err := net.ListenUDP("udp", addr)
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
+	lf := LogForwarder{
+		BindAddress:     "udp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+	buffer := make([]byte, 1024)
+	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	n, err := udpConn.Read(buffer)
+	c.Assert(err, check.IsNil)
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.id))
+}

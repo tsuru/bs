@@ -153,6 +153,12 @@ forward logs to any syslog server, only to tsuru API.
 servers. The timezone format must be a location existing in the [IANA Time
 Zone database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 
+
+#### LOG_SYSLOG_MESSAGE_EXTRA_START and LOG_SYSLOG_MESSAGE_EXTRA_END
+`LOG_SYSLOG_MESSAGE_EXTRA_{START,END}` are variables that can contain any text
+to be added to the start or to the end of the forwarded syslog message. bs will
+expand environment variables present in these messages during startup.
+
 ### STATUS_INTERVAL
 
 `STATUS_INTERVAL` is the interval in seconds between status collecting and
@@ -254,5 +260,3 @@ container logs are being sent to be forwarded by bs.
 
 `HOST_PROC` is the path to the volume where *bs* host `/proc` was mounted in
 the *bs* container.
-
-

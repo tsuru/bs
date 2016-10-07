@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -17,11 +18,13 @@ import (
 )
 
 type syslogBackend struct {
-	syslogLocation *time.Location
-	msgChans       []chan<- *LogMessage
-	quitChans      []chan<- bool
-	bufferPool     sync.Pool
-	nextNotify     *time.Timer
+	syslogLocation   *time.Location
+	syslogExtraStart []byte
+	syslogExtraEnd   []byte
+	msgChans         []chan<- *LogMessage
+	quitChans        []chan<- bool
+	bufferPool       sync.Pool
+	nextNotify       *time.Timer
 }
 
 type syslogForwarder struct {
@@ -30,6 +33,14 @@ type syslogForwarder struct {
 }
 
 func (b *syslogBackend) initialize() error {
+	extra := config.StringEnvOrDefault("", "LOG_SYSLOG_MESSAGE_EXTRA_START")
+	if extra != "" {
+		b.syslogExtraStart = []byte(os.ExpandEnv(extra) + " ")
+	}
+	extra = config.StringEnvOrDefault("", "LOG_SYSLOG_MESSAGE_EXTRA_END")
+	if extra != "" {
+		b.syslogExtraEnd = []byte(" " + os.ExpandEnv(extra))
+	}
 	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_SYSLOG_BUFFER_SIZE", "LOG_BUFFER_SIZE")
 	forwardAddresses := config.StringsEnvOrDefault(nil, "LOG_SYSLOG_FORWARD_ADDRESSES", "SYSLOG_FORWARD_ADDRESSES")
 	if len(forwardAddresses) == 0 {
@@ -86,7 +97,9 @@ func (b *syslogBackend) sendMessage(priority int, ts time.Time, contId, appName,
 	buffer = append(buffer, '[')
 	buffer = append(buffer, processName...)
 	buffer = append(buffer, ']', ':', ' ')
+	buffer = append(buffer, b.syslogExtraStart...)
 	buffer = append(buffer, content...)
+	buffer = append(buffer, b.syslogExtraEnd...)
 	buffer = append(buffer, '\n')
 	for i, ch := range b.msgChans {
 		var chBuffer []byte
