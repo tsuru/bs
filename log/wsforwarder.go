@@ -39,6 +39,7 @@ type wsForwarder struct {
 	pongInterval time.Duration
 	jsonEncoder  *json.Encoder
 	quitCh       <-chan bool
+	bufferConn   *bufferedConn
 }
 
 func (b *tsuruBackend) initialize() error {
@@ -155,6 +156,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		bslog.Errorf("[log forwarder] unable to create ping frame writer, closing websocket: %s", err)
 		return nil, err
 	}
+	f.bufferConn = newBufferedConn(ws, time.Second)
 	lastPongTime := time.Now().UnixNano()
 	stopWg.Add(2)
 	go func() {
@@ -195,14 +197,15 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			}
 		}
 	}()
-	bufferConn := newBufferedConn(ws, time.Second)
-	f.jsonEncoder = json.NewEncoder(bufferConn)
-	return bufferConn, nil
+	f.jsonEncoder = json.NewEncoder(f.bufferConn)
+	return f.bufferConn, nil
 }
 
 func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, data []byte) error {
 	f.connMutex.Lock()
 	defer f.connMutex.Unlock()
+	f.bufferConn.mu.Lock()
+	defer f.bufferConn.mu.Unlock()
 	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
 	if err != nil {
 		return fmt.Errorf("error setting deadline: %s", err)
