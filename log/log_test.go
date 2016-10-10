@@ -50,14 +50,19 @@ func (s *S) SetUpSuite(c *check.C) {
 	c.Assert(err, check.IsNil)
 }
 
-func (s *S) SetUpTest(c *check.C) {
-	var err error
-	s.dockerServer, err = dTesting.NewServer("127.0.0.1:0", nil, nil)
-	c.Assert(err, check.IsNil)
-	dockerClient, err := docker.NewClient(s.dockerServer.URL())
-	c.Assert(err, check.IsNil)
+func serverWithContainer() (*dTesting.DockerServer, string, error) {
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	dockerClient, err := docker.NewClient(dockerServer.URL())
+	if err != nil {
+		return nil, "", err
+	}
 	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
-	c.Assert(err, check.IsNil)
+	if err != nil {
+		return nil, "", err
+	}
 	config := docker.Config{
 		Image: "myimg",
 		Cmd:   []string{"mycmd"},
@@ -65,8 +70,16 @@ func (s *S) SetUpTest(c *check.C) {
 	}
 	opts := docker.CreateContainerOptions{Name: "myContName", Config: &config}
 	cont, err := dockerClient.CreateContainer(opts)
+	if err != nil {
+		return nil, "", err
+	}
+	return dockerServer, cont.ID, nil
+}
+
+func (s *S) SetUpTest(c *check.C) {
+	var err error
+	s.dockerServer, s.id, err = serverWithContainer()
 	c.Assert(err, check.IsNil)
-	s.id = cont.ID
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, "LOG_") || strings.HasPrefix(env, "TSURU_") {
 			os.Unsetenv(strings.SplitN(env, "=", 2)[0])
@@ -256,138 +269,6 @@ func (s *S) TestLogForwarderForwardConnError(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.ErrorMatches, `unable to initialize log backend "syslog": \[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
-}
-
-func (s *S) BenchmarkMessagesBroadcast(c *check.C) {
-	c.StopTimer()
-	startReceiver := func() net.Conn {
-		addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
-		c.Assert(err, check.IsNil)
-		udpConn, err := net.ListenUDP("udp", addr)
-		c.Assert(err, check.IsNil)
-		return udpConn
-	}
-	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
-	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		io.Copy(ioutil.Discard, ws)
-	}))
-	defer srv.Close()
-	os.Setenv("TSURU_ENDPOINT", srv.URL)
-	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
-	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
-	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
-	lf := LogForwarder{
-		BindAddress:     "tcp://0.0.0.0:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"tsuru", "syslog"},
-	}
-	err := lf.Start()
-	c.Assert(err, check.IsNil)
-	logParts := format.LogParts{
-		"container_id": s.id,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
-	c.StartTimer()
-	for i := 0; i < c.N; i++ {
-		lf.Handle(logParts, 1, nil)
-	}
-	c.StopTimer()
-	lf.stopWait()
-}
-
-func (s *S) BenchmarkMessagesBroadcastWaitTsuru(c *check.C) {
-	c.StopTimer()
-	done := make(chan bool)
-	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		counter := 0
-		scanner := bufio.NewScanner(ws)
-		for scanner.Scan() {
-			counter++
-			if counter == c.N {
-				close(done)
-				return
-			}
-		}
-	}))
-	defer srv.Close()
-	os.Setenv("TSURU_ENDPOINT", srv.URL)
-	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
-	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
-	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "tcp://0.0.0.0:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-	}
-	err := lf.Start()
-	c.Assert(err, check.IsNil)
-	logParts := format.LogParts{
-		"container_id": s.id,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
-	c.StartTimer()
-	for i := 0; i < c.N; i++ {
-		lf.Handle(logParts, 1, nil)
-	}
-	<-done
-	c.StopTimer()
-	lf.stopWait()
-}
-
-func (s *S) BenchmarkMessagesBroadcastWaitSyslog(c *check.C) {
-	c.StopTimer()
-	done := []chan bool{make(chan bool), make(chan bool)}
-	startReceiver := func(i int) net.Listener {
-		addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
-		c.Assert(err, check.IsNil)
-		tcpConn, err := net.ListenTCP("tcp", addr)
-		c.Assert(err, check.IsNil)
-		go func() {
-			conn, err := tcpConn.Accept()
-			c.Assert(err, check.IsNil)
-			counter := 0
-			scanner := bufio.NewScanner(conn)
-			for scanner.Scan() {
-				counter++
-				if counter == c.N {
-					close(done[i])
-					return
-				}
-			}
-		}()
-		return tcpConn
-	}
-	forwardedConns := []net.Listener{startReceiver(0), startReceiver(1)}
-	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String()+",tcp://"+forwardedConns[1].Addr().String())
-	lf := LogForwarder{
-		BindAddress:     "tcp://0.0.0.0:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
-	}
-	err := lf.Start()
-	c.Assert(err, check.IsNil)
-	logParts := format.LogParts{
-		"container_id": s.id,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
-	c.StartTimer()
-	for i := 0; i < c.N; i++ {
-		lf.Handle(logParts, 1, nil)
-	}
-	<-done[0]
-	<-done[1]
-	c.StopTimer()
-	lf.stopWait()
 }
 
 func (s *S) TestLogForwarderOverflow(c *check.C) {
@@ -633,4 +514,202 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.id))
+}
+
+func startReceiver(expected int, ch chan struct{}) net.Listener {
+	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+	tcpConn, _ := net.ListenTCP("tcp", addr)
+	go func() {
+		conn, err := tcpConn.Accept()
+		if err != nil {
+			return
+		}
+		counter := 0
+		scanner := bufio.NewScanner(conn)
+		for scanner.Scan() {
+			counter++
+			if counter == expected {
+				close(ch)
+				return
+			}
+		}
+	}()
+	return tcpConn
+}
+
+func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
+	b.StopTimer()
+	dockerServer, contID, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	done := []chan struct{}{make(chan struct{})}
+	forwardedConns := []net.Listener{startReceiver(b.N, done[0])}
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String())
+	lf := LogForwarder{
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logParts := format.LogParts{
+		"container_id": contID,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	close(lf.backends[0].(*syslogBackend).msgChans[0])
+	<-done[0]
+	b.StopTimer()
+	lf.server.Kill()
+	lf.Wait()
+}
+
+func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
+	b.StopTimer()
+	dockerServer, contID, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	done := []chan struct{}{make(chan struct{}), make(chan struct{})}
+	forwardedConns := []net.Listener{startReceiver(b.N, done[0]), startReceiver(b.N, done[1])}
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String()+",tcp://"+forwardedConns[1].Addr().String())
+	lf := LogForwarder{
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logParts := format.LogParts{
+		"container_id": contID,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	close(lf.backends[0].(*syslogBackend).msgChans[0])
+	close(lf.backends[0].(*syslogBackend).msgChans[1])
+	<-done[0]
+	<-done[1]
+	b.StopTimer()
+	lf.server.Kill()
+	lf.Wait()
+}
+
+func BenchmarkMessagesBroadcast(b *testing.B) {
+	b.StopTimer()
+	dockerServer, contID, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	startReceiver := func() net.Conn {
+		addr, recErr := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		udpConn, recErr := net.ListenUDP("udp", addr)
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		return udpConn
+	}
+	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(ioutil.Discard, ws)
+	}))
+	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
+	lf := LogForwarder{
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends: []string{"tsuru", "syslog"},
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logParts := format.LogParts{
+		"container_id": contID,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	b.StopTimer()
+	lf.stopWait()
+}
+
+func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
+	b.StopTimer()
+	dockerServer, contID, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	done := make(chan bool)
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		counter := 0
+		scanner := bufio.NewScanner(ws)
+		for scanner.Scan() {
+			counter++
+			if counter == b.N {
+				close(done)
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
+	lf := LogForwarder{
+		EnabledBackends: []string{"tsuru"},
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  dockerServer.URL(),
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logParts := format.LogParts{
+		"container_id": contID,
+		"hostname":     "myhost",
+		"timestamp":    time.Now(),
+		"priority":     30,
+		"content":      "mymsg",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(logParts, 1, nil)
+	}
+	<-done
+	b.StopTimer()
+	lf.stopWait()
 }

@@ -94,6 +94,9 @@ func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMes
 				case <-quit:
 					break loop
 				case msg := <-ch:
+					if msg == nil {
+						break loop
+					}
 					err = forwarder.process(conn, msg)
 					if err != nil {
 						break loop
