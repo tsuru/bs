@@ -5,6 +5,7 @@
 package log
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"net/url"
@@ -129,10 +130,44 @@ func (b *syslogBackend) stop() {
 	}
 }
 
+type bufferedSyslogConn struct {
+	net.Conn
+	w  *bufio.Writer
+	to time.Duration
+}
+
+func (c *bufferedSyslogConn) Write(msg []byte) (int, error) {
+	if c.to > 0 && len(msg) > c.w.Available() {
+		c.Conn.SetWriteDeadline(time.Now().Add(c.to))
+	}
+	return c.w.Write(msg)
+}
+
+func (c *bufferedSyslogConn) Close() error {
+	if c.to > 0 {
+		c.Conn.SetWriteDeadline(time.Now().Add(c.to))
+	}
+	c.w.Flush()
+	return c.Conn.Close()
+}
+
+func (c *bufferedSyslogConn) SetWriteDeadline(deadline time.Time) error {
+	if deadline.IsZero() {
+		c.to = 0
+		c.Conn.SetWriteDeadline(time.Time{})
+	} else {
+		c.to = deadline.Sub(time.Now())
+	}
+	return nil
+}
+
 func (f *syslogForwarder) connect() (net.Conn, error) {
 	conn, err := net.DialTimeout(f.url.Scheme, f.url.Host, forwardConnDialTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("[log forwarder] unable to connect to %q: %s", f.url, err)
+	}
+	if f.url.Scheme == "tcp" {
+		conn = &bufferedSyslogConn{Conn: conn, w: bufio.NewWriter(conn)}
 	}
 	return conn, nil
 }
