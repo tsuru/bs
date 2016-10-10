@@ -709,6 +709,7 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lf.Handle(logParts, 1, nil)
 	}
+	close(lf.backends[0].(*tsuruBackend).msgCh)
 	<-done
 	b.StopTimer()
 	lf.stopWait()

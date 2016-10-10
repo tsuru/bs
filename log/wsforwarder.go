@@ -195,8 +195,9 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			}
 		}
 	}()
-	f.jsonEncoder = json.NewEncoder(ws)
-	return ws, nil
+	bufferConn := newBufferedConn(ws, time.Second)
+	f.jsonEncoder = json.NewEncoder(bufferConn)
+	return bufferConn, nil
 }
 
 func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, data []byte) error {
