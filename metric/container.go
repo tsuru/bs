@@ -10,7 +10,10 @@ func statsToMetricsMap(s *docker.Stats) (map[string]float, error) {
 	previousCPU := s.PreCPUStats.CPUUsage.TotalUsage
 	previousSystem := s.PreCPUStats.SystemCPUUsage
 	cpuPercent := calculateCPUPercent(previousCPU, previousSystem, s)
-	memPercent := float64(s.MemoryStats.Usage) / float64(s.MemoryStats.Limit) * 100.0
+	memPercent := 0.0
+	if s.MemoryStats.Limit > 0 {
+		memPercent = float64(s.MemoryStats.Usage) / float64(s.MemoryStats.Limit) * 100.0
+	}
 	stats := map[string]float{
 		"cpu_max":     float(cpuPercent),
 		"mem_max":     float(s.MemoryStats.Usage),
