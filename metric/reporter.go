@@ -43,6 +43,9 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers, selectionEnvs [
 		bslog.Errorf("failed to execute conntrack: %s", err)
 	}
 	for _, cont := range containers {
+		if cont.State != "" && cont.State != "running" {
+			continue
+		}
 		wg.Add(1)
 		go func(contID string) {
 			defer wg.Done()

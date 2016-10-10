@@ -6,6 +6,7 @@ package metric
 
 import (
 	"errors"
+	"sort"
 	"testing"
 
 	"github.com/fsouza/go-dockerclient"
@@ -101,6 +102,40 @@ func (s *S) TestSendConnMetricsFailure(c *check.C) {
 }
 
 func (s *S) TestGetMetrics(c *check.C) {
+	bogusContainers := s.buildContainers()
+	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
+	s.prepareStats(dockerServer, conts)
+	client, err := container.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	defer dockerServer.Stop()
+	r := Reporter{backend: &fakeBackend, infoClient: client}
+	containers := make([]docker.APIContainers, len(conts))
+	containers[0] = docker.APIContainers{ID: conts[0].ID}
+	containers[1] = docker.APIContainers{ID: conts[1].ID, State: "restarting"}
+	containers[2] = docker.APIContainers{ID: conts[2].ID, State: "running"}
+	r.getMetrics(containers, []string{})
+	id0 := conts[0].ID[:12]
+	id1 := conts[2].ID[:12]
+	expected := []fakeStat{
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "mem_pct_max", value: float(0)},
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "mem_limit", value: float(0)},
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "netrx", value: float(0)},
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "nettx", value: float(0)},
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "cpu_max", value: float(250)},
+		{container: "nonApp", image: "tsuru/python", hostname: id0, key: "mem_max", value: float(0)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "cpu_max", value: float(250)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "mem_max", value: float(0)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "mem_pct_max", value: float(0)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "mem_limit", value: float(0)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "netrx", value: float(0)},
+		{container: "test", image: "tsuru/python", app: "someapp", hostname: id1, key: "nettx", value: float(0)},
+	}
+	sort.Sort(fakeStatList(expected))
+	sort.Sort(fakeStatList(fakeBackend.stats))
+	c.Assert(fakeBackend.stats, check.DeepEquals, expected)
+}
+
+func (s *S) TestGetMetricsEmpty(c *check.C) {
 	var containers []docker.APIContainers
 	r := &Reporter{}
 	r.getMetrics(containers, []string{})

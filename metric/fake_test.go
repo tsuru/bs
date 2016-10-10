@@ -30,6 +30,12 @@ type fake struct {
 	failures chan error
 }
 
+type fakeStatList []fakeStat
+
+func (s fakeStatList) Len() int           { return len(s) }
+func (s fakeStatList) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s fakeStatList) Less(i, j int) bool { return s[i].container+s[i].key < s[j].container+s[j].key }
+
 func (s *fake) Send(container ContainerInfo, key string, value interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
