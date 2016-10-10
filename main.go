@@ -61,32 +61,35 @@ func onSignalDebugGoroutines(signal os.Signal) {
 }
 
 func onSignalDebugProfile(signal os.Signal) {
-	profFileName := "memprofile.out"
-	file, err := os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	cpufile, err := os.OpenFile("./cpuprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
 	if err != nil {
-		bslog.Warnf("Error trying to open profile file %q: %s", profFileName, err)
+		bslog.Warnf("Error trying to open profile file: %s", err)
 		return
 	}
-	err = pprof.WriteHeapProfile(file)
+	memfile, err := os.OpenFile("./memprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
 	if err != nil {
-		bslog.Warnf("Error trying to write mem profile: %s", err)
+		bslog.Warnf("Error trying to open profile file: %s", err)
+		return
 	}
-	bslog.Warnf("Wrote mem profile to %s", profFileName)
-	file.Close()
-	profFileName = "cpuprofile.out"
-	bslog.Warnf("Starting cpu profile, writing output to %s", profFileName)
-	defer bslog.Warnf("Finished cpu profile, see %s", profFileName)
-	file, err = os.OpenFile(profFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	lockfile, err := os.OpenFile("./lockprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
 	if err != nil {
-		bslog.Warnf("Error trying to open profile file %q: %s", profFileName, err)
+		bslog.Warnf("Error trying to open profile file: %s", err)
+		return
 	}
-	defer file.Close()
-	err = pprof.StartCPUProfile(file)
-	if err != nil {
-		bslog.Warnf("Error trying to start cpu profile: %s", err)
-	}
-	defer pprof.StopCPUProfile()
+	bslog.Warnf("Starting profile...")
+	defer bslog.Warnf("Profile done, files written: %s, %s, %s", cpufile.Name(), memfile.Name(), lockfile.Name())
+	runtime.GC()
+	pprof.WriteHeapProfile(memfile)
+	memfile.Close()
+	runtime.SetBlockProfileRate(1)
 	time.Sleep(30 * time.Second)
+	pprof.Lookup("block").WriteTo(lockfile, 0)
+	runtime.SetBlockProfileRate(0)
+	lockfile.Close()
+	pprof.StartCPUProfile(cpufile)
+	time.Sleep(30 * time.Second)
+	pprof.StopCPUProfile()
+	cpufile.Close()
 	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
 }
 
