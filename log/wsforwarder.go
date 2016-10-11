@@ -26,7 +26,7 @@ import (
 var testTlsConfig *tls.Config
 
 type tsuruBackend struct {
-	msgCh      chan<- *LogMessage
+	msgCh      chan<- LogMessage
 	quitCh     chan<- bool
 	nextNotify *time.Timer
 }
@@ -80,15 +80,13 @@ func (b *tsuruBackend) initialize() error {
 	return nil
 }
 
-func (b *tsuruBackend) sendMessage(priority int, ts time.Time, contId, appName, processName, content string) {
-	msg := &LogMessage{
-		logEntry: &app.Applog{
-			Date:    ts,
-			AppName: appName,
-			Message: content,
-			Source:  processName,
-			Unit:    contId,
-		},
+func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
+	msg := &app.Applog{
+		Date:    parts.ts,
+		AppName: appName,
+		Message: string(parts.content),
+		Source:  processName,
+		Unit:    container,
 	}
 	select {
 	case b.msgCh <- msg:
@@ -220,14 +218,15 @@ func (f *wsForwarder) writeWithDeadline(conn net.Conn, writer io.WriteCloser, da
 	return nil
 }
 
-func (f *wsForwarder) process(conn net.Conn, msg *LogMessage) error {
+func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 	f.connMutex.Lock()
 	defer f.connMutex.Unlock()
 	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
 	if err != nil {
 		return fmt.Errorf("error setting deadline: %s", err)
 	}
-	err = f.jsonEncoder.Encode(msg.logEntry)
+	entry := msg.(*app.Applog)
+	err = f.jsonEncoder.Encode(entry)
 	if err != nil {
 		return fmt.Errorf("error sending message: %s", err)
 	}

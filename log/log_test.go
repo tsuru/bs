@@ -295,25 +295,19 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
-	logParts := format.LogParts{
-		"priority":     30,
-		"facility":     3,
-		"severity":     6,
-		"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
-		"hostname":     "ubuntu-trusty-64",
-		"tag":          "docker/" + s.id,
-		"proc_id":      "4843",
-		"content":      "hey",
-		"rawmsg":       []byte{},
-		"container_id": s.id,
-	}
+	parts := format.LogParts{"parts": &rawLogParts{
+		ts:        time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+		priority:  []byte("30"),
+		content:   []byte("hey"),
+		container: []byte(s.id),
+	}}
 	wg := sync.WaitGroup{}
 	for i := 0; i < 32; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 1000; j++ {
-				lf.Handle(logParts, 0, nil)
+				lf.Handle(parts, 0, nil)
 			}
 		}()
 	}
@@ -346,30 +340,18 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
 	parts := []format.LogParts{
-		{
-			"priority":     30,
-			"facility":     3,
-			"severity":     6,
-			"timestamp":    time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
-			"hostname":     "ubuntu-trusty-64",
-			"tag":          "docker/" + s.id,
-			"proc_id":      "4843",
-			"content":      "",
-			"rawmsg":       []byte{},
-			"container_id": s.id,
-		},
-		{
-			"priority":     30,
-			"facility":     3,
-			"severity":     6,
-			"timestamp":    time.Time{},
-			"hostname":     "ubuntu-trusty-64",
-			"tag":          "docker/" + s.id,
-			"proc_id":      "4843",
-			"content":      "hey",
-			"rawmsg":       []byte{},
-			"container_id": s.id,
-		},
+		{"parts": &rawLogParts{
+			ts:        time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
+			priority:  []byte("30"),
+			content:   []byte(""),
+			container: []byte(s.id),
+		}},
+		{"parts": &rawLogParts{
+			ts:        time.Time{},
+			priority:  []byte("30"),
+			content:   []byte("hey"),
+			container: []byte(s.id),
+		}},
 	}
 	expected := []func(){
 		func() {
@@ -556,16 +538,15 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	logParts := format.LogParts{
-		"container_id": contID,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
+	parts := format.LogParts{"parts": &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		lf.Handle(logParts, 1, nil)
+		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
 	<-done[0]
@@ -593,16 +574,15 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	logParts := format.LogParts{
-		"container_id": contID,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
+	parts := format.LogParts{"parts": &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		lf.Handle(logParts, 1, nil)
+		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
 	close(lf.backends[0].(*syslogBackend).msgChans[1])
@@ -650,16 +630,15 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	logParts := format.LogParts{
-		"container_id": contID,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
+	parts := format.LogParts{"parts": &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		lf.Handle(logParts, 1, nil)
+		lf.Handle(parts, 1, nil)
 	}
 	b.StopTimer()
 	lf.stopWait()
@@ -698,16 +677,15 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	logParts := format.LogParts{
-		"container_id": contID,
-		"hostname":     "myhost",
-		"timestamp":    time.Now(),
-		"priority":     30,
-		"content":      "mymsg",
-	}
+	parts := format.LogParts{"parts": &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		lf.Handle(logParts, 1, nil)
+		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*tsuruBackend).msgCh)
 	<-done

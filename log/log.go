@@ -13,7 +13,6 @@ import (
 
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
-	"github.com/tsuru/tsuru/app"
 	"gopkg.in/mcuadros/go-syslog.v2"
 	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
@@ -32,10 +31,7 @@ var (
 	}
 )
 
-type LogMessage struct {
-	logEntry  *app.Applog
-	syslogMsg []byte
-}
+type LogMessage interface{}
 
 type LogForwarder struct {
 	BindAddress     string
@@ -44,22 +40,23 @@ type LogForwarder struct {
 	infoClient      *container.InfoClient
 	server          *syslog.Server
 	backends        []logBackend
+	formatter       *LenientFormat
 }
 
 type forwarderBackend interface {
 	connect() (net.Conn, error)
-	process(conn net.Conn, msg *LogMessage) error
+	process(conn net.Conn, msg LogMessage) error
 	close(conn net.Conn)
 }
 
 type logBackend interface {
 	initialize() error
-	sendMessage(int, time.Time, string, string, string, string)
+	sendMessage(*rawLogParts, string, string, string)
 	stop()
 }
 
-func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- *LogMessage, chan<- bool, error) {
-	ch := make(chan *LogMessage, bufferSize)
+func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- LogMessage, chan<- bool, error) {
+	ch := make(chan LogMessage, bufferSize)
 	quit := make(chan bool)
 	if initializable, ok := forwarder.(interface {
 		initialize(<-chan bool)
@@ -142,9 +139,10 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
+	l.formatter = &LenientFormat{}
 	l.server = syslog.NewServer()
 	l.server.SetHandler(l)
-	l.server.SetFormat(LenientFormat{})
+	l.server.SetFormat(l.formatter)
 	url, err := url.Parse(l.BindAddress)
 	if err != nil {
 		return
@@ -183,33 +181,28 @@ func (l *LogForwarder) stopWait() {
 	l.Wait()
 }
 
-func (l *LogForwarder) Handle(logParts format.LogParts, msgLen int64, err error) {
+func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
+	parts := logParts["parts"].(*rawLogParts)
 	if err != nil {
-		bslog.Debugf("[log forwarder] ignored msg %#v error processing: %s", logParts, err)
+		bslog.Debugf("[log forwarder] ignored msg %v error processing: %s", parts, err)
 		return
 	}
-	content, _ := logParts["content"].(string)
-	if content == "" {
+	if len(parts.content) == 0 {
 		// Silently ignored as docker sometimes will send messages with empty
 		// content.
 		return
 	}
-	ts, _ := logParts["timestamp"].(time.Time)
-	priority, _ := logParts["priority"].(int)
-	if ts.IsZero() || priority == 0 {
-		bslog.Debugf("[log forwarder] invalid message %#v", logParts)
+	if parts.ts.IsZero() || len(parts.priority) == 0 {
+		bslog.Debugf("[log forwarder] invalid message %v", parts)
 		return
 	}
-	contId, _ := logParts["container_id"].(string)
-	if contId == "" {
-		contId, _ = logParts["hostname"].(string)
-	}
-	contData, err := l.infoClient.GetAppContainer(contId, true)
+	contStr := string(parts.container)
+	contData, err := l.infoClient.GetAppContainer(contStr, true)
 	if err != nil {
-		bslog.Debugf("[log forwarder] ignored msg %#v error to get appname: %s", logParts, err)
+		bslog.Debugf("[log forwarder] ignored msg %v error to get appname: %s", parts, err)
 		return
 	}
 	for _, backend := range l.backends {
-		backend.sendMessage(priority, ts, contId, contData.AppName, contData.ProcessName, content)
+		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contStr)
 	}
 }

@@ -8,8 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"gopkg.in/mcuadros/go-syslog.v2/format"
@@ -17,89 +15,71 @@ import (
 
 type LenientFormat struct{}
 
-func (LenientFormat) GetParser(line []byte) format.LogParser {
+func (f *LenientFormat) GetParser(line []byte) format.LogParser {
 	return &LenientParser{line: line}
 }
 
-func (LenientFormat) GetSplitFunc() bufio.SplitFunc {
+func (f *LenientFormat) GetSplitFunc() bufio.SplitFunc {
 	return nil
 }
 
+type rawLogParts struct {
+	ts        time.Time
+	priority  []byte
+	content   []byte
+	container []byte
+}
+
+func (p *rawLogParts) String() string {
+	return fmt.Sprintf("{log entry: %v %q %q %q}", p.ts, string(p.priority), string(p.content), string(p.container))
+}
+
 type LenientParser struct {
-	line      []byte
-	logParts  format.LogParts
-	subParser format.LogParser
+	line  []byte
+	parts rawLogParts
+}
+
+type parseError struct {
+	line []byte
+	msg  string
+}
+
+func (e *parseError) Error() string {
+	return fmt.Sprintf("could not parse %q: %s", string(e.line), e.msg)
 }
 
 func (p *LenientParser) Parse() error {
 	groups := parseLogLine(p.line)
 	if len(groups) != 7 {
-		return p.defaultParsers()
+		return &parseError{line: p.line, msg: "invalid groups length"}
 	}
-	priority, err := strconv.Atoi(string(groups[0]))
-	if err != nil {
-		return p.defaultParsers()
-	}
-	var ts time.Time
+	var err error
 	if len(groups[2]) == 0 {
-		ts, err = time.Parse(time.RFC3339, string(groups[1]))
+		p.parts.ts, err = time.Parse(time.RFC3339, string(groups[1]))
 		if err != nil {
-			return p.defaultParsers()
+			return &parseError{line: p.line, msg: "unable to parse time as RFC3339"}
 		}
 	} else {
 		dt := string(bytes.Join(groups[1:3], []byte{' '}))
-		ts, err = time.ParseInLocation(time.Stamp, dt, time.Local)
+		p.parts.ts, err = time.ParseInLocation(time.Stamp, dt, time.Local)
 		if err != nil {
-			return p.defaultParsers()
+			return &parseError{line: p.line, msg: "unable to parse time as Stamp"}
 		}
-		ts = ts.AddDate(time.Now().Year(), 0, 0)
+		p.parts.ts = p.parts.ts.AddDate(time.Now().Year(), 0, 0)
 	}
-	p.logParts = format.LogParts{
-		"priority":  priority,
-		"facility":  priority / 8,
-		"severity":  priority % 8,
-		"timestamp": ts,
-		"hostname":  string(groups[3]),
-		"tag":       string(groups[4]),
-		"content":   string(groups[6]),
+	p.parts.priority = groups[0]
+	p.parts.container = groups[4]
+	idx := bytes.IndexByte(p.parts.container, '/')
+	if idx != -1 {
+		p.parts.container = p.parts.container[idx+1:]
 	}
+	p.parts.content = groups[6]
 	return nil
 }
 
 func (p *LenientParser) Location(*time.Location) {
 }
 
-func (p *LenientParser) defaultParsers() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("recovered panic parsing with %T, invalid message %q: %v", p.subParser, string(p.line), r)
-		}
-	}()
-	p.subParser = (&format.RFC5424{}).GetParser(p.line)
-	err = p.subParser.Parse()
-	if err == nil {
-		return nil
-	}
-	p.subParser = (&format.RFC3164{}).GetParser(p.line)
-	return p.subParser.Parse()
-}
-
 func (p *LenientParser) Dump() format.LogParts {
-	if p.subParser != nil {
-		p.logParts = p.subParser.Dump()
-	}
-	p.logParts["rawmsg"] = p.line
-	if _, ok := p.logParts["app_name"]; ok {
-		p.logParts["tag"] = p.logParts["app_name"]
-	}
-	if _, ok := p.logParts["message"]; ok {
-		p.logParts["content"] = p.logParts["message"]
-	}
-	if tag, ok := p.logParts["tag"].(string); ok {
-		parts := strings.SplitN(tag, "/", 2)
-		if len(parts) == 2 {
-			p.logParts["container_id"] = parts[1]
-		}
-	}
-	return p.logParts
+	return format.LogParts{"parts": &p.parts}
 }

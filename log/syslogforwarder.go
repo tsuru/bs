@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -21,7 +20,7 @@ type syslogBackend struct {
 	syslogLocation   *time.Location
 	syslogExtraStart []byte
 	syslogExtraEnd   []byte
-	msgChans         []chan<- *LogMessage
+	msgChans         []chan<- LogMessage
 	quitChans        []chan<- bool
 	bufferPool       sync.Pool
 	nextNotify       *time.Timer
@@ -80,25 +79,25 @@ func (b *syslogBackend) initialize() error {
 	return nil
 }
 
-func (b *syslogBackend) sendMessage(priority int, ts time.Time, contId, appName, processName, content string) {
+func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
 	lenSyslogs := len(b.msgChans)
 	if lenSyslogs == 0 {
 		return
 	}
 	buffer := b.bufferPool.Get().([]byte)[:0]
 	buffer = append(buffer, '<')
-	buffer = strconv.AppendInt(buffer, int64(priority), 10)
+	buffer = append(buffer, parts.priority...)
 	buffer = append(buffer, '>')
-	buffer = append(buffer, ts.In(b.syslogLocation).Format(time.Stamp)...)
+	buffer = append(buffer, parts.ts.In(b.syslogLocation).Format(time.Stamp)...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, contId...)
+	buffer = append(buffer, parts.container...)
 	buffer = append(buffer, ' ')
 	buffer = append(buffer, appName...)
 	buffer = append(buffer, '[')
 	buffer = append(buffer, processName...)
 	buffer = append(buffer, ']', ':', ' ')
 	buffer = append(buffer, b.syslogExtraStart...)
-	buffer = append(buffer, content...)
+	buffer = append(buffer, parts.content...)
 	buffer = append(buffer, b.syslogExtraEnd...)
 	buffer = append(buffer, '\n')
 	for i, ch := range b.msgChans {
@@ -109,9 +108,8 @@ func (b *syslogBackend) sendMessage(priority int, ts time.Time, contId, appName,
 			chBuffer = b.bufferPool.Get().([]byte)[:0]
 			chBuffer = append(chBuffer, buffer...)
 		}
-		msg := &LogMessage{syslogMsg: chBuffer}
 		select {
-		case ch <- msg:
+		case ch <- chBuffer:
 		default:
 			select {
 			case <-b.nextNotify.C:
@@ -140,14 +138,15 @@ func (f *syslogForwarder) connect() (net.Conn, error) {
 	return conn, nil
 }
 
-func (f *syslogForwarder) process(conn net.Conn, msg *LogMessage) error {
+func (f *syslogForwarder) process(conn net.Conn, msg LogMessage) error {
 	err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
 	if err != nil {
 		return err
 	}
-	lenMsg := len(msg.syslogMsg)
-	n, err := conn.Write(msg.syslogMsg)
-	f.bufferPool.Put(msg.syslogMsg)
+	msgBytes := msg.([]byte)
+	lenMsg := len(msgBytes)
+	n, err := conn.Write(msgBytes)
+	f.bufferPool.Put(msg)
 	if err != nil {
 		return err
 	}
