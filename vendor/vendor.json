@@ -370,34 +370,34 @@
 			"revisionTime": "2014-10-24T11:38:53-02:00"
 		},
 		{
-			"checksumSHA1": "MKssg9Cf21/fv8QP5fwyMM05Rso=",
+			"checksumSHA1": "TShvgY4gpvGGQvOSVQTWTtSFO38=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2",
-			"revision": "bf5898e4125405be828b846aac76b25701887513",
-			"revisionTime": "2016-10-07T20:38:02Z"
+			"revision": "40092311ed709931537d9a6281953c27f0fed360",
+			"revisionTime": "2016-10-11T15:41:59Z"
 		},
 		{
 			"checksumSHA1": "cCSjCUbzXN88zL80ulZAg5iVr/Y=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2/format",
-			"revision": "bf5898e4125405be828b846aac76b25701887513",
-			"revisionTime": "2016-10-07T20:38:02Z"
+			"revision": "40092311ed709931537d9a6281953c27f0fed360",
+			"revisionTime": "2016-10-11T15:41:59Z"
 		},
 		{
 			"checksumSHA1": "vTfr6a5y9D7tYzYWQUZebomOkBs=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser",
-			"revision": "bf5898e4125405be828b846aac76b25701887513",
-			"revisionTime": "2016-10-07T20:38:02Z"
+			"revision": "40092311ed709931537d9a6281953c27f0fed360",
+			"revisionTime": "2016-10-11T15:41:59Z"
 		},
 		{
 			"checksumSHA1": "P25L0Jjo6CtxTkNKQpWoLWJWnPM=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc3164",
-			"revision": "bf5898e4125405be828b846aac76b25701887513",
-			"revisionTime": "2016-10-07T20:38:02Z"
+			"revision": "40092311ed709931537d9a6281953c27f0fed360",
+			"revisionTime": "2016-10-11T15:41:59Z"
 		},
 		{
 			"checksumSHA1": "eBx0t9XBJz+OC2k69iFwraxni9o=",
 			"path": "gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc5424",
-			"revision": "bf5898e4125405be828b846aac76b25701887513",
-			"revisionTime": "2016-10-07T20:38:02Z"
+			"revision": "40092311ed709931537d9a6281953c27f0fed360",
+			"revisionTime": "2016-10-11T15:41:59Z"
 		},
 		{
 			"origin": "github.com/tsuru/tsuru/vendor/gopkg.in/mgo.v2",
