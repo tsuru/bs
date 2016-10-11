@@ -5,6 +5,7 @@
 package log
 
 import (
+	"testing"
 	"time"
 
 	"gopkg.in/check.v1"
@@ -24,28 +25,28 @@ func (s *S) TestLenientFormatGetSplitFunc(c *check.C) {
 	c.Assert(splitFunc, check.IsNil)
 }
 
-func (s *S) BenchmarkLenientParserParse(c *check.C) {
+func BenchmarkLenientParserParse(b *testing.B) {
 	logLine := []byte("<30>2015-06-05T16:13:47Z vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[4843]: hey")
-	c.ResetTimer()
-	for i := 0; i < c.N; i++ {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
 		lp.Parse()
 	}
 }
 
-func (s *S) BenchmarkLenientParserParseNewFormat(c *check.C) {
+func BenchmarkLenientParserParseNewFormat(b *testing.B) {
 	logLine := []byte("<30> May 13 21:10:17 vagrant-ubuntu-trusty-64 docker/00dfa98fe8e0[10798]: hey")
-	c.ResetTimer()
-	for i := 0; i < c.N; i++ {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
 		lp.Parse()
 	}
 }
 
-func (s *S) BenchmarkLenientParserParseUnixFormat(c *check.C) {
+func BenchmarkLenientParserParseUnixFormat(b *testing.B) {
 	logLine := []byte("<30>May 13 21:10:17 docker/00dfa98fe8e0[10798]: hey")
-	c.ResetTimer()
-	for i := 0; i < c.N; i++ {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
 		lp.Parse()
 	}
