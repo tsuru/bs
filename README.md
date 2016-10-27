@@ -193,6 +193,10 @@ the metric. The default value is `tsuru`.
 `METRICS_LOGSTASH_PROTOCOL` is the `Logstash` protocol. Supported protocols
 are `udp` and `tcp`. The default value is `udp`.
 
+### METRICS_NETWORK_INTERFACE
+
+`METRICS_NETWORK_INTERFACE` is the `Network Interface` host. The default value is `eth0`.
+
 ### METRICS_ELASTICSEARCH_HOST
 
 `METRICS_ELASTICSEARCH_HOST` is the `Elastisearch` host. This environ is used
