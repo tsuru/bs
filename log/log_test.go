@@ -268,7 +268,7 @@ func (s *S) TestLogForwarderForwardConnError(c *check.C) {
 		EnabledBackends: []string{"syslog"},
 	}
 	err = lf.Start()
-	c.Assert(err, check.ErrorMatches, `unable to initialize log backend "syslog": \[log forwarder\] unable to connect to "tcp://localhost:99999": dial tcp: invalid port 99999`)
+	c.Assert(err, check.ErrorMatches, `unable to initialize log backend "syslog": \[log forwarder\] unable to connect to "tcp://localhost:99999":.*invalid port.*`)
 }
 
 func (s *S) TestLogForwarderOverflow(c *check.C) {
