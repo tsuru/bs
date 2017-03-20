@@ -94,13 +94,13 @@ func onSignalDebugProfile(signal os.Signal) {
 }
 
 func main() {
-	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
-	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
 	flag.Parse()
 	if printVersion {
 		fmt.Printf("bs version %s\n", version)
 		return
 	}
+	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
+	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
 	lf := log.LogForwarder{
 		BindAddress:     config.Config.SyslogListenAddress,
 		DockerEndpoint:  config.Config.DockerEndpoint,
