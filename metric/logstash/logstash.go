@@ -82,6 +82,7 @@ func (s *logStash) appendInfo(message map[string]interface{}, container metric.C
 		message["container"] = container.Name
 		message["image"] = container.Image
 	}
+	message["labels"] = container.Labels
 }
 
 func (s *logStash) send(message map[string]interface{}) error {

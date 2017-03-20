@@ -16,6 +16,7 @@ type ContainerInfo struct {
 	Hostname string
 	App      string
 	Process  string
+	Labels   map[string]string
 }
 
 func NewContainerInfo(container *container.Container) ContainerInfo {
@@ -29,6 +30,7 @@ func NewContainerInfo(container *container.Container) ContainerInfo {
 		Hostname: container.Config.Hostname,
 		Process:  container.ProcessName,
 		App:      container.AppName,
+		Labels:   container.Config.Labels,
 	}
 }
 

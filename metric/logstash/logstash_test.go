@@ -46,6 +46,9 @@ func (s *S) TestSend(c *check.C) {
 		App:      "app",
 		Hostname: "hostname",
 		Process:  "process",
+		Labels: map[string]string{
+			"tsuru.pool.name": "mypool",
+		},
 	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	var data [246]byte
@@ -59,6 +62,9 @@ func (s *S) TestSend(c *check.C) {
 		"app":     "app",
 		"host":    "hostname",
 		"process": "process",
+		"labels": map[string]interface{}{
+			"tsuru.pool.name": "mypool",
+		},
 	}
 	var got map[string]interface{}
 	err = json.Unmarshal(data[:n], &got)
@@ -68,6 +74,9 @@ func (s *S) TestSend(c *check.C) {
 		Name:     "container",
 		Hostname: "hostname",
 		Image:    "image",
+		Labels: map[string]string{
+			"tsuru.pool.name": "mypool",
+		},
 	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	n, _, err = conn.ReadFrom(data[:])
@@ -80,6 +89,9 @@ func (s *S) TestSend(c *check.C) {
 		"host":      "hostname",
 		"image":     "image",
 		"container": "container",
+		"labels": map[string]interface{}{
+			"tsuru.pool.name": "mypool",
+		},
 	}
 	got = make(map[string]interface{})
 	err = json.Unmarshal(data[:n], &got)
@@ -116,6 +128,9 @@ func (s *S) TestSendTCP(c *check.C) {
 		App:      "app",
 		Hostname: "hostname",
 		Process:  "process",
+		Labels: map[string]string{
+			"tsuru.pool.name": "mypool",
+		},
 	}, "key", "value")
 	c.Assert(err, check.IsNil)
 	data := <-dataCh
@@ -127,6 +142,9 @@ func (s *S) TestSendTCP(c *check.C) {
 		"app":     "app",
 		"host":    "hostname",
 		"process": "process",
+		"labels": map[string]interface{}{
+			"tsuru.pool.name": "mypool",
+		},
 	}
 	var got map[string]interface{}
 	err = json.Unmarshal(data, &got)
