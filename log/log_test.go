@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -498,7 +499,49 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.id))
 }
 
-func startReceiver(expected int, ch chan struct{}) net.Listener {
+func (s *S) TestLogForwarderStress(c *check.C) {
+	n := 100
+	done := make(chan struct{})
+	data := make(chan string, n)
+	tcpConn := startReceiver(n, done, data)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+tcpConn.Addr().String())
+	lf := LogForwarder{
+		BindAddress:     "tcp://0.0.0.0:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("tcp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg %05d\n", s.id, i))
+			_, writeErr := conn.Write(msg)
+			c.Assert(writeErr, check.IsNil)
+		}(i)
+	}
+	wg.Wait()
+	<-done
+	close(data)
+	messages := make([]string, 0, n)
+	for msg := range data {
+		messages = append(messages, msg)
+	}
+	sort.Strings(messages)
+	expected := make([]string, n)
+	for i := 0; i < n; i++ {
+		expected[i] = fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg %05d", s.id, i)
+	}
+	c.Assert(messages, check.DeepEquals, expected)
+}
+
+func startReceiver(expected int, ch chan struct{}, data ...chan string) net.Listener {
 	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
 	tcpConn, _ := net.ListenTCP("tcp", addr)
 	go func() {
@@ -510,6 +553,9 @@ func startReceiver(expected int, ch chan struct{}) net.Listener {
 		scanner := bufio.NewScanner(conn)
 		for scanner.Scan() {
 			counter++
+			if len(data) > 0 {
+				data[0] <- scanner.Text()
+			}
 			if counter == expected {
 				close(ch)
 				return
