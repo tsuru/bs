@@ -10,6 +10,7 @@ import (
 	"io"
 	stdSyslog "log/syslog"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -135,7 +136,72 @@ func logEntryFromName(fileName string) logFileEntry {
 	if len(parts) > 2 {
 		part := strings.TrimSuffix(parts[2], ".log")
 		i := strings.LastIndex(part, "-")
-		entry.containerName, entry.containerID = part[:i], part[i+1:]
+		if i != -1 {
+			entry.containerName, entry.containerID = part[:i], part[i+1:]
+		}
 	}
 	return entry
+}
+
+type kubernetesLogStreamer struct {
+	dir      string
+	quit     chan struct{}
+	monitors map[string]*fileMonitor
+	handler  syslog.Handler
+}
+
+func newKubeLogStreamer(handler syslog.Handler, dir string) *kubernetesLogStreamer {
+	return &kubernetesLogStreamer{
+		dir:      dir,
+		handler:  handler,
+		quit:     make(chan struct{}),
+		monitors: make(map[string]*fileMonitor),
+	}
+}
+
+func (s *kubernetesLogStreamer) stop() {
+	s.quit <- struct{}{}
+}
+
+func (s *kubernetesLogStreamer) watch() {
+	for {
+		files, err := filepath.Glob(filepath.Join(s.dir, "*.log"))
+		if err != nil {
+			bslog.Errorf("unable to list files in directory: %s", err)
+		}
+		for _, f := range files {
+			entry := logEntryFromName(filepath.Base(f))
+			if entry.containerName == podContainerName ||
+				entry.namespace == kubeSystemNamespace {
+				continue
+			}
+			m := s.monitors[entry.containerID]
+			if m != nil && !m.alive() {
+				m = nil
+			}
+			if m == nil {
+				m, err = newFileMonitor(s.handler, f, entry.containerID)
+				if err != nil {
+					bslog.Errorf("unable to create file monitor for %q: %s", f, err)
+					continue
+				}
+				err = m.run()
+				if err != nil {
+					bslog.Errorf("unable to run file monitor for %q: %s", f, err)
+					continue
+				}
+				s.monitors[entry.containerID] = m
+			}
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-s.quit:
+			for _, m := range s.monitors {
+				m.stop()
+				m.wait()
+			}
+			s.monitors = nil
+			return
+		}
+	}
 }

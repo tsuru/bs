@@ -7,6 +7,7 @@ package log
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/check.v1"
@@ -19,8 +20,8 @@ const (
 {"log":"msg2\n","stream":"stdout","time":"2017-03-21T21:28:32.0Z"}
 {"log":"msg3\n","stream":"stderr","time":"2017-03-21T21:28:42.0Z"}
 `
-	additionalEntries = `
-{"log":"msg4\n","stream":"stderr","time":"2017-03-21T21:28:52.0Z"}
+	singleEntry = `
+{"log":"msg-single\n","stream":"stderr","time":"2017-03-21T21:28:52.0Z"}
 `
 )
 
@@ -90,11 +91,11 @@ func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 		c.Check(parts["parts"], check.DeepEquals, &expected)
 	}
 	for i := 0; i < 100; i++ {
-		err = ioutil.WriteFile(fName, []byte(additionalEntries), 0600)
+		err = ioutil.WriteFile(fName, []byte(singleEntry), 0600)
 		c.Assert(err, check.IsNil)
 	}
 	expectedMessages = []rawLogParts{
-		{content: []byte("msg4"), ts: ts0.Add(30 * time.Second), container: []byte("cont1"), priority: []byte("27")},
+		{content: []byte("msg-single"), ts: ts0.Add(30 * time.Second), container: []byte("cont1"), priority: []byte("27")},
 	}
 	for _, expected := range expectedMessages {
 		parts := <-th.parts
@@ -192,4 +193,25 @@ func (s *S) TestLogEntryFromName(c *check.C) {
 	for i, tt := range tests {
 		c.Assert(logEntryFromName(tt.in), check.DeepEquals, tt.out, check.Commentf("test %d", i))
 	}
+}
+
+func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer := newKubeLogStreamer(th, dirName)
+	go streamer.watch()
+	defer streamer.stop()
+	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	parts := <-th.parts
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
+		priority:  []byte("27"),
+	})
 }
