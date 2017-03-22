@@ -128,3 +128,68 @@ func (s *S) TestFileMonitorAlive(c *check.C) {
 	}
 	c.Assert(m.alive(), check.Equals, false)
 }
+
+func (s *S) TestLogEntryFromName(c *check.C) {
+	tests := []struct {
+		in  string
+		out logFileEntry
+	}{
+		{
+			in: "kube-addon-manager-minikube_kube-system_POD-cb1e80138062646f91f08090e6d5e872e83e32d227ff137e621109ac58b515f6.log",
+			out: logFileEntry{
+				podName:       "kube-addon-manager-minikube",
+				namespace:     "kube-system",
+				containerName: "POD",
+				containerID:   "cb1e80138062646f91f08090e6d5e872e83e32d227ff137e621109ac58b515f6",
+			},
+		},
+		{
+			in: "kube-addon-manager-minikube_kube-system_kube-addon-manager-009fe350fb558575aa8c396f9aed216978e2c46aa9d9601d85df4c0c44eff251.log",
+			out: logFileEntry{
+				podName:       "kube-addon-manager-minikube",
+				namespace:     "kube-system",
+				containerName: "kube-addon-manager",
+				containerID:   "009fe350fb558575aa8c396f9aed216978e2c46aa9d9601d85df4c0c44eff251",
+			},
+		},
+		{
+			in: "myapp-web-2453793373-cbk0k_default_POD-b166a7daa5511a7dc39a861785b00a2799bbab0b45079b0f4de78bbc537d4717.log",
+			out: logFileEntry{
+				podName:       "myapp-web-2453793373-cbk0k",
+				namespace:     "default",
+				containerName: "POD",
+				containerID:   "b166a7daa5511a7dc39a861785b00a2799bbab0b45079b0f4de78bbc537d4717",
+			},
+		},
+		{
+			in: "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log",
+			out: logFileEntry{
+				podName:       "myapp-web-2453793373-cbk0k",
+				namespace:     "default",
+				containerName: "myapp-web",
+				containerID:   "e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b",
+			},
+		},
+		{
+			in: "node-container-big-sibling-pool-pool3-7fz9h_default_POD-a5211d198958eb5c06cb2505a21edf50b7527fe7646b955ea9b14db65e387e2e.log",
+			out: logFileEntry{
+				podName:       "node-container-big-sibling-pool-pool3-7fz9h",
+				namespace:     "default",
+				containerName: "POD",
+				containerID:   "a5211d198958eb5c06cb2505a21edf50b7527fe7646b955ea9b14db65e387e2e",
+			},
+		},
+		{
+			in: "node-container-big-sibling-pool-pool3-7fz9h_default_big-sibling-c040b6047b48cb5eacf2977bca9a40074e77f90bb6133d069cba71d44349c263.log",
+			out: logFileEntry{
+				podName:       "node-container-big-sibling-pool-pool3-7fz9h",
+				namespace:     "default",
+				containerName: "big-sibling",
+				containerID:   "c040b6047b48cb5eacf2977bca9a40074e77f90bb6133d069cba71d44349c263",
+			},
+		},
+	}
+	for i, tt := range tests {
+		c.Assert(logEntryFromName(tt.in), check.DeepEquals, tt.out, check.Commentf("test %d", i))
+	}
+}

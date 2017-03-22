@@ -11,6 +11,7 @@ import (
 	stdSyslog "log/syslog"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,9 @@ import (
 const (
 	severityMask = 0x07
 	facilityMask = 0xf8
+
+	podContainerName    = "POD"
+	kubeSystemNamespace = "kube-system"
 )
 
 type fileMonitor struct {
@@ -110,4 +114,28 @@ func (m *fileMonitor) run() error {
 		m.wait()
 	}()
 	return nil
+}
+
+type logFileEntry struct {
+	podName       string
+	namespace     string
+	containerID   string
+	containerName string
+}
+
+func logEntryFromName(fileName string) logFileEntry {
+	entry := logFileEntry{}
+	parts := strings.Split(fileName, "_")
+	if len(parts) > 0 {
+		entry.podName = parts[0]
+	}
+	if len(parts) > 1 {
+		entry.namespace = parts[1]
+	}
+	if len(parts) > 2 {
+		part := strings.TrimSuffix(parts[2], ".log")
+		i := strings.LastIndex(part, "-")
+		entry.containerName, entry.containerID = part[:i], part[i+1:]
+	}
+	return entry
 }
