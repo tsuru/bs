@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/tsuru/bs/bslog"
@@ -30,11 +30,13 @@ const (
 )
 
 type fileMonitor struct {
-	handler   syslog.Handler
-	cmd       *exec.Cmd
-	reader    io.ReadCloser
-	container []byte
-	finished  int32
+	handler    syslog.Handler
+	mu         sync.RWMutex
+	cmd        *exec.Cmd
+	finished   bool
+	reader     io.ReadCloser
+	container  []byte
+	streamDone chan struct{}
 }
 
 type logLine struct {
@@ -52,9 +54,10 @@ func (b *rawByte) UnmarshalText(val []byte) error {
 
 func newFileMonitor(handler syslog.Handler, path, containerID string) (*fileMonitor, error) {
 	m := &fileMonitor{
-		cmd:       exec.Command("tail", "-n", "+0", "-F", path),
-		handler:   handler,
-		container: []byte(containerID),
+		cmd:        exec.Command("tail", "-n", "+0", "-F", path),
+		handler:    handler,
+		container:  []byte(containerID),
+		streamDone: make(chan struct{}),
 	}
 	var err error
 	m.reader, err = m.cmd.StdoutPipe()
@@ -65,6 +68,7 @@ func newFileMonitor(handler syslog.Handler, path, containerID string) (*fileMoni
 }
 
 func (m *fileMonitor) streamOutput() {
+	defer close(m.streamDone)
 	dec := json.NewDecoder(m.reader)
 	var lineData logLine
 	for {
@@ -91,7 +95,9 @@ func (m *fileMonitor) streamOutput() {
 }
 
 func (m *fileMonitor) alive() bool {
-	return atomic.LoadInt32(&m.finished) == 0
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return !m.finished
 }
 
 func (m *fileMonitor) stop() {
@@ -101,6 +107,10 @@ func (m *fileMonitor) stop() {
 }
 
 func (m *fileMonitor) wait() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.finished = true
+	<-m.streamDone
 	return m.cmd.Wait()
 }
 
@@ -110,7 +120,6 @@ func (m *fileMonitor) run() error {
 		return err
 	}
 	go func() {
-		defer atomic.AddInt32(&m.finished, 1)
 		m.streamOutput()
 		m.wait()
 	}()

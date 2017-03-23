@@ -71,7 +71,7 @@ func (s *S) TestFileMonitorRun(c *check.C) {
 func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 	fName := withTempFile(c)
 	defer os.Remove(fName)
-	th := &testHandler{parts: make(chan format.LogParts)}
+	th := &testHandler{parts: make(chan format.LogParts, 100)}
 	m, err := newFileMonitor(th, fName, "cont1")
 	c.Assert(err, check.IsNil)
 	err = m.run()
