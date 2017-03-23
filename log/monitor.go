@@ -7,8 +7,10 @@ package log
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	stdSyslog "log/syslog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -28,6 +30,8 @@ const (
 	podContainerName    = "POD"
 	kubeSystemNamespace = "kube-system"
 )
+
+var errNoMonitorDir = errors.New("monitor directory not found")
 
 type fileMonitor struct {
 	handler    syslog.Handler
@@ -114,16 +118,15 @@ func (m *fileMonitor) wait() error {
 	return m.cmd.Wait()
 }
 
-func (m *fileMonitor) run() error {
-	err := m.cmd.Start()
-	if err != nil {
-		return err
-	}
+func (m *fileMonitor) start() error {
+	return m.cmd.Start()
+}
+
+func (m *fileMonitor) run() {
 	go func() {
 		m.streamOutput()
 		m.wait()
 	}()
-	return nil
 }
 
 type logFileEntry struct {
@@ -159,13 +162,20 @@ type kubernetesLogStreamer struct {
 	handler  syslog.Handler
 }
 
-func newKubeLogStreamer(handler syslog.Handler, dir string) *kubernetesLogStreamer {
+func newKubeLogStreamer(handler syslog.Handler, dir string) (*kubernetesLogStreamer, error) {
+	_, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errNoMonitorDir
+		}
+		return nil, err
+	}
 	return &kubernetesLogStreamer{
 		dir:      dir,
 		handler:  handler,
 		quit:     make(chan struct{}),
 		monitors: make(map[string]*fileMonitor),
-	}
+	}, nil
 }
 
 func (s *kubernetesLogStreamer) stop() {
@@ -194,12 +204,13 @@ func (s *kubernetesLogStreamer) watch() {
 					bslog.Errorf("unable to create file monitor for %q: %s", f, err)
 					continue
 				}
-				err = m.run()
+				err = m.start()
 				if err != nil {
 					bslog.Errorf("unable to run file monitor for %q: %s", f, err)
 					continue
 				}
 				s.monitors[entry.containerID] = m
+				m.run()
 			}
 		}
 		select {

@@ -49,8 +49,9 @@ func (s *S) TestFileMonitorRun(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts)}
 	m, err := newFileMonitor(th, fName, "cont1")
 	c.Assert(err, check.IsNil)
-	err = m.run()
+	err = m.start()
 	c.Assert(err, check.IsNil)
+	m.run()
 	defer func() {
 		m.stop()
 		m.wait()
@@ -74,8 +75,9 @@ func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts, 100)}
 	m, err := newFileMonitor(th, fName, "cont1")
 	c.Assert(err, check.IsNil)
-	err = m.run()
+	err = m.start()
 	c.Assert(err, check.IsNil)
+	m.run()
 	defer func() {
 		m.stop()
 		m.wait()
@@ -110,8 +112,9 @@ func (s *S) TestFileMonitorAlive(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts)}
 	m, err := newFileMonitor(th, fName, "cont1")
 	c.Assert(err, check.IsNil)
-	err = m.run()
+	err = m.start()
 	c.Assert(err, check.IsNil)
+	m.run()
 	defer func() {
 		m.stop()
 		m.wait()
@@ -200,7 +203,8 @@ func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer := newKubeLogStreamer(th, dirName)
+	streamer, err := newKubeLogStreamer(th, dirName)
+	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
 	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
@@ -214,4 +218,80 @@ func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
 		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
 		priority:  []byte("27"),
 	})
+}
+
+func (s *S) TestKubernetesLogStreamerWatchIgnoredFiles(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer, err := newKubeLogStreamer(th, dirName)
+	c.Assert(err, check.IsNil)
+	go streamer.watch()
+	defer streamer.stop()
+	name := filepath.Join(dirName, "pod1_kube-system_contName1-contID1.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	select {
+	case <-th.parts:
+		c.Fatal("no parts expected")
+	case <-time.After(500 * time.Millisecond):
+	}
+	name = filepath.Join(dirName, "pod2_default_POD-contID2.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	select {
+	case <-th.parts:
+		c.Fatal("no parts expected")
+	case <-time.After(500 * time.Millisecond):
+	}
+	name = filepath.Join(dirName, "pod3_default_contName2-contID3.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	parts := <-th.parts
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("contID3"),
+		priority:  []byte("27"),
+	})
+}
+
+func (s *S) TestKubernetesLogStreamerWatchKilledWatcher(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer, err := newKubeLogStreamer(th, dirName)
+	c.Assert(err, check.IsNil)
+	go streamer.watch()
+	defer streamer.stop()
+	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	parts := <-th.parts
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
+		priority:  []byte("27"),
+	})
+	streamer.monitors["e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"].stop()
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	parts = <-th.parts
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
+		priority:  []byte("27"),
+	})
+}
+
+func (s *S) TestKubernetesLogStreamerDirNotFound(c *check.C) {
+	th := &testHandler{parts: make(chan format.LogParts)}
+	_, err := newKubeLogStreamer(th, "/some/invalid/path")
+	c.Assert(err, check.Equals, errNoMonitorDir)
 }
