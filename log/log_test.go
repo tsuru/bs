@@ -44,6 +44,7 @@ func Test(t *testing.T) {
 type S struct {
 	dockerServer *dTesting.DockerServer
 	id           string
+	idShort      string
 }
 
 func (s *S) SetUpSuite(c *check.C) {
@@ -81,6 +82,7 @@ func serverWithContainer() (*dTesting.DockerServer, string, error) {
 func (s *S) SetUpTest(c *check.C) {
 	var err error
 	s.dockerServer, s.id, err = serverWithContainer()
+	s.idShort = s.id[:12]
 	c.Assert(err, check.IsNil)
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, "LOG_") || strings.HasPrefix(env, "TSURU_") {
@@ -117,7 +119,7 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg\n", s.id))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg\n", s.idShort))
 }
 
 func (s *S) TestLogForwarderStartNoneBackend(c *check.C) {
@@ -161,7 +163,7 @@ func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 12:13:47 %s coolappname[procx]: mymsg\n", s.id))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 12:13:47 %s coolappname[procx]: mymsg\n", s.idShort))
 }
 
 func (s *S) TestLogForwarderWSForwarderHTTP(c *check.C) {
@@ -234,7 +236,7 @@ func testLogForwarderWSForwarder(
 		Message: "mymsg",
 		Source:  "procx",
 		AppName: "coolappname",
-		Unit:    s.id,
+		Unit:    s.idShort,
 	})
 	err = json.Unmarshal([]byte(parts[1]), &logLine)
 	c.Assert(err, check.IsNil)
@@ -243,7 +245,7 @@ func testLogForwarderWSForwarder(
 		Message: "mymsg2",
 		Source:  "procx",
 		AppName: "coolappname",
-		Unit:    s.id,
+		Unit:    s.idShort,
 	})
 }
 
@@ -497,7 +499,7 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.id))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.idShort))
 }
 
 func (s *S) TestLogForwarderStartFromFile(c *check.C) {
@@ -526,7 +528,7 @@ func (s *S) TestLogForwarderStartFromFile(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<27>Mar 21 18:28:52 %s coolappname[procx]: msg-single\n", s.id))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<27>Mar 21 18:28:52 %s coolappname[procx]: msg-single\n", s.idShort))
 }
 
 func (s *S) TestLogForwarderStress(c *check.C) {
@@ -566,7 +568,7 @@ func (s *S) TestLogForwarderStress(c *check.C) {
 	sort.Strings(messages)
 	expected := make([]string, n)
 	for i := 0; i < n; i++ {
-		expected[i] = fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg %05d", s.id, i)
+		expected[i] = fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg %05d", s.idShort, i)
 	}
 	c.Assert(messages, check.DeepEquals, expected)
 }
