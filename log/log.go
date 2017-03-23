@@ -22,6 +22,7 @@ const (
 	forwardConnDialTimeout  = time.Second
 	forwardConnWriteTimeout = time.Second
 	noneBackend             = "none"
+	containerIDTrimSize     = 12
 )
 
 var (
@@ -213,10 +214,6 @@ func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
 	if err != nil {
 		bslog.Debugf("[log forwarder] ignored msg %v error to get appname: %s", parts, err)
 		return
-	}
-	if len(parts.container) > 12 {
-		parts.container = parts.container[:12]
-		contStr = contStr[:12]
 	}
 	for _, backend := range l.backends {
 		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contStr)

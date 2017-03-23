@@ -212,7 +212,7 @@ func testLogForwarderWSForwarder(
 	os.Setenv("TSURU_TOKEN", "mytoken")
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	testTlsConfig = &tls.Config{RootCAs: srvCerts}
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
@@ -318,7 +318,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
 		BindAddress:     "udp://127.0.0.1:59317",
@@ -368,7 +368,7 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	parts := []format.LogParts{
 		{"parts": &rawLogParts{
 			ts:        time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
@@ -641,14 +641,14 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 		b.Fatal(err)
 	}
 	rPart := &rawLogParts{
-		ts:       time.Now(),
-		priority: []byte("30"),
-		content:  []byte("mymsg"),
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
 	}
 	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
@@ -678,14 +678,14 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 		b.Fatal(err)
 	}
 	rPart := &rawLogParts{
-		ts:       time.Now(),
-		priority: []byte("30"),
-		content:  []byte("mymsg"),
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
 	}
 	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
@@ -724,7 +724,7 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
 		BindAddress:     "tcp://127.0.0.1:59317",
 		DockerEndpoint:  dockerServer.URL(),
@@ -736,14 +736,14 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	}
 	defer lf.stopWait()
 	rPart := &rawLogParts{
-		ts:       time.Now(),
-		priority: []byte("30"),
-		content:  []byte("mymsg"),
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
 	}
 	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	b.StopTimer()
@@ -772,7 +772,7 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
 		BindAddress:     "tcp://127.0.0.1:59317",
@@ -784,14 +784,14 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	}
 	defer lf.stopWait()
 	rPart := &rawLogParts{
-		ts:       time.Now(),
-		priority: []byte("30"),
-		content:  []byte("mymsg"),
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
 	}
 	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*tsuruBackend).msgCh)
