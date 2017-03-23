@@ -536,7 +536,9 @@ func (s *S) TestLogForwarderStartFromFile(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	os.Setenv("LOG_KUBERNETES_LOG_DIR", dirName)
+	os.Setenv("LOG_KUBERNETES_LOG_POS_DIR", dirName)
 	defer os.Unsetenv("LOG_KUBERNETES_LOG_DIR")
+	defer os.Unsetenv("LOG_KUBERNETES_LOG_POS_DIR")
 	lf := LogForwarder{
 		BindAddress:     "udp://127.0.0.1:59317",
 		DockerEndpoint:  s.dockerServer.URL(),

@@ -33,6 +33,30 @@ func (h *testHandler) Handle(logParts format.LogParts, _ int64, err error) {
 	h.parts <- logParts
 }
 
+func partsTimeout(c *check.C, ch chan format.LogParts) format.LogParts {
+	select {
+	case data := <-ch:
+		return data
+	case <-time.After(5 * time.Second):
+		c.Fatal("timeout waiting for channel")
+	}
+	return nil
+}
+
+func stopWaitTimeout(c *check.C, m *fileMonitor) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		m.stop()
+		m.wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		c.Fatal("timeout waiting for stop wait")
+	}
+}
+
 func withTempFile(c *check.C) string {
 	f, err := ioutil.TempFile("", "bs-file-monitor")
 	c.Assert(err, check.IsNil)
@@ -52,10 +76,7 @@ func (s *S) TestFileMonitorRun(c *check.C) {
 	err = m.start()
 	c.Assert(err, check.IsNil)
 	m.run()
-	defer func() {
-		m.stop()
-		m.wait()
-	}()
+	defer stopWaitTimeout(c, m)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:22Z")
 	expectedMessages := []rawLogParts{
 		{content: []byte("msg1"), ts: ts0, container: []byte("cont1"), priority: []byte("27")},
@@ -63,7 +84,7 @@ func (s *S) TestFileMonitorRun(c *check.C) {
 		{content: []byte("msg3"), ts: ts0.Add(20 * time.Second), container: []byte("cont1"), priority: []byte("27")},
 	}
 	for _, expected := range expectedMessages {
-		parts := <-th.parts
+		parts := partsTimeout(c, th.parts)
 		c.Check(parts["parts"], check.DeepEquals, &expected)
 	}
 	c.Assert(m.alive(), check.Equals, true)
@@ -78,10 +99,7 @@ func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 	err = m.start()
 	c.Assert(err, check.IsNil)
 	m.run()
-	defer func() {
-		m.stop()
-		m.wait()
-	}()
+	defer stopWaitTimeout(c, m)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:22Z")
 	expectedMessages := []rawLogParts{
 		{content: []byte("msg1"), ts: ts0, container: []byte("cont1"), priority: []byte("27")},
@@ -89,7 +107,7 @@ func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 		{content: []byte("msg3"), ts: ts0.Add(20 * time.Second), container: []byte("cont1"), priority: []byte("27")},
 	}
 	for _, expected := range expectedMessages {
-		parts := <-th.parts
+		parts := partsTimeout(c, th.parts)
 		c.Check(parts["parts"], check.DeepEquals, &expected)
 	}
 	for i := 0; i < 100; i++ {
@@ -100,25 +118,79 @@ func (s *S) TestFileMonitorRunOnTruncate(c *check.C) {
 		{content: []byte("msg-single"), ts: ts0.Add(30 * time.Second), container: []byte("cont1"), priority: []byte("27")},
 	}
 	for _, expected := range expectedMessages {
-		parts := <-th.parts
+		parts := partsTimeout(c, th.parts)
 		c.Check(parts["parts"], check.DeepEquals, &expected)
 	}
 	c.Assert(m.alive(), check.Equals, true)
 }
 
+func (s *S) TestFileMonitorRunRestartShouldNotRepeatLines(c *check.C) {
+	updatePosInterval = 10 * time.Millisecond
+	defer func() { updatePosInterval = 5 * time.Second }()
+	fName := withTempFile(c)
+	defer os.Remove(fName)
+	th := &testHandler{parts: make(chan format.LogParts, 10)}
+	m, err := newFileMonitor(th, fName, "cont1")
+	c.Assert(err, check.IsNil)
+	m.posFile = fName + ".pos"
+	err = m.start()
+	c.Assert(err, check.IsNil)
+	m.run()
+	defer func() {
+		stopWaitTimeout(c, m)
+	}()
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:22Z")
+	expectedMessages := []rawLogParts{
+		{content: []byte("msg1"), ts: ts0, container: []byte("cont1"), priority: []byte("27")},
+		{content: []byte("msg2"), ts: ts0.Add(10 * time.Second), container: []byte("cont1"), priority: []byte("30")},
+		{content: []byte("msg3"), ts: ts0.Add(20 * time.Second), container: []byte("cont1"), priority: []byte("27")},
+	}
+	for _, expected := range expectedMessages {
+		parts := partsTimeout(c, th.parts)
+		c.Check(parts["parts"], check.DeepEquals, &expected)
+	}
+	for {
+		_, err := os.Stat(m.posFile)
+		if err == nil {
+			break
+		}
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-time.After(5 * time.Second):
+			c.Fatal("timeout waiting for pos file")
+		}
+	}
+	stopWaitTimeout(c, m)
+	f, err := os.OpenFile(fName, os.O_WRONLY|os.O_APPEND, 0600)
+	c.Assert(err, check.IsNil)
+	defer f.Close()
+	_, err = f.Write([]byte(singleEntry))
+	c.Assert(err, check.IsNil)
+	m, err = newFileMonitor(th, fName, "cont1")
+	c.Assert(err, check.IsNil)
+	m.posFile = fName + ".pos"
+	err = m.start()
+	c.Assert(err, check.IsNil)
+	m.run()
+	parts := partsTimeout(c, th.parts)
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0.Add(30 * time.Second),
+		container: []byte("cont1"),
+		priority:  []byte("27"),
+	})
+}
+
 func (s *S) TestFileMonitorAlive(c *check.C) {
 	fName := withTempFile(c)
 	defer os.Remove(fName)
-	th := &testHandler{parts: make(chan format.LogParts)}
+	th := &testHandler{parts: make(chan format.LogParts, 10)}
 	m, err := newFileMonitor(th, fName, "cont1")
 	c.Assert(err, check.IsNil)
 	err = m.start()
 	c.Assert(err, check.IsNil)
 	m.run()
-	defer func() {
-		m.stop()
-		m.wait()
-	}()
+	defer stopWaitTimeout(c, m)
 	m.cmd.Process.Kill()
 	for {
 		if !m.alive() {
@@ -203,14 +275,14 @@ func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName)
+	streamer, err := newKubeLogStreamer(th, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
 	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
-	parts := <-th.parts
+	parts := partsTimeout(c, th.parts)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
 	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
 		content:   []byte("msg-single"),
@@ -225,7 +297,7 @@ func (s *S) TestKubernetesLogStreamerWatchIgnoredFiles(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName)
+	streamer, err := newKubeLogStreamer(th, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
@@ -248,7 +320,7 @@ func (s *S) TestKubernetesLogStreamerWatchIgnoredFiles(c *check.C) {
 	name = filepath.Join(dirName, "pod3_default_contName2-contID3.log")
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
-	parts := <-th.parts
+	parts := partsTimeout(c, th.parts)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
 	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
 		content:   []byte("msg-single"),
@@ -263,14 +335,14 @@ func (s *S) TestKubernetesLogStreamerWatchKilledWatcher(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName)
+	streamer, err := newKubeLogStreamer(th, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
 	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
-	parts := <-th.parts
+	parts := partsTimeout(c, th.parts)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
 	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
 		content:   []byte("msg-single"),
@@ -281,7 +353,7 @@ func (s *S) TestKubernetesLogStreamerWatchKilledWatcher(c *check.C) {
 	streamer.monitors["e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"].stop()
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
-	parts = <-th.parts
+	parts = partsTimeout(c, th.parts)
 	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
 		content:   []byte("msg-single"),
 		ts:        ts0,
@@ -295,13 +367,13 @@ func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName)
+	streamer, err := newKubeLogStreamer(th, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
 	streamer.watchOnce()
-	parts := <-th.parts
+	parts := partsTimeout(c, th.parts)
 	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
 	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
 		content:   []byte("msg-single"),
@@ -317,6 +389,6 @@ func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
 
 func (s *S) TestKubernetesLogStreamerDirNotFound(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts)}
-	_, err := newKubeLogStreamer(th, "/some/invalid/path")
+	_, err := newKubeLogStreamer(th, "/some/invalid/path", "")
 	c.Assert(err, check.Equals, errNoLogDirectory)
 }

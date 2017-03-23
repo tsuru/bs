@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	stdSyslog "log/syslog"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tsuru/bs/bslog"
@@ -31,17 +33,25 @@ const (
 	kubeSystemNamespace = "kube-system"
 )
 
-var errNoLogDirectory = errors.New("monitor directory not found")
+var (
+	errNoLogDirectory = errors.New("monitor directory not found")
+
+	updatePosInterval = 5 * time.Second
+)
 
 type fileMonitor struct {
-	handler    syslog.Handler
-	mu         sync.RWMutex
-	cmd        *exec.Cmd
-	path       string
-	finished   bool
-	reader     io.ReadCloser
-	container  []byte
-	streamDone chan struct{}
+	handler        syslog.Handler
+	mu             sync.RWMutex
+	cmd            *exec.Cmd
+	path           string
+	finished       bool
+	reader         io.ReadCloser
+	container      []byte
+	streamDone     chan struct{}
+	posUpdateDone  chan struct{}
+	loadedLastTime int64
+	lastTime       int64
+	posFile        string
 }
 
 type logLine struct {
@@ -59,11 +69,12 @@ func (b *rawByte) UnmarshalText(val []byte) error {
 
 func newFileMonitor(handler syslog.Handler, path, containerID string) (*fileMonitor, error) {
 	m := &fileMonitor{
-		cmd:        exec.Command("tail", "-n", "+0", "-F", path),
-		handler:    handler,
-		container:  []byte(containerID),
-		streamDone: make(chan struct{}),
-		path:       path,
+		cmd:           exec.Command("tail", "-n", "+0", "-F", path),
+		handler:       handler,
+		container:     []byte(containerID),
+		streamDone:    make(chan struct{}),
+		posUpdateDone: make(chan struct{}),
+		path:          path,
 	}
 	var err error
 	m.reader, err = m.cmd.StdoutPipe()
@@ -71,6 +82,41 @@ func newFileMonitor(handler syslog.Handler, path, containerID string) (*fileMoni
 		return nil, err
 	}
 	return m, nil
+}
+
+func (m *fileMonitor) loadLastPos() error {
+	if m.posFile == "" {
+		return nil
+	}
+	data, err := ioutil.ReadFile(m.posFile)
+	if err == nil {
+		m.loadedLastTime, _ = strconv.ParseInt(string(data), 10, 64)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func (m *fileMonitor) updatePos() {
+	if m.posFile == "" {
+		return
+	}
+	go func() {
+		defer close(m.posUpdateDone)
+		for {
+			select {
+			case <-time.After(updatePosInterval):
+			case <-m.streamDone:
+				return
+			}
+			t := atomic.LoadInt64(&m.lastTime)
+			data := strconv.FormatInt(t, 10)
+			err := ioutil.WriteFile(m.posFile, []byte(data), 0600)
+			if err != nil {
+				bslog.Errorf("error storing last timestamp in %q: %v", m.posFile, err)
+			}
+		}
+	}()
 }
 
 func (m *fileMonitor) streamOutput() {
@@ -85,12 +131,17 @@ func (m *fileMonitor) streamOutput() {
 			}
 			return
 		}
+		timeNano := lineData.Time.UnixNano()
+		if timeNano <= m.loadedLastTime {
+			continue
+		}
 		facility := stdSyslog.LOG_DAEMON
 		severity := stdSyslog.LOG_INFO
 		if lineData.Stream != "stdout" {
 			severity = stdSyslog.LOG_ERR
 		}
 		pr := int((facility & facilityMask) | (severity & severityMask))
+		atomic.StoreInt64(&m.lastTime, timeNano)
 		m.handler.Handle(format.LogParts{"parts": &rawLogParts{
 			content:   bytes.TrimSpace(lineData.Log),
 			ts:        lineData.Time,
@@ -117,14 +168,22 @@ func (m *fileMonitor) wait() error {
 	defer m.mu.Unlock()
 	m.finished = true
 	<-m.streamDone
+	if m.posFile != "" {
+		<-m.posUpdateDone
+	}
 	return m.cmd.Wait()
 }
 
 func (m *fileMonitor) start() error {
+	err := m.loadLastPos()
+	if err != nil {
+		return err
+	}
 	return m.cmd.Start()
 }
 
 func (m *fileMonitor) run() {
+	m.updatePos()
 	go func() {
 		m.streamOutput()
 		m.wait()
@@ -159,12 +218,13 @@ func logEntryFromName(fileName string) logFileEntry {
 
 type kubernetesLogStreamer struct {
 	dir      string
+	posDir   string
 	quit     chan struct{}
 	monitors map[string]*fileMonitor
 	handler  syslog.Handler
 }
 
-func newKubeLogStreamer(handler syslog.Handler, dir string) (*kubernetesLogStreamer, error) {
+func newKubeLogStreamer(handler syslog.Handler, dir, posDir string) (*kubernetesLogStreamer, error) {
 	_, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -174,6 +234,7 @@ func newKubeLogStreamer(handler syslog.Handler, dir string) (*kubernetesLogStrea
 	}
 	return &kubernetesLogStreamer{
 		dir:      dir,
+		posDir:   posDir,
 		handler:  handler,
 		quit:     make(chan struct{}),
 		monitors: make(map[string]*fileMonitor),
@@ -197,7 +258,8 @@ func (s *kubernetesLogStreamer) watchOnce() {
 		bslog.Errorf("unable to list files in directory: %s", err)
 	}
 	for _, f := range files {
-		entry := logEntryFromName(filepath.Base(f))
+		fileName := filepath.Base(f)
+		entry := logEntryFromName(fileName)
 		if entry.containerName == podContainerName ||
 			entry.namespace == kubeSystemNamespace {
 			continue
@@ -211,6 +273,9 @@ func (s *kubernetesLogStreamer) watchOnce() {
 			if err != nil {
 				bslog.Errorf("unable to create file monitor for %q: %s", f, err)
 				continue
+			}
+			if s.posDir != "" {
+				m.posFile = filepath.Join(s.posDir, fileName+".tsurubs.pos")
 			}
 			err = m.start()
 			if err != nil {

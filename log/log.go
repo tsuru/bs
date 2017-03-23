@@ -161,7 +161,8 @@ func (l *LogForwarder) Start() (err error) {
 		return
 	}
 	kubeLogDir := config.StringEnvOrDefault("/var/log/containers", "LOG_KUBERNETES_LOG_DIR")
-	l.kubeStreamer, err = newKubeLogStreamer(l, kubeLogDir)
+	kubeLogPosDir := config.StringEnvOrDefault("/var/log", "LOG_KUBERNETES_LOG_POS_DIR")
+	l.kubeStreamer, err = newKubeLogStreamer(l, kubeLogDir, kubeLogPosDir)
 	if err == nil {
 		go l.kubeStreamer.watch()
 	} else if err != errNoLogDirectory {
