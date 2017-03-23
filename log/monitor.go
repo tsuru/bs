@@ -31,7 +31,7 @@ const (
 	kubeSystemNamespace = "kube-system"
 )
 
-var errNoMonitorDir = errors.New("monitor directory not found")
+var errNoLogDirectory = errors.New("monitor directory not found")
 
 type fileMonitor struct {
 	handler    syslog.Handler
@@ -168,7 +168,7 @@ func newKubeLogStreamer(handler syslog.Handler, dir string) (*kubernetesLogStrea
 	_, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, errNoMonitorDir
+			return nil, errNoLogDirectory
 		}
 		return nil, err
 	}

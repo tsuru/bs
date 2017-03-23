@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/container"
 	"gopkg.in/mcuadros/go-syslog.v2"
 	"gopkg.in/mcuadros/go-syslog.v2/format"
@@ -41,6 +42,7 @@ type LogForwarder struct {
 	server          *syslog.Server
 	backends        []logBackend
 	formatter       *LenientFormat
+	kubeStreamer    *kubernetesLogStreamer
 }
 
 type forwarderBackend interface {
@@ -157,6 +159,13 @@ func (l *LogForwarder) Start() (err error) {
 	if err != nil {
 		return
 	}
+	kubeLogDir := config.StringEnvOrDefault("/var/log/containers", "LOG_KUBERNETES_LOG_DIR")
+	l.kubeStreamer, err = newKubeLogStreamer(l, kubeLogDir)
+	if err == nil {
+		go l.kubeStreamer.watch()
+	} else if err != errNoLogDirectory {
+		return err
+	}
 	return l.server.Boot()
 }
 
@@ -173,6 +182,9 @@ func (l *LogForwarder) Stop() {
 	}
 	for _, backend := range l.backends {
 		backend.stop()
+	}
+	if l.kubeStreamer != nil {
+		l.kubeStreamer.stop()
 	}
 }
 

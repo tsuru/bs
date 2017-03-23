@@ -318,5 +318,5 @@ func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
 func (s *S) TestKubernetesLogStreamerDirNotFound(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts)}
 	_, err := newKubeLogStreamer(th, "/some/invalid/path")
-	c.Assert(err, check.Equals, errNoMonitorDir)
+	c.Assert(err, check.Equals, errNoLogDirectory)
 }

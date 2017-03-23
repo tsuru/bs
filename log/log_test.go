@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -497,6 +498,35 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.id))
+}
+
+func (s *S) TestLogForwarderStartFromFile(c *check.C) {
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	udpConn, err := net.ListenUDP("udp", addr)
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	os.Setenv("LOG_KUBERNETES_LOG_DIR", dirName)
+	defer os.Unsetenv("LOG_KUBERNETES_LOG_DIR")
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	name := filepath.Join(dirName, fmt.Sprintf("pod1_default_contName1-%s.log", s.id))
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	buffer := make([]byte, 1024)
+	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	n, err := udpConn.Read(buffer)
+	c.Assert(err, check.IsNil)
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<27>Mar 21 18:28:52 %s coolappname[procx]: msg-single\n", s.id))
 }
 
 func (s *S) TestLogForwarderStress(c *check.C) {
