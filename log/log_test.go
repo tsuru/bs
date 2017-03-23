@@ -130,6 +130,7 @@ func (s *S) TestLogForwarderStartNoneBackend(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -174,18 +175,28 @@ func (s *S) TestLogForwarderWSForwarderHTTPS(c *check.C) {
 	testLogForwarderWSForwarder(s, c, httptest.NewTLSServer)
 }
 
+func recvTimeout(c *check.C, ch chan string) string {
+	select {
+	case data := <-ch:
+		return data
+	case <-time.After(5 * time.Second):
+		c.Fatal("timeout waiting for channel")
+	}
+	return ""
+}
+
 func testLogForwarderWSForwarder(
 	s *S, c *check.C,
 	serverFunc func(handler http.Handler) *httptest.Server,
 ) {
-	var body bytes.Buffer
-	var serverMut sync.Mutex
-	var req *http.Request
+	reqCh := make(chan *http.Request, 1)
+	bodyCh := make(chan string, 1)
 	srv := serverFunc(websocket.Handler(func(ws *websocket.Conn) {
-		serverMut.Lock()
-		defer serverMut.Unlock()
-		req = ws.Request()
-		io.Copy(&body, ws)
+		reqCh <- ws.Request()
+		scanner := bufio.NewScanner(ws)
+		for scanner.Scan() {
+			bodyCh <- scanner.Text()
+		}
 	}))
 	defer srv.Close()
 	srvCerts := x509.NewCertPool()
@@ -201,7 +212,7 @@ func testLogForwarderWSForwarder(
 	os.Setenv("TSURU_TOKEN", "mytoken")
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	testTlsConfig = &tls.Config{RootCAs: srvCerts}
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
@@ -210,6 +221,7 @@ func testLogForwarderWSForwarder(
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
@@ -219,17 +231,16 @@ func testLogForwarderWSForwarder(
 	c.Assert(err, check.IsNil)
 	_, err = conn.Write([]byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg2\n", s.id)))
 	c.Assert(err, check.IsNil)
-	time.Sleep(2 * time.Second)
-	lf.stopWait()
-	serverMut.Lock()
-	parts := strings.Split(body.String(), "\n")
-	c.Assert(req, check.NotNil)
-	c.Assert(req.Header.Get("Authorization"), check.Equals, "bearer mytoken")
-	serverMut.Unlock()
-	c.Assert(parts, check.HasLen, 3)
-	c.Assert(parts[2], check.Equals, "")
+	select {
+	case req := <-reqCh:
+		c.Assert(req.Header.Get("Authorization"), check.Equals, "bearer mytoken")
+	case <-time.After(5 * time.Second):
+		c.Fatal("timeout waiting for request")
+	}
+	line1 := recvTimeout(c, bodyCh)
+	line2 := recvTimeout(c, bodyCh)
 	var logLine app.Applog
-	err = json.Unmarshal([]byte(parts[0]), &logLine)
+	err = json.Unmarshal([]byte(line1), &logLine)
 	c.Assert(err, check.IsNil)
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
@@ -238,7 +249,7 @@ func testLogForwarderWSForwarder(
 		AppName: "coolappname",
 		Unit:    s.idShort,
 	})
-	err = json.Unmarshal([]byte(parts[1]), &logLine)
+	err = json.Unmarshal([]byte(line2), &logLine)
 	c.Assert(err, check.IsNil)
 	c.Assert(logLine, check.DeepEquals, app.Applog{
 		Date:    baseTime,
@@ -256,6 +267,22 @@ func (s *S) TestLogForwarderStartBindError(c *check.C) {
 	}
 	err := lf.Start()
 	c.Assert(err, check.ErrorMatches, `invalid protocol "xudp", expected tcp or udp`)
+}
+
+func (s *S) TestLogForwarderStartAlreadyBound(c *check.C) {
+	lf := LogForwarder{
+		BindAddress:    "udp://127.0.0.1:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+	}
+	err := lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	lf2 := LogForwarder{
+		BindAddress:    "udp://127.0.0.1:59317",
+		DockerEndpoint: s.dockerServer.URL(),
+	}
+	err = lf2.Start()
+	c.Assert(err, check.ErrorMatches, `.*address already in use.*`)
 }
 
 func (s *S) TestLogForwarderForwardConnError(c *check.C) {
@@ -291,7 +318,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
 		BindAddress:     "udp://127.0.0.1:59317",
@@ -330,19 +357,18 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 		bslog.Logger = prevLog
 		bslog.Debug = false
 	}()
-	var body bytes.Buffer
-	var serverMut sync.Mutex
+	bodyCh := make(chan string, 2)
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		serverMut.Lock()
-		defer serverMut.Unlock()
-		io.Copy(&body, ws)
+		data, err := ioutil.ReadAll(ws)
+		c.Assert(err, check.IsNil)
+		bodyCh <- string(data)
 	}))
 	defer srv.Close()
 	os.Setenv("BS_DEBUG", "true")
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "0")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	parts := []format.LogParts{
 		{"parts": &rawLogParts{
 			ts:        time.Date(2015, 6, 5, 16, 13, 47, 0, time.UTC),
@@ -359,15 +385,13 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 	}
 	expected := []func(){
 		func() {
-			serverMut.Lock()
-			c.Assert(body.String(), check.Equals, "")
-			serverMut.Unlock()
+			body := recvTimeout(c, bodyCh)
+			c.Assert(body, check.Equals, "")
 			c.Assert(logBuf.String(), check.Not(check.Matches), `(?s).*\[log forwarder\] invalid message.*`)
 		},
 		func() {
-			serverMut.Lock()
-			c.Assert(body.String(), check.Equals, "")
-			serverMut.Unlock()
+			body := recvTimeout(c, bodyCh)
+			c.Assert(body, check.Equals, "")
 			c.Assert(logBuf.String(), check.Matches, `(?s).*\[log forwarder\] invalid message.*`)
 		},
 	}
@@ -401,7 +425,7 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "100")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.2")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
 		BindAddress:     "udp://127.0.0.1:59317",
@@ -464,7 +488,7 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		c.Fatal("timeout after 5 seconds")
+		c.Error("timeout after 5 seconds")
 	}
 	lf.stopWait()
 	c.Assert(logBuf.String(), check.Matches, `(?s).*no pong response in.*`)
@@ -616,14 +640,15 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	parts := format.LogParts{"parts": &rawLogParts{
-		ts:        time.Now(),
-		priority:  []byte("30"),
-		content:   []byte("mymsg"),
-		container: []byte(contID),
-	}}
+	rPart := &rawLogParts{
+		ts:       time.Now(),
+		priority: []byte("30"),
+		content:  []byte("mymsg"),
+	}
+	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
@@ -652,14 +677,15 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	parts := format.LogParts{"parts": &rawLogParts{
-		ts:        time.Now(),
-		priority:  []byte("30"),
-		content:   []byte("mymsg"),
-		container: []byte(contID),
-	}}
+	rPart := &rawLogParts{
+		ts:       time.Now(),
+		priority: []byte("30"),
+		content:  []byte("mymsg"),
+	}
+	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
@@ -698,7 +724,7 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	lf := LogForwarder{
 		BindAddress:     "tcp://127.0.0.1:59317",
 		DockerEndpoint:  dockerServer.URL(),
@@ -708,18 +734,19 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	parts := format.LogParts{"parts": &rawLogParts{
-		ts:        time.Now(),
-		priority:  []byte("30"),
-		content:   []byte("mymsg"),
-		container: []byte(contID),
-	}}
+	defer lf.stopWait()
+	rPart := &rawLogParts{
+		ts:       time.Now(),
+		priority: []byte("30"),
+		content:  []byte("mymsg"),
+	}
+	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	b.StopTimer()
-	lf.stopWait()
 }
 
 func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
@@ -745,7 +772,7 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
 	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
-	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.4")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	lf := LogForwarder{
 		EnabledBackends: []string{"tsuru"},
 		BindAddress:     "tcp://127.0.0.1:59317",
@@ -755,18 +782,19 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	parts := format.LogParts{"parts": &rawLogParts{
-		ts:        time.Now(),
-		priority:  []byte("30"),
-		content:   []byte("mymsg"),
-		container: []byte(contID),
-	}}
+	defer lf.stopWait()
+	rPart := &rawLogParts{
+		ts:       time.Now(),
+		priority: []byte("30"),
+		content:  []byte("mymsg"),
+	}
+	parts := format.LogParts{"parts": rPart}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		rPart.container = []byte(contID)
 		lf.Handle(parts, 1, nil)
 	}
 	close(lf.backends[0].(*tsuruBackend).msgCh)
 	<-done
 	b.StopTimer()
-	lf.stopWait()
 }
