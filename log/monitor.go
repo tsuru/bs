@@ -37,6 +37,7 @@ type fileMonitor struct {
 	handler    syslog.Handler
 	mu         sync.RWMutex
 	cmd        *exec.Cmd
+	path       string
 	finished   bool
 	reader     io.ReadCloser
 	container  []byte
@@ -62,6 +63,7 @@ func newFileMonitor(handler syslog.Handler, path, containerID string) (*fileMoni
 		handler:    handler,
 		container:  []byte(containerID),
 		streamDone: make(chan struct{}),
+		path:       path,
 	}
 	var err error
 	m.reader, err = m.cmd.StdoutPipe()
@@ -182,37 +184,48 @@ func (s *kubernetesLogStreamer) stop() {
 	s.quit <- struct{}{}
 }
 
-func (s *kubernetesLogStreamer) watch() {
-	for {
-		files, err := filepath.Glob(filepath.Join(s.dir, "*.log"))
-		if err != nil {
-			bslog.Errorf("unable to list files in directory: %s", err)
+func (s *kubernetesLogStreamer) watchOnce() {
+	for id, m := range s.monitors {
+		_, err := os.Stat(m.path)
+		if err != nil && os.IsNotExist(err) {
+			m.stop()
+			delete(s.monitors, id)
 		}
-		for _, f := range files {
-			entry := logEntryFromName(filepath.Base(f))
-			if entry.containerName == podContainerName ||
-				entry.namespace == kubeSystemNamespace {
+	}
+	files, err := filepath.Glob(filepath.Join(s.dir, "*.log"))
+	if err != nil {
+		bslog.Errorf("unable to list files in directory: %s", err)
+	}
+	for _, f := range files {
+		entry := logEntryFromName(filepath.Base(f))
+		if entry.containerName == podContainerName ||
+			entry.namespace == kubeSystemNamespace {
+			continue
+		}
+		m := s.monitors[entry.containerID]
+		if m != nil && !m.alive() {
+			m = nil
+		}
+		if m == nil {
+			m, err = newFileMonitor(s.handler, f, entry.containerID)
+			if err != nil {
+				bslog.Errorf("unable to create file monitor for %q: %s", f, err)
 				continue
 			}
-			m := s.monitors[entry.containerID]
-			if m != nil && !m.alive() {
-				m = nil
+			err = m.start()
+			if err != nil {
+				bslog.Errorf("unable to run file monitor for %q: %s", f, err)
+				continue
 			}
-			if m == nil {
-				m, err = newFileMonitor(s.handler, f, entry.containerID)
-				if err != nil {
-					bslog.Errorf("unable to create file monitor for %q: %s", f, err)
-					continue
-				}
-				err = m.start()
-				if err != nil {
-					bslog.Errorf("unable to run file monitor for %q: %s", f, err)
-					continue
-				}
-				s.monitors[entry.containerID] = m
-				m.run()
-			}
+			s.monitors[entry.containerID] = m
+			m.run()
 		}
+	}
+}
+
+func (s *kubernetesLogStreamer) watch() {
+	for {
+		s.watchOnce()
 		select {
 		case <-time.After(time.Second):
 		case <-s.quit:

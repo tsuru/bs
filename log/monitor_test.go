@@ -290,6 +290,31 @@ func (s *S) TestKubernetesLogStreamerWatchKilledWatcher(c *check.C) {
 	})
 }
 
+func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer, err := newKubeLogStreamer(th, dirName)
+	c.Assert(err, check.IsNil)
+	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	streamer.watchOnce()
+	parts := <-th.parts
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
+		priority:  []byte("27"),
+	})
+	err = os.Remove(name)
+	c.Assert(err, check.IsNil)
+	streamer.watchOnce()
+	c.Assert(streamer.monitors, check.HasLen, 0)
+}
+
 func (s *S) TestKubernetesLogStreamerDirNotFound(c *check.C) {
 	th := &testHandler{parts: make(chan format.LogParts)}
 	_, err := newKubeLogStreamer(th, "/some/invalid/path")
