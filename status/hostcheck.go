@@ -152,7 +152,7 @@ func (c *createContainerCheck) Run() error {
 		return err
 	}
 	contName := "bs-hostcheck-container"
-	c.client.RemoveContainer(docker.RemoveContainerOptions{ID: contName, Force: true})
+	removeErr := c.client.RemoveContainer(docker.RemoveContainerOptions{ID: contName, Force: true})
 	baseContInfo, err := c.client.InspectContainer(c.baseContID)
 	if err != nil {
 		return err
@@ -169,6 +169,9 @@ func (c *createContainerCheck) Run() error {
 	}
 	cont, err := c.client.CreateContainer(opts)
 	if err != nil {
+		if err == docker.ErrContainerAlreadyExists && removeErr != nil {
+			return fmt.Errorf("failed to remove old container: %v", removeErr)
+		}
 		return err
 	}
 	output := bytes.NewBuffer(nil)
