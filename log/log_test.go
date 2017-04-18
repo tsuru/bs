@@ -529,6 +529,7 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 	os.Setenv("LOG_SYSLOG_MESSAGE_EXTRA_START", "#val1")
 	os.Setenv("LOG_SYSLOG_MESSAGE_EXTRA_END", "#val2")
+	os.Setenv("LOG_SYSLOG_MTU_NETWORK_INTERFACE", "invalid")
 	defer os.Unsetenv("LOG_SYSLOG_MESSAGE_EXTRA_START")
 	defer os.Unsetenv("LOG_SYSLOG_MESSAGE_EXTRA_END")
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
@@ -547,12 +548,15 @@ func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
+	extraSz := 66
+	limit := udpMessageDefaultMTU - udpHeaderSz
+	maxSz := limit - extraSz - 2
 	bigContent := "a" +
-		strings.Repeat("*", 1332) +
+		strings.Repeat("*", maxSz) +
 		"bc" +
-		strings.Repeat("*", 1332) +
+		strings.Repeat("*", maxSz) +
 		"de" +
-		strings.Repeat("*", 500) +
+		strings.Repeat("*", 400) +
 		"f"
 	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: %s\n", s.id, bigContent))
 	_, err = conn.Write(msg)
@@ -561,9 +565,9 @@ func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 		content string
 		sz      int
 	}{
-		{content: "a" + strings.Repeat("*", 1332) + "b", sz: 1400},
-		{content: "c" + strings.Repeat("*", 1332) + "d", sz: 1400},
-		{content: "e" + strings.Repeat("*", 500) + "f", sz: 568},
+		{content: "a" + strings.Repeat("*", maxSz) + "b", sz: limit},
+		{content: "c" + strings.Repeat("*", maxSz) + "d", sz: limit},
+		{content: "e" + strings.Repeat("*", 400) + "f", sz: 468},
 	}
 	for _, content := range expectedContents {
 		buffer := make([]byte, 4196)

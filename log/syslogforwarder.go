@@ -18,6 +18,7 @@ import (
 
 const (
 	udpMessageDefaultMTU = 1500
+	udpHeaderSz          = 100 // Exagerated a bit due to possibility of ipv6 extensions, ipsec, etc.
 )
 
 type syslogBackend struct {
@@ -32,8 +33,9 @@ type syslogBackend struct {
 
 type syslogForwarder struct {
 	url          *url.URL
-	messageLimit int
 	bufferPool   *sync.Pool
+	mtu          int
+	messageLimit int
 }
 
 func (b *syslogBackend) initialize() error {
@@ -60,6 +62,16 @@ func (b *syslogBackend) initialize() error {
 			bslog.Warnf("unable to parse syslog timezone format: %s", err)
 		}
 	}
+	mtu := udpMessageDefaultMTU
+	mtuInterface := config.StringEnvOrDefault("eth0", "LOG_SYSLOG_MTU_NETWORK_INTERFACE")
+	if mtuInterface != "" {
+		iface, err := net.InterfaceByName(mtuInterface)
+		if err == nil && iface.MTU > 0 {
+			mtu = iface.MTU
+		} else {
+			bslog.Warnf("unable to read mtu from interface, using default %d: %s", mtu, err)
+		}
+	}
 	b.bufferPool = sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 200)
@@ -74,6 +86,7 @@ func (b *syslogBackend) initialize() error {
 		forwardChan, quitChan, err := processMessages(&syslogForwarder{
 			url:        forwardUrl,
 			bufferPool: &b.bufferPool,
+			mtu:        mtu,
 		}, bufferSize)
 		if err != nil {
 			return err
@@ -156,14 +169,14 @@ func (f *syslogForwarder) connect() (net.Conn, error) {
 	if f.url.Scheme == "tcp" {
 		conn = newBufferedConn(conn, time.Second)
 	} else {
-		f.messageLimit = udpMessageDefaultMTU - 100
+		f.messageLimit = f.mtu - udpHeaderSz
 	}
 	return conn, nil
 }
 
 func (f *syslogForwarder) splitParts(conn net.Conn, bufIdx bufferWithIdx) error {
 	fullLen := len(bufIdx.buffer)
-	if f.messageLimit == 0 || fullLen <= f.messageLimit {
+	if f.messageLimit <= 0 || fullLen <= f.messageLimit {
 		// Fast path, message fit, no manipulation needed.
 		return f.writePart(conn, bufIdx.buffer)
 	}
