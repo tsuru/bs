@@ -623,8 +623,13 @@ func startReceiver(expected int, ch chan struct{}, data ...chan string) net.List
 	return tcpConn
 }
 
+func disableLog() {
+	bslog.Logger = log.New(ioutil.Discard, "", 0)
+}
+
 func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	b.StopTimer()
+	disableLog()
 	dockerServer, contID, err := serverWithContainer()
 	if err != nil {
 		b.Fatal(err)
@@ -662,6 +667,7 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 
 func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	b.StopTimer()
+	disableLog()
 	dockerServer, contID, err := serverWithContainer()
 	if err != nil {
 		b.Fatal(err)
@@ -701,6 +707,7 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 
 func BenchmarkMessagesBroadcast(b *testing.B) {
 	b.StopTimer()
+	disableLog()
 	dockerServer, contID, err := serverWithContainer()
 	if err != nil {
 		b.Fatal(err)
@@ -753,6 +760,7 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 
 func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	b.StopTimer()
+	disableLog()
 	dockerServer, contID, err := serverWithContainer()
 	if err != nil {
 		b.Fatal(err)
