@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
-	"runtime/pprof"
 	"syscall"
-	"time"
 
+	"github.com/google/gops/agent"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/log"
@@ -47,66 +45,25 @@ func startSignalHandler(callback func(os.Signal), signals ...os.Signal) {
 	signal.Notify(sigChan, signals...)
 }
 
-func onSignalDebugGoroutines(signal os.Signal) {
-	var buf []byte
-	var written int
-	currLen := 1024
-	for written == len(buf) {
-		buf = make([]byte, currLen)
-		written = runtime.Stack(buf, true)
-		currLen *= 2
-	}
-	fmt.Print(string(buf[:written]))
-	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
-}
-
-func onSignalDebugProfile(signal os.Signal) {
-	cpufile, err := os.OpenFile("./cpuprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
-	if err != nil {
-		bslog.Warnf("Error trying to open profile file: %s", err)
-		return
-	}
-	memfile, err := os.OpenFile("./memprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
-	if err != nil {
-		bslog.Warnf("Error trying to open profile file: %s", err)
-		return
-	}
-	lockfile, err := os.OpenFile("./lockprofile.out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
-	if err != nil {
-		bslog.Warnf("Error trying to open profile file: %s", err)
-		return
-	}
-	bslog.Warnf("Starting profile...")
-	defer bslog.Warnf("Profile done, files written: %s, %s, %s", cpufile.Name(), memfile.Name(), lockfile.Name())
-	runtime.GC()
-	pprof.WriteHeapProfile(memfile)
-	memfile.Close()
-	runtime.SetBlockProfileRate(1)
-	time.Sleep(30 * time.Second)
-	pprof.Lookup("block").WriteTo(lockfile, 0)
-	runtime.SetBlockProfileRate(0)
-	lockfile.Close()
-	pprof.StartCPUProfile(cpufile)
-	time.Sleep(30 * time.Second)
-	pprof.StopCPUProfile()
-	cpufile.Close()
-	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
-}
-
 func main() {
+	err := agent.Listen(&agent.Options{
+		NoShutdownCleanup: true,
+	})
+	if err != nil {
+		bslog.Fatalf("Unable to initialize gops agent: %s\n", err)
+	}
+	defer agent.Close()
 	flag.Parse()
 	if printVersion {
 		fmt.Printf("bs version %s\n", version)
 		return
 	}
-	startSignalHandler(onSignalDebugGoroutines, syscall.SIGUSR1)
-	startSignalHandler(onSignalDebugProfile, syscall.SIGUSR2)
 	lf := log.LogForwarder{
 		BindAddress:     config.Config.SyslogListenAddress,
 		DockerEndpoint:  config.Config.DockerEndpoint,
 		EnabledBackends: config.Config.LogBackends,
 	}
-	err := lf.Start()
+	err = lf.Start()
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}

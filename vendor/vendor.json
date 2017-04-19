@@ -135,6 +135,24 @@
 			"revisionTime": "2016-03-11T12:06:26+09:00"
 		},
 		{
+			"checksumSHA1": "GEOcEfTErKBV6xEvZGjYy2LV0PI=",
+			"path": "github.com/google/gops/agent",
+			"revision": "62f833fc9f6c4d3223bdb37bd0c2f8951bed8596",
+			"revisionTime": "2017-03-19T00:29:31Z"
+		},
+		{
+			"checksumSHA1": "JReTqQzncYSyvJbrmfBWZHMZfQU=",
+			"path": "github.com/google/gops/internal",
+			"revision": "62f833fc9f6c4d3223bdb37bd0c2f8951bed8596",
+			"revisionTime": "2017-03-19T00:29:31Z"
+		},
+		{
+			"checksumSHA1": "OPlS4cJsOSpZ/FrUOJtfJXikjII=",
+			"path": "github.com/google/gops/signal",
+			"revision": "62f833fc9f6c4d3223bdb37bd0c2f8951bed8596",
+			"revisionTime": "2017-03-19T00:29:31Z"
+		},
+		{
 			"checksumSHA1": "iIUYZyoanCQQTUaWsu8b+iOSPt4=",
 			"path": "github.com/gorilla/context",
 			"revision": "1ea25387ff6f684839d82767c1733ff4d4d15d0a",
@@ -162,6 +180,12 @@
 			"path": "github.com/howeyc/fsnotify",
 			"revision": "f0bfa8e747315ab4e18d6af9c90f5969caaa05a1",
 			"revisionTime": "2016-01-06T20:16:19-02:00"
+		},
+		{
+			"checksumSHA1": "fq867CzsSFnrAb9OMi5g3Xa6Igs=",
+			"path": "github.com/kardianos/osext",
+			"revision": "8fef92e41e22a70e700a96b29f066cda30ea24ef",
+			"revisionTime": "2015-04-10T03:44:20Z"
 		},
 		{
 			"checksumSHA1": "3AoPMXlmVq2+iWMpsdJZkcUKHB8=",
