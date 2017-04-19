@@ -545,37 +545,71 @@ func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
 	defer lf.stopWait()
-	conn, err := net.Dial("udp", "127.0.0.1:59317")
-	c.Assert(err, check.IsNil)
-	defer conn.Close()
 	extraSz := 66
 	limit := udpMessageDefaultMTU - udpHeaderSz
-	maxSz := limit - extraSz - 2
-	bigContent := "a" +
-		strings.Repeat("*", maxSz) +
-		"bc" +
-		strings.Repeat("*", maxSz) +
-		"de" +
-		strings.Repeat("*", 400) +
-		"f"
-	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: %s\n", s.id, bigContent))
-	_, err = conn.Write(msg)
-	c.Assert(err, check.IsNil)
-	expectedContents := []struct {
-		content string
-		sz      int
+	maxSz := limit - extraSz - 2 - 6
+	tests := []struct {
+		content          string
+		expectedContents []string
+		expectedSizes    []int
 	}{
-		{content: "a" + strings.Repeat("*", maxSz) + "b", sz: limit},
-		{content: "c" + strings.Repeat("*", maxSz) + "d", sz: limit},
-		{content: "e" + strings.Repeat("*", 400) + "f", sz: 468},
+		{
+			content: "a" +
+				strings.Repeat("*", maxSz) +
+				"bc" +
+				strings.Repeat("*", maxSz) +
+				"de" +
+				strings.Repeat("*", 400) +
+				"f",
+			expectedContents: []string{
+				"a" + strings.Repeat("*", maxSz) + "b (1/3)",
+				"c" + strings.Repeat("*", maxSz) + "d (2/3)",
+				"e" + strings.Repeat("*", 400) + "f (3/3)",
+			},
+			expectedSizes: []int{limit, limit, 474},
+		},
+		{
+			content: "a" +
+				strings.Repeat("*", maxSz) +
+				"bc" +
+				strings.Repeat("*", maxSz) +
+				"d",
+			expectedContents: []string{
+				"a" + strings.Repeat("*", maxSz) + "b (1/2)",
+				"c" + strings.Repeat("*", maxSz) + "d (2/2)",
+			},
+			expectedSizes: []int{limit, limit},
+		},
+		{
+			content: "a" +
+				strings.Repeat("*", maxSz) +
+				"bc" +
+				strings.Repeat("*", maxSz) +
+				"de",
+			expectedContents: []string{
+				"a" + strings.Repeat("*", maxSz) + "b (1/3)",
+				"c" + strings.Repeat("*", maxSz) + "d (2/3)",
+				"e (3/3)",
+			},
+			expectedSizes: []int{limit, limit, 73},
+		},
 	}
-	for _, content := range expectedContents {
-		buffer := make([]byte, 4196)
-		udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		n, err := udpConn.Read(buffer)
+	for _, tt := range tests {
+		conn, err := net.Dial("udp", "127.0.0.1:59317")
 		c.Assert(err, check.IsNil)
-		c.Assert(n, check.Equals, content.sz)
-		c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 %s #val2\n", s.idShort, content.content))
+		msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: %s\n", s.id, tt.content))
+		_, err = conn.Write(msg)
+		c.Assert(err, check.IsNil)
+		for i, content := range tt.expectedContents {
+			buffer := make([]byte, 4196)
+			udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			var n int
+			n, err = udpConn.Read(buffer)
+			c.Assert(err, check.IsNil)
+			c.Assert(n, check.Equals, tt.expectedSizes[i])
+			c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 %s #val2\n", s.idShort, content))
+		}
+		conn.Close()
 	}
 }
 

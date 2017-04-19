@@ -178,42 +178,49 @@ func (f *syslogForwarder) splitParts(conn net.Conn, bufIdx bufferWithIdx) error 
 	fullLen := len(bufIdx.buffer)
 	if f.messageLimit <= 0 || fullLen <= f.messageLimit {
 		// Fast path, message fit, no manipulation needed.
-		return f.writePart(conn, bufIdx.buffer)
+		err := f.writePart(conn, bufIdx.buffer)
+		f.bufferPool.Put(bufIdx.buffer)
+		return err
 	}
 	headerBuf := bufIdx.buffer[:bufIdx.headerIdx]
 	trailerBuf := bufIdx.buffer[bufIdx.contentIdx:]
 	contentBuf := bufIdx.buffer[bufIdx.headerIdx:bufIdx.contentIdx]
 	availableSz := f.messageLimit - (len(headerBuf) + len(trailerBuf))
 	contentSz := len(contentBuf)
-	for contentSz > availableSz {
-		buffer := f.bufferPool.Get().([]byte)[:0]
-		buffer = append(buffer, headerBuf...)
-		buffer = append(buffer, contentBuf[:availableSz]...)
+	nParts := contentSz / (availableSz - 6)
+	if contentSz%(availableSz-6) != 0 {
+		nParts++
+	}
+	i := 0
+	for contentSz > 0 {
+		var buffer []byte
+		i++
+		partElement := fmt.Sprintf(" (%d/%d)", i, nParts)
+		sizeToUse := availableSz - len(partElement)
+		if sizeToUse >= len(contentBuf) {
+			sizeToUse = len(contentBuf)
+			buffer = headerBuf
+		} else {
+			buffer = f.bufferPool.Get().([]byte)[:0]
+			buffer = append(buffer, headerBuf...)
+		}
+		buffer = append(buffer, contentBuf[:sizeToUse]...)
+		buffer = append(buffer, partElement...)
 		buffer = append(buffer, trailerBuf...)
 		err := f.writePart(conn, buffer)
 		f.bufferPool.Put(buffer)
 		if err != nil {
 			return err
 		}
-		contentBuf = contentBuf[availableSz:]
+		contentBuf = contentBuf[sizeToUse:]
 		contentSz = len(contentBuf)
-	}
-	if contentSz > 0 {
-		// Reuse original buffer for remainder, no need for getting another
-		// from the bufferPool.
-		buffer := headerBuf
-		buffer = append(buffer, contentBuf...)
-		buffer = append(buffer, trailerBuf...)
-		return f.writePart(conn, buffer)
 	}
 	return nil
 }
 
 func (f *syslogForwarder) process(conn net.Conn, msg LogMessage) error {
 	bufIdx := msg.(bufferWithIdx)
-	err := f.splitParts(conn, bufIdx)
-	f.bufferPool.Put(bufIdx.buffer)
-	return err
+	return f.splitParts(conn, bufIdx)
 }
 
 func (f *syslogForwarder) writePart(conn net.Conn, buf []byte) error {
