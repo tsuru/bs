@@ -7,6 +7,7 @@ package log
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,8 +23,14 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-// Overridden by tests with tls enabled.
-var testTlsConfig *tls.Config
+var (
+	// Overridden by tests with tls enabled.
+	testTlsConfig *tls.Config
+
+	errConnMaxAgeExceeded = errors.New("max connection age exceeded")
+)
+
+const connMaxAge = time.Minute * 15
 
 type tsuruBackend struct {
 	msgCh      chan<- LogMessage
@@ -32,14 +39,16 @@ type tsuruBackend struct {
 }
 
 type wsForwarder struct {
-	url          string
-	token        string
-	connMutex    sync.Mutex
-	pingInterval time.Duration
-	pongInterval time.Duration
-	jsonEncoder  *json.Encoder
-	quitCh       <-chan bool
-	bufferConn   *bufferedConn
+	url           string
+	token         string
+	connMutex     sync.Mutex
+	pingInterval  time.Duration
+	pongInterval  time.Duration
+	jsonEncoder   *json.Encoder
+	quitCh        <-chan bool
+	bufferConn    *bufferedConn
+	connCreatedAt time.Time
+	expireConnCh  chan bool
 }
 
 func (b *tsuruBackend) initialize() error {
@@ -146,6 +155,8 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	f.connCreatedAt = time.Now()
+	f.expireConnCh = make(chan bool)
 	ws, err := websocket.NewClient(config, client)
 	if err != nil {
 		client.Close()
@@ -166,6 +177,11 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 		for {
 			frame, err := ws.NewFrameReader()
 			if err != nil {
+				select {
+				case <-f.expireConnCh:
+					return
+				default:
+				}
 				bslog.Errorf("[log forwarder] unable to create pong frame reader, closing websocket: %s", err)
 				return
 			}
@@ -182,6 +198,8 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			select {
 			case <-time.After(f.pingInterval):
 			case <-f.quitCh:
+				return
+			case <-f.expireConnCh:
 				return
 			}
 			err := f.writeWithDeadline(ws, pingWriter, []byte{'z'})
@@ -232,6 +250,10 @@ func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 	err = f.jsonEncoder.Encode(entry)
 	if err != nil {
 		return fmt.Errorf("error sending message: %s", err)
+	}
+	if time.Since(f.connCreatedAt) >= connMaxAge {
+		close(f.expireConnCh)
+		return errConnMaxAgeExceeded
 	}
 	return nil
 }
