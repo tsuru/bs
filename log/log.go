@@ -140,6 +140,7 @@ func (l *LogForwarder) Start() (err error) {
 	}
 	l.infoClient, err = container.NewClient(l.DockerEndpoint)
 	if err != nil {
+		err = fmt.Errorf("unable to initialize docker client %s: %s", l.DockerEndpoint, err)
 		return
 	}
 	l.formatter = &LenientFormat{}
