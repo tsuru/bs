@@ -18,6 +18,7 @@ const (
 	DefaultInterval       = 60
 	DefaultBufferSize     = 1000000
 	DefaultWsPingInterval = 30
+	DefaultDockerEndpoint = "unix:///var/run/docker.sock"
 )
 
 var Config struct {
@@ -37,7 +38,7 @@ func init() {
 
 func LoadConfig() {
 	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
-	Config.DockerEndpoint = os.Getenv("DOCKER_ENDPOINT")
+	Config.DockerEndpoint = StringEnvOrDefault(DefaultDockerEndpoint, "DOCKER_ENDPOINT")
 	Config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	Config.TsuruToken = os.Getenv("TSURU_TOKEN")
 	Config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")

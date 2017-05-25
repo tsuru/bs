@@ -253,7 +253,7 @@ reported to.
 ### DOCKER_ENDPOINT
 
 `DOCKER_ENDPOINT` is the docker endpoint from where the container metrics are
-going to be collected from.
+going to be collected from. The default value is "unix:///var/run/docker.sock".
 
 ### SYSLOG_LISTEN_ADDRESS
 
