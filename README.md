@@ -128,6 +128,12 @@ If a Pong message is not received in this interval the websocket connection
 will be reopened. Default value is 4 times the value of
 `LOG_TSURU_PING_INTERVAL`.
 
+#### LOG_TSURU_CONN_MAX_AGE
+
+`LOG_TSURU_CONN_MAX_AGE` is the max duration, in seconds, that a websocket 
+connection will be kept opened with the tsuru API server. Default value is -1, 
+which means the connection will never be closed.
+
 ### `syslog` backend
 
 Enabling `syslog` log backend will allow bs to forward all received logs to

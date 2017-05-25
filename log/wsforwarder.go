@@ -30,8 +30,6 @@ var (
 	errConnMaxAgeExceeded = errors.New("max connection age exceeded")
 )
 
-const connMaxAge = time.Minute * 15
-
 type tsuruBackend struct {
 	msgCh      chan<- LogMessage
 	quitCh     chan<- bool
@@ -48,6 +46,7 @@ type wsForwarder struct {
 	quitCh        <-chan bool
 	bufferConn    *bufferedConn
 	connCreatedAt time.Time
+	connMaxAge    time.Duration
 	expireConnCh  chan bool
 }
 
@@ -64,6 +63,7 @@ func (b *tsuruBackend) initialize() error {
 		bslog.Warnf("invalid WS pong interval %v (it must be higher than ping interval). Using the default value of %v", wsPongInterval, newPongInterval)
 		wsPongInterval = newPongInterval
 	}
+	wsConnMaxAge := config.SecondsEnvOrDefault(-1, "LOG_TSURU_CONN_MAX_AGE")
 	b.nextNotify = time.NewTimer(0)
 	tsuruUrl, err := url.Parse(config.Config.TsuruEndpoint)
 	if err != nil {
@@ -80,6 +80,7 @@ func (b *tsuruBackend) initialize() error {
 		token:        config.Config.TsuruToken,
 		pingInterval: wsPingInterval,
 		pongInterval: wsPongInterval,
+		connMaxAge:   wsConnMaxAge,
 	}, bufferSize)
 	if err != nil {
 		return err
@@ -251,7 +252,7 @@ func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 	if err != nil {
 		return fmt.Errorf("error sending message: %s", err)
 	}
-	if time.Since(f.connCreatedAt) >= connMaxAge {
+	if time.Since(f.connCreatedAt) >= f.connMaxAge && f.connMaxAge >= 0 {
 		close(f.expireConnCh)
 		return errConnMaxAgeExceeded
 	}
