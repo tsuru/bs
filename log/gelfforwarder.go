@@ -6,7 +6,9 @@ package log
 
 import (
 	"encoding/json"
+	"net"
 	"strconv"
+	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
 	"github.com/tsuru/bs/bslog"
@@ -14,13 +16,16 @@ import (
 )
 
 type gelfBackend struct {
-	writer *gelf.Writer
-	extra  json.RawMessage
+	extra      json.RawMessage
+	host       string
+	msgCh      chan<- LogMessage
+	quitCh     chan<- bool
+	nextNotify *time.Timer
 }
 
 func (b *gelfBackend) initialize() error {
-	var err error
-	host := config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
+	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_GELF_BUFFER_SIZE", "LOG_BUFFER_SIZE")
+	b.host = config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
 	if extra != "" {
 		data := map[string]interface{}{}
@@ -30,7 +35,9 @@ func (b *gelfBackend) initialize() error {
 			b.extra = json.RawMessage(extra)
 		}
 	}
-	b.writer, err = gelf.NewWriter(host)
+	b.nextNotify = time.NewTimer(0)
+	var err error
+	b.msgCh, b.quitCh, err = processMessages(b, bufferSize)
 	if err != nil {
 		return err
 	}
@@ -58,12 +65,46 @@ func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, cont
 		},
 		RawExtra: b.extra,
 	}
-	err := b.writer.WriteMessage(msg)
-	if err != nil {
-		bslog.Errorf("[log forwarder] failed to send gelf logs: %s", err)
-		return
+	select {
+	case b.msgCh <- msg:
+	default:
+		select {
+		case <-b.nextNotify.C:
+			bslog.Errorf("Dropping log messages to gelf due to full channel buffer.")
+			b.nextNotify.Reset(time.Minute)
+		default:
+		}
 	}
 }
 func (b *gelfBackend) stop() {
-	b.writer.Close()
+	close(b.quitCh)
+}
+
+type gelfConnWrapper struct {
+	net.Conn
+	*gelf.Writer
+}
+
+func (w *gelfConnWrapper) Close() error {
+	return w.Writer.Close()
+}
+
+func (w *gelfConnWrapper) Write(msg []byte) (int, error) {
+	return 0, nil
+}
+
+func (b *gelfBackend) connect() (net.Conn, error) {
+	writer, err := gelf.NewWriter(b.host)
+	if err != nil {
+		return nil, err
+	}
+	return &gelfConnWrapper{Writer: writer}, nil
+}
+
+func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
+	return conn.(*gelfConnWrapper).WriteMessage(msg.(*gelf.Message))
+}
+
+func (b *gelfBackend) close(conn net.Conn) {
+	conn.Close()
 }
