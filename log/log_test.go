@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Graylog2/go-gelf/gelf"
 	"github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
@@ -894,4 +895,103 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	close(lf.backends[0].(*tsuruBackend).msgCh)
 	<-done
 	b.StopTimer()
+}
+
+func (s *S) TestGelfForwarder(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
+	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
+	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
+	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
+	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
+}
+
+func (s *S) TestGelfForwarderExtraTags(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	defer os.Unsetenv("LOG_GELF_EXTRA_TAGS")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	os.Setenv("LOG_GELF_EXTRA_TAGS", `{"_tags": "TSURU"}`)
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
+	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
+	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
+	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
+	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
+	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU")
+}
+
+func (s *S) TestGelfForwarderStdErr(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<27>2015-06-05T16:13:47Z myhost docker/%s: myerr\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
+	c.Assert(gelfMsg.Short, check.Equals, "myerr")
+	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_ERR)
+	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
+	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
 }

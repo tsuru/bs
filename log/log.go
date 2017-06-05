@@ -30,6 +30,7 @@ var (
 	logBackends = map[string]func() logBackend{
 		"syslog": func() logBackend { return &syslogBackend{} },
 		"tsuru":  func() logBackend { return &tsuruBackend{} },
+		"gelf":   func() logBackend { return &gelfBackend{} },
 	}
 )
 
