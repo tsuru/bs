@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
@@ -20,6 +21,7 @@ type gelfBackend struct {
 	host       string
 	msgCh      chan<- LogMessage
 	quitCh     chan<- bool
+	tryJSON    bool
 	nextNotify *time.Timer
 }
 
@@ -35,6 +37,8 @@ func (b *gelfBackend) initialize() error {
 			b.extra = json.RawMessage(extra)
 		}
 	}
+	b.tryJSON, _ = strconv.ParseBool(config.StringEnvOrDefault("FALSE", "LOG_GELF_TRY_JSON"))
+
 	b.nextNotify = time.NewTimer(0)
 	var err error
 	b.msgCh, b.quitCh, err = processMessages(b, bufferSize)
@@ -65,6 +69,7 @@ func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, cont
 		},
 		RawExtra: b.extra,
 	}
+
 	select {
 	case b.msgCh <- msg:
 	default:
@@ -102,7 +107,30 @@ func (b *gelfBackend) connect() (net.Conn, error) {
 }
 
 func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
-	return conn.(*gelfConnWrapper).WriteMessage(msg.(*gelf.Message))
+
+	var message *gelf.Message
+	message = msg.(*gelf.Message)
+
+	// Test if message has a JSON and parsing it in extra tags of GELF
+	if b.tryJSON {
+		first := strings.Index(message.Short, "{")
+		last := strings.LastIndex(message.Short, "}") + 1
+		if first >= 0 && last >= first {
+			jsonMessage := message.Short[first:last]
+			data := map[string]interface{}{}
+			if err := json.Unmarshal([]byte(jsonMessage), &data); err == nil {
+				for k, v := range data {
+					if k[0] != '_' {
+						message.Extra["_"+k] = v
+					} else {
+						message.Extra[k] = v
+					}
+				}
+			}
+		}
+	}
+
+	return conn.(*gelfConnWrapper).WriteMessage(message)
 }
 
 func (b *gelfBackend) close(conn net.Conn) {
