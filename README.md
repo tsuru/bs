@@ -98,7 +98,7 @@ behavior.
 ### LOG_BACKENDS
 
 Comma separated list of which log backends are enabled. Currently possible
-options are `tsuru`, `syslog` and `none`. Default value is `tsuru,syslog`
+options are `tsuru`, `syslog`,`gelf` and `none`. Default value is `tsuru,syslog`
 enabling both available backends.
 
 Each backend has it's own possible config variables described in the next
@@ -164,6 +164,36 @@ Zone database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 `LOG_SYSLOG_MESSAGE_EXTRA_{START,END}` are variables that can contain any text
 to be added to the start or to the end of the forwarded syslog message. bs will
 expand environment variables present in these messages during startup.
+
+### `gelf` backend
+
+Enabling `gelf` log backend will send all received messages in Graylog Extended
+Log Format (GELF) to a Graylog2 server.
+
+#### LOG_GELF_BUFFER_SIZE
+
+`LOG_GELF_BUFFER_SIZE` is the buffer size for log messages on this backend.
+Default value is the value of `LOG_BUFFER_SIZE`.
+
+#### LOG_GELF_HOST
+
+`LOG_GELF_HOST` is the Graylog2 server endpoint to which bs will forward the
+logs from Docker containers. Log entries will be rewritten to properly identify
+the application and process responsible for the entry using `_app` and `_pid`
+as additional fields. The default value is `localhost:12201`.
+
+#### LOG_GELF_EXTRA_TAGS
+
+`LOG_GELF_EXTRA_TAGS` is the environment variable that allows add fixed extra
+fields in the log entries. Its format is JSON and every field you send must be
+prefixed with an underscore `_`. The default value is disabled.
+
+#### LOG_GELF_TRY_JSON
+
+`LOG_GELF_TRY_JSON` is a boolean value that allows rewrite log entries
+searching for JSON inside text and adding additional fields for each attribute
+found. Keys that do not start with underscore `_` will be automatically fixed.
+The default value is `false`.
 
 ### STATUS_INTERVAL
 
