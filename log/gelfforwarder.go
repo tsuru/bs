@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
@@ -16,11 +17,12 @@ import (
 )
 
 type gelfBackend struct {
-	extra      json.RawMessage
-	host       string
-	msgCh      chan<- LogMessage
-	quitCh     chan<- bool
-	nextNotify *time.Timer
+	extra           json.RawMessage
+	host            string
+	fieldsWhitelist []string
+	msgCh           chan<- LogMessage
+	quitCh          chan<- bool
+	nextNotify      *time.Timer
 }
 
 func (b *gelfBackend) initialize() error {
@@ -35,6 +37,14 @@ func (b *gelfBackend) initialize() error {
 			b.extra = json.RawMessage(extra)
 		}
 	}
+	b.fieldsWhitelist = config.StringsEnvOrDefault([]string{
+		"request_id",
+		"request_time",
+		"request_uri",
+		"status",
+		"method",
+		"uri",
+	}, "LOG_GELF_FIELDS_WHITELIST")
 	b.nextNotify = time.NewTimer(0)
 	var err error
 	b.msgCh, b.quitCh, err = processMessages(b, bufferSize)
@@ -101,8 +111,29 @@ func (b *gelfBackend) connect() (net.Conn, error) {
 	return &gelfConnWrapper{Writer: writer}, nil
 }
 
+func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
+	shortMsg := gelfMsg.Short
+	if !strings.Contains(shortMsg, "=") {
+		return
+	}
+	for _, field := range b.fieldsWhitelist {
+		idx := strings.Index(shortMsg, field+"=")
+		if idx == -1 {
+			continue
+		}
+		idx += len(field) + 1
+		end := strings.Index(shortMsg[idx:], " ")
+		if end == -1 {
+			end = len(shortMsg) - idx
+		}
+		gelfMsg.Extra["_"+field] = shortMsg[idx : idx+end]
+	}
+}
+
 func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
-	return conn.(*gelfConnWrapper).WriteMessage(msg.(*gelf.Message))
+	gelfMsg := msg.(*gelf.Message)
+	b.parseFields(gelfMsg)
+	return conn.(*gelfConnWrapper).WriteMessage(gelfMsg)
 }
 
 func (b *gelfBackend) close(conn net.Conn) {
