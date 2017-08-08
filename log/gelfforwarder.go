@@ -108,6 +108,7 @@ func (b *gelfBackend) connect() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	writer.CompressionType = gelf.CompressNone
 	return &gelfConnWrapper{Writer: writer}, nil
 }
 
