@@ -1032,3 +1032,50 @@ func (s *S) TestGelfForwarderStdErr(c *check.C) {
 	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
 	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
 }
+
+func BenchmarkMessagesGelfBackendProcess(b *testing.B) {
+	b.StopTimer()
+	disableLog()
+	startReceiver := func() net.Conn {
+		addr, recErr := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		udpConn, recErr := net.ListenUDP("udp", addr)
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		go func() {
+			io.Copy(ioutil.Discard, udpConn)
+		}()
+		return udpConn
+	}
+	conn := startReceiver()
+	os.Setenv("LOG_GELF_HOST", conn.LocalAddr().String())
+	be := gelfBackend{}
+	err := be.initialize()
+	if err != nil {
+		b.Fatal(err)
+	}
+	gelfConn, err := be.connect()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err = be.process(gelfConn, &gelf.Message{
+			Version: "1.1",
+			Host:    "mycont",
+			Short:   "mymsg",
+			Level:   gelf.LOG_ERR,
+			Extra: map[string]interface{}{
+				"_app": "app1",
+				"_pid": "process1",
+			},
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
