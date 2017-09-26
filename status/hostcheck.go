@@ -35,7 +35,7 @@ type hostCheckResult struct {
 	Successful bool
 }
 
-var cgroupIDRegexp = regexp.MustCompile(`(?ms)/docker/(.*?)$`)
+var cgroupIDRegexp = regexp.MustCompile(`(?ms).*/(.*?)$`)
 
 func NewCheckCollection(client *docker.Client) *checkCollection {
 	hostCheckTimeout := config.SecondsEnvOrDefault(0, "HOSTCHECK_TIMEOUT")
@@ -125,24 +125,27 @@ type createContainerCheck struct {
 	message    string
 }
 
+func parseContainerID(file string) (string, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return "", err
+	}
+	result := cgroupIDRegexp.FindSubmatch(data)
+	if len(result) != 2 {
+		return "", fmt.Errorf("unable to parse container id from %q, returned data:\n%s", file, string(data))
+	}
+	return string(result[1]), nil
+}
+
 func (c *createContainerCheck) setBaseContainerID() error {
 	if c.baseContID != "" {
 		return nil
 	}
-	cgroupFile, err := os.Open("/proc/1/cgroup")
+	var err error
+	c.baseContID, err = parseContainerID("/proc/self/cgroup")
 	if err != nil {
 		return err
 	}
-	defer cgroupFile.Close()
-	data, err := ioutil.ReadAll(cgroupFile)
-	if err != nil {
-		return err
-	}
-	result := cgroupIDRegexp.FindSubmatch(data)
-	if len(result) != 2 {
-		return fmt.Errorf("unable to parse container id from /proc/1/cgroup, returned data:\n%s", string(data))
-	}
-	c.baseContID = string(result[1])
 	return nil
 }
 
