@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	docker "github.com/fsouza/go-dockerclient"
+	dTesting "github.com/fsouza/go-dockerclient/testing"
+	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
@@ -271,12 +274,38 @@ func (s *S) TestLogEntryFromName(c *check.C) {
 	}
 }
 
+func serverWithClient(c *check.C) (*dTesting.DockerServer, *container.InfoClient) {
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
+	c.Assert(err, check.IsNil)
+	cli, err := container.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	err = cli.GetClient().PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
+	c.Assert(err, check.IsNil)
+	createCont := func(name string) {
+		config := docker.Config{
+			Image: "myimg",
+			Cmd:   []string{"mycmd"},
+			Env:   []string{"ENV1=val1", "TSURU_PROCESSNAME=procx", "TSURU_APPNAME=coolappname"},
+		}
+		opts := docker.CreateContainerOptions{Name: name, Config: &config}
+		_, err = cli.GetClient().CreateContainer(opts)
+		c.Assert(err, check.IsNil)
+	}
+	createCont("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b")
+	createCont("contID1")
+	createCont("contID2")
+	createCont("contID3")
+	return dockerServer, cli
+}
+
 func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
 	dirName, err := ioutil.TempDir("", "bs-kube-log")
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName, dirName)
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
@@ -297,8 +326,10 @@ func (s *S) TestKubernetesLogStreamerWatchCreatesPosDir(c *check.C) {
 	dirName, err := ioutil.TempDir("", "bs-kube-log")
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName, dirName+"/posdir")
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName+"/posdir")
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
@@ -329,12 +360,43 @@ func (s *S) TestKubernetesLogStreamerWatchCreatesPosDir(c *check.C) {
 	c.Assert(string(data), check.Equals, strconv.FormatInt(ts0.UnixNano(), 10))
 }
 
+func (s *S) TestKubernetesLogStreamerWatchNotTsuruContainer(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
+	config := docker.Config{
+		Image: "myimg",
+		Cmd:   []string{"mycmd"},
+		Env:   []string{"ENV1=val1"},
+	}
+	opts := docker.CreateContainerOptions{Name: "contIDNotTSURU", Config: &config}
+	_, err = cli.GetClient().CreateContainer(opts)
+	c.Assert(err, check.IsNil)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName)
+	c.Assert(err, check.IsNil)
+	go streamer.watch()
+	defer streamer.stop()
+	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-contIDNotTSURU.log")
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	select {
+	case <-th.parts:
+		c.Fatal("no parts expected")
+	case <-time.After(500 * time.Millisecond):
+	}
+}
+
 func (s *S) TestKubernetesLogStreamerWatchIgnoredFiles(c *check.C) {
 	dirName, err := ioutil.TempDir("", "bs-kube-log")
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName, dirName)
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
@@ -371,8 +433,10 @@ func (s *S) TestKubernetesLogStreamerWatchKilledWatcher(c *check.C) {
 	dirName, err := ioutil.TempDir("", "bs-kube-log")
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName, dirName)
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	go streamer.watch()
 	defer streamer.stop()
@@ -403,8 +467,10 @@ func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
 	dirName, err := ioutil.TempDir("", "bs-kube-log")
 	c.Assert(err, check.IsNil)
 	defer os.RemoveAll(dirName)
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	streamer, err := newKubeLogStreamer(th, dirName, dirName)
+	streamer, err := newKubeLogStreamer(th, cli, dirName, dirName)
 	c.Assert(err, check.IsNil)
 	name := filepath.Join(dirName, "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log")
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
@@ -425,7 +491,9 @@ func (s *S) TestKubernetesLogStreamerWatchRemoveOld(c *check.C) {
 }
 
 func (s *S) TestKubernetesLogStreamerDirNotFound(c *check.C) {
+	srv, cli := serverWithClient(c)
+	defer srv.Stop()
 	th := &testHandler{parts: make(chan format.LogParts)}
-	_, err := newKubeLogStreamer(th, "/some/invalid/path", "")
+	_, err := newKubeLogStreamer(th, cli, "/some/invalid/path", "")
 	c.Assert(err, check.Equals, errNoLogDirectory)
 }
