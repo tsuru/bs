@@ -232,6 +232,12 @@ func newKubeLogStreamer(handler syslog.Handler, dir, posDir string) (*kubernetes
 		}
 		return nil, err
 	}
+	if posDir != "" {
+		err = os.MkdirAll(posDir, 0755)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &kubernetesLogStreamer{
 		dir:      dir,
 		posDir:   posDir,

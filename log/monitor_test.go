@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"gopkg.in/check.v1"
@@ -150,7 +151,7 @@ func (s *S) TestFileMonitorRunRestartShouldNotRepeatLines(c *check.C) {
 		c.Check(parts["parts"], check.DeepEquals, &expected)
 	}
 	for {
-		_, err := os.Stat(m.posFile)
+		_, err = os.Stat(m.posFile)
 		if err == nil {
 			break
 		}
@@ -290,6 +291,42 @@ func (s *S) TestKubernetesLogStreamerWatch(c *check.C) {
 		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
 		priority:  []byte("27"),
 	})
+}
+
+func (s *S) TestKubernetesLogStreamerWatchCreatesPosDir(c *check.C) {
+	dirName, err := ioutil.TempDir("", "bs-kube-log")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(dirName)
+	th := &testHandler{parts: make(chan format.LogParts)}
+	streamer, err := newKubeLogStreamer(th, dirName, dirName+"/posdir")
+	c.Assert(err, check.IsNil)
+	go streamer.watch()
+	defer streamer.stop()
+	fName := "myapp-web-2453793373-cbk0k_default_myapp-web-e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b.log"
+	name := filepath.Join(dirName, fName)
+	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
+	c.Assert(err, check.IsNil)
+	parts := partsTimeout(c, th.parts)
+	ts0, _ := time.Parse(time.RFC3339, "2017-03-21T21:28:52Z")
+	c.Check(parts["parts"], check.DeepEquals, &rawLogParts{
+		content:   []byte("msg-single"),
+		ts:        ts0,
+		container: []byte("e50ac4567691092729a360a3a8fdc9741e81030dd3f8e90633c71cba88e32f6b"),
+		priority:  []byte("27"),
+	})
+	var data []byte
+	for {
+		data, _ = ioutil.ReadFile(filepath.Join(dirName+"/posdir", fName+".tsurubs.pos"))
+		if len(data) > 0 {
+			break
+		}
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-time.After(5 * time.Second):
+			c.Fatal("timeout waiting for pos file")
+		}
+	}
+	c.Assert(string(data), check.Equals, strconv.FormatInt(ts0.UnixNano(), 10))
 }
 
 func (s *S) TestKubernetesLogStreamerWatchIgnoredFiles(c *check.C) {
