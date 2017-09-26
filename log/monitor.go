@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/container"
 	"gopkg.in/mcuadros/go-syslog.v2"
 	"gopkg.in/mcuadros/go-syslog.v2/format"
 )
@@ -222,9 +223,10 @@ type kubernetesLogStreamer struct {
 	quit     chan struct{}
 	monitors map[string]*fileMonitor
 	handler  syslog.Handler
+	client   *container.InfoClient
 }
 
-func newKubeLogStreamer(handler syslog.Handler, dir, posDir string) (*kubernetesLogStreamer, error) {
+func newKubeLogStreamer(handler syslog.Handler, client *container.InfoClient, dir, posDir string) (*kubernetesLogStreamer, error) {
 	_, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -244,6 +246,7 @@ func newKubeLogStreamer(handler syslog.Handler, dir, posDir string) (*kubernetes
 		handler:  handler,
 		quit:     make(chan struct{}),
 		monitors: make(map[string]*fileMonitor),
+		client:   client,
 	}, nil
 }
 
@@ -268,6 +271,13 @@ func (s *kubernetesLogStreamer) watchOnce() {
 		entry := logEntryFromName(fileName)
 		if entry.containerName == podContainerName ||
 			entry.namespace == kubeSystemNamespace {
+			continue
+		}
+		_, err = s.client.GetAppContainer(entry.containerID, true)
+		if err != nil {
+			if err != container.ErrTsuruVariablesNotFound {
+				bslog.Errorf("unable to get container info for %q: %s", f, err)
+			}
 			continue
 		}
 		m := s.monitors[entry.containerID]
