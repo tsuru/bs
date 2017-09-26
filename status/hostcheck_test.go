@@ -135,6 +135,51 @@ func (s S) TestCheckCollectionRunTimeout(c *check.C) {
 	})
 }
 
+func (s S) TestParseContainerID(c *check.C) {
+	tests := []struct {
+		data     string
+		expected string
+	}{
+		{
+			`11:freezer:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+10:cpuacct,cpu:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+9:pids:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+8:blkio:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+7:memory:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+6:cpuset:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+5:devices:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+4:perf_event:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+3:net_prio,net_cls:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+2:hugetlb:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+1:name=systemd:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad`,
+			"3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad",
+		},
+		{
+			`11:name=systemd:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+10:hugetlb:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+9:perf_event:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+8:blkio:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+7:freezer:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+6:devices:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+5:memory:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+4:cpuacct:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+3:cpu:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+2:cpuset:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804`,
+			"6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804",
+		},
+	}
+	for _, tt := range tests {
+		f, err := ioutil.TempFile("", "tsurutests")
+		c.Assert(err, check.IsNil)
+		defer os.Remove(f.Name())
+		f.Write([]byte(tt.data))
+		f.Close()
+		id, err := parseContainerID(f.Name())
+		c.Assert(err, check.IsNil)
+		c.Assert(id, check.Equals, tt.expected)
+	}
+}
+
 func stopContainer(client *docker.Client, exceptID string, c *check.C) chan bool {
 	done := make(chan bool)
 	go func() {
