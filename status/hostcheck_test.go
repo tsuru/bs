@@ -139,9 +139,10 @@ func (s S) TestParseContainerID(c *check.C) {
 	tests := []struct {
 		data     string
 		expected string
+		err      string
 	}{
 		{
-			`11:freezer:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
+			data: `11:freezer:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
 10:cpuacct,cpu:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
 9:pids:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
 8:blkio:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
@@ -152,10 +153,10 @@ func (s S) TestParseContainerID(c *check.C) {
 3:net_prio,net_cls:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
 2:hugetlb:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad
 1:name=systemd:/kubepods/besteffort/pod1a487934-a2c7-11e7-9ab6-06d3b605db81/3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad`,
-			"3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad",
+			expected: "3e86c741c2c6bd556d5e8a3e5bc56363ca40a81927e6d55c30aefdcea7ca54ad",
 		},
 		{
-			`11:name=systemd:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
+			data: `11:name=systemd:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
 10:hugetlb:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
 9:perf_event:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
 8:blkio:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
@@ -165,7 +166,35 @@ func (s S) TestParseContainerID(c *check.C) {
 4:cpuacct:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
 3:cpu:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804
 2:cpuset:/docker/6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804`,
-			"6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804",
+			expected: "6d52b4d36625e83be18320e0ce56304186e205334510131e14c6dc73526f5804",
+		},
+		{
+			data: `11:memory:/user.slice
+10:hugetlb:/
+9:pids:/user.slice/user-900.slice
+8:cpuset:/
+7:freezer:/
+6:devices:/user.slice
+5:cpu,cpuacct:/user.slice
+4:net_cls,net_prio:/
+3:blkio:/user.slice
+2:perf_event:/
+1:name=systemd:/user.slice/user-900.slice/session-22.scope`,
+			err: "(?s)unable to parse container id from .*",
+		},
+		{
+			data: `11:memory:/init.scope
+10:hugetlb:/
+9:pids:/init.scope
+8:cpuset:/
+7:freezer:/
+6:devices:/init.scope
+5:cpu,cpuacct:/init.scope
+4:net_cls,net_prio:/
+3:blkio:/init.scope
+2:perf_event:/
+1:name=systemd:/init.scope`,
+			err: "(?s)unable to parse container id from .*",
 		},
 	}
 	for _, tt := range tests {
@@ -175,8 +204,13 @@ func (s S) TestParseContainerID(c *check.C) {
 		f.Write([]byte(tt.data))
 		f.Close()
 		id, err := parseContainerID(f.Name())
-		c.Assert(err, check.IsNil)
-		c.Assert(id, check.Equals, tt.expected)
+		if tt.err != "" {
+			c.Assert(err, check.ErrorMatches, tt.err)
+			c.Assert(id, check.Equals, "")
+		} else {
+			c.Assert(err, check.IsNil)
+			c.Assert(id, check.Equals, tt.expected)
+		}
 	}
 }
 

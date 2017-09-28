@@ -35,7 +35,7 @@ type hostCheckResult struct {
 	Successful bool
 }
 
-var cgroupIDRegexp = regexp.MustCompile(`(?ms).*/(.*?)$`)
+var cgroupIDRegexp = regexp.MustCompile(`(?ms).*/([a-fA-F0-9]+?)$`)
 
 func NewCheckCollection(client *docker.Client) *checkCollection {
 	hostCheckTimeout := config.SecondsEnvOrDefault(0, "HOSTCHECK_TIMEOUT")
