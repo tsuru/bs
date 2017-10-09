@@ -136,7 +136,7 @@ func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
 		gelfMsg.Level = gelf.LOG_CRIT
 	case "ERR", "ERROR":
 		gelfMsg.Level = gelf.LOG_ERR
-	case "WARN", "WANING":
+	case "WARN", "WARNING":
 		gelfMsg.Level = gelf.LOG_WARNING
 	case "NOTICE":
 		gelfMsg.Level = gelf.LOG_NOTICE
