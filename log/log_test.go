@@ -1001,6 +1001,41 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	})
 }
 
+func (s *S) TestGelfForwarderParseLevel(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	defer os.Unsetenv("LOG_GELF_FIELDS_WHITELIST")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	os.Setenv("LOG_GELF_FIELDS_WHITELIST", "request_id,status")
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: level=CRITICAL mymsg\n", s.id))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
+	c.Assert(gelfMsg.Short, check.Equals, "level=CRITICAL mymsg")
+	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_CRIT)
+	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
+		"_app": "coolappname",
+		"_pid": "procx",
+	})
+}
+
 func (s *S) TestGelfForwarderStdErr(c *check.C) {
 	defer os.Unsetenv("LOG_GELF_HOST")
 	reader, err := gelf.NewReader("127.0.0.1:0")

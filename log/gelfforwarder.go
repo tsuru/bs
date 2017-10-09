@@ -118,16 +118,32 @@ func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
 		return
 	}
 	for _, field := range b.fieldsWhitelist {
-		idx := strings.Index(shortMsg, field+"=")
-		if idx == -1 {
+		value := findFieldInMsg(shortMsg, field)
+		if value == "" {
 			continue
 		}
-		idx += len(field) + 1
-		end := strings.Index(shortMsg[idx:], " ")
-		if end == -1 {
-			end = len(shortMsg) - idx
-		}
-		gelfMsg.Extra["_"+field] = shortMsg[idx : idx+end]
+		gelfMsg.Extra["_"+field] = value
+	}
+
+	level := findFieldInMsg(shortMsg, "level")
+
+	switch level {
+	case "EMERG":
+		gelfMsg.Level = gelf.LOG_EMERG
+	case "ALERT":
+		gelfMsg.Level = gelf.LOG_ALERT
+	case "CRIT", "CRITICAL":
+		gelfMsg.Level = gelf.LOG_CRIT
+	case "ERR", "ERROR":
+		gelfMsg.Level = gelf.LOG_ERR
+	case "WARN", "WANING":
+		gelfMsg.Level = gelf.LOG_WARNING
+	case "NOTICE":
+		gelfMsg.Level = gelf.LOG_NOTICE
+	case "INFO":
+		gelfMsg.Level = gelf.LOG_INFO
+	case "DEBUG":
+		gelfMsg.Level = gelf.LOG_DEBUG
 	}
 }
 
@@ -139,4 +155,18 @@ func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
 
 func (b *gelfBackend) close(conn net.Conn) {
 	conn.Close()
+}
+
+func findFieldInMsg(msg, field string) string {
+	idx := strings.Index(msg, field+"=")
+	if idx == -1 {
+		return ""
+	}
+	idx += len(field) + 1
+	end := strings.Index(msg[idx:], " ")
+	if end == -1 {
+		end = len(msg) - idx
+	}
+
+	return msg[idx : idx+end]
 }
