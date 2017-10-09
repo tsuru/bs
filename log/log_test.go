@@ -1019,7 +1019,7 @@ func (s *S) TestGelfForwarderParseLevel(c *check.C) {
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
-	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: level=CRITICAL mymsg\n", s.id))
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: level=critical mymsg\n", s.id))
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 
@@ -1028,7 +1028,7 @@ func (s *S) TestGelfForwarderParseLevel(c *check.C) {
 	c.Assert(gelfMsg, check.Not(check.IsNil))
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
-	c.Assert(gelfMsg.Short, check.Equals, "level=CRITICAL mymsg")
+	c.Assert(gelfMsg.Short, check.Equals, "level=critical mymsg")
 	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_CRIT)
 	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
 		"_app": "coolappname",

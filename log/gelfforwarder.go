@@ -125,7 +125,7 @@ func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
 		gelfMsg.Extra["_"+field] = value
 	}
 
-	level := findFieldInMsg(shortMsg, "level")
+	level := strings.ToUpper(findFieldInMsg(shortMsg, "level"))
 
 	switch level {
 	case "EMERG":
