@@ -128,11 +128,11 @@ func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
 	level := strings.ToUpper(findFieldInMsg(shortMsg, "level"))
 
 	switch level {
-	case "EMERG":
+	case "EMERG", "PANIC":
 		gelfMsg.Level = gelf.LOG_EMERG
 	case "ALERT":
 		gelfMsg.Level = gelf.LOG_ALERT
-	case "CRIT", "CRITICAL":
+	case "CRIT", "CRITICAL", "FATAL":
 		gelfMsg.Level = gelf.LOG_CRIT
 	case "ERR", "ERROR":
 		gelfMsg.Level = gelf.LOG_ERR
