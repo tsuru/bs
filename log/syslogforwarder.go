@@ -32,10 +32,12 @@ type syslogBackend struct {
 }
 
 type syslogForwarder struct {
-	url          *url.URL
-	bufferPool   *sync.Pool
-	mtu          int
-	messageLimit int
+	url           *url.URL
+	bufferPool    *sync.Pool
+	mtu           int
+	messageLimit  int
+	connCreatedAt time.Time
+	connMaxAge    time.Duration
 }
 
 func (b *syslogBackend) initialize() error {
@@ -78,6 +80,7 @@ func (b *syslogBackend) initialize() error {
 		},
 	}
 	b.nextNotify = time.NewTimer(0)
+	connMaxAge := config.SecondsEnvOrDefault(-1, "LOG_SYSLOG_CONN_MAX_AGE")
 	for _, addr := range forwardAddresses {
 		forwardUrl, err := url.Parse(addr)
 		if err != nil {
@@ -87,6 +90,7 @@ func (b *syslogBackend) initialize() error {
 			url:        forwardUrl,
 			bufferPool: &b.bufferPool,
 			mtu:        mtu,
+			connMaxAge: connMaxAge,
 		}, bufferSize)
 		if err != nil {
 			return err
@@ -168,6 +172,7 @@ func (f *syslogForwarder) connect() (net.Conn, error) {
 	}
 	if f.url.Scheme == "tcp" {
 		conn = newBufferedConn(conn, time.Second)
+		f.connCreatedAt = time.Now()
 	} else {
 		f.messageLimit = f.mtu - udpHeaderSz
 	}
@@ -220,7 +225,14 @@ func (f *syslogForwarder) splitParts(conn net.Conn, bufIdx bufferWithIdx) error 
 
 func (f *syslogForwarder) process(conn net.Conn, msg LogMessage) error {
 	bufIdx := msg.(bufferWithIdx)
-	return f.splitParts(conn, bufIdx)
+	err := f.splitParts(conn, bufIdx)
+	if err != nil {
+		return err
+	}
+	if f.url.Scheme == "tcp" && f.connMaxAge >= 0 && time.Since(f.connCreatedAt) >= f.connMaxAge {
+		return errConnMaxAgeExceeded
+	}
+	return nil
 }
 
 func (f *syslogForwarder) writePart(conn net.Conn, buf []byte) error {
