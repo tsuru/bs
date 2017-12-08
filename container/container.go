@@ -19,9 +19,10 @@ import (
 var (
 	ErrTsuruVariablesNotFound = errors.New("could not find wanted envs")
 
-	hexRegex          = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
-	processNameLabels = []string{"bs.tsuru.io/log-app-name", "log-app-name", "io.kubernetes.pod.name"}
-	appNameLabels     = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.container.name"}
+	hexRegex = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
+
+	appNameLabels     = []string{"bs.tsuru.io/log-app-name", "log-app-name", "io.kubernetes.container.name"}
+	processNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.pod.name"}
 )
 
 const containerIDTrimSize = 12
