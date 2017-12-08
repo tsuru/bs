@@ -80,8 +80,8 @@ func serverWithContainer() (*dTesting.DockerServer, string, error) {
 	return dockerServer, cont.ID, nil
 }
 
-func (s *S) addGenericContainer(name string, labels map[string]string) (string, error) {
-	dockerClient, err := docker.NewClient(s.dockerServer.URL())
+func addGenericContainer(name string, labels map[string]string, serverURL string) (string, error) {
+	dockerClient, err := docker.NewClient(serverURL)
 	if err != nil {
 		return "", err
 	}
@@ -713,7 +713,7 @@ func (s *S) TestLogForwarderStress(c *check.C) {
 }
 
 func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
-	contID, err := s.addGenericContainer("big-sibling", nil)
+	contID, err := addGenericContainer("big-sibling", nil, s.dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	c.Assert(err, check.IsNil)
@@ -744,7 +744,10 @@ func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
 }
 
 func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
-	contID, err := s.addGenericContainer("big-sibling", map[string]string{"io.kubernetes.pod.name": "my-pod", "io.kubernetes.container.name": "my-cont"})
+	contID, err := addGenericContainer("big-sibling", map[string]string{
+		"io.kubernetes.pod.name":       "my-pod",
+		"io.kubernetes.container.name": "my-cont",
+	}, s.dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	c.Assert(err, check.IsNil)
@@ -878,6 +881,66 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	b.StopTimer()
 	lf.server.Kill()
 	lf.Wait()
+}
+
+func BenchmarkMessagesBroadcastNonAppContainer(b *testing.B) {
+	b.StopTimer()
+	disableLog()
+	dockerServer, _, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	contID, err := addGenericContainer("big-sibling", map[string]string{
+		"io.kubernetes.pod.name":       "my-pod",
+		"io.kubernetes.container.name": "my-cont",
+	}, dockerServer.URL())
+	if err != nil {
+		b.Fatal(err)
+	}
+	startReceiver := func() net.Conn {
+		addr, recErr := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		udpConn, recErr := net.ListenUDP("udp", addr)
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		return udpConn
+	}
+	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		io.Copy(ioutil.Discard, ws)
+	}))
+	defer srv.Close()
+	os.Setenv("TSURU_ENDPOINT", srv.URL)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+forwardedConns[0].LocalAddr().String()+",udp://"+forwardedConns[1].LocalAddr().String())
+	os.Setenv("LOG_TSURU_BUFFER_SIZE", "1000000")
+	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
+	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
+	lf := LogForwarder{
+		BindAddress:     "tcp://127.0.0.1:59317",
+		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends: []string{"tsuru", "syslog"},
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer lf.stopWait()
+	rPart := &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}
+	parts := format.LogParts{"parts": rPart}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(parts, 1, nil)
+	}
+	b.StopTimer()
 }
 
 func BenchmarkMessagesBroadcast(b *testing.B) {
