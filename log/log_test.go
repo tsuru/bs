@@ -80,6 +80,31 @@ func serverWithContainer() (*dTesting.DockerServer, string, error) {
 	return dockerServer, cont.ID, nil
 }
 
+func (s *S) addGenericContainer(name string, labels map[string]string) (string, error) {
+	dockerClient, err := docker.NewClient(s.dockerServer.URL())
+	if err != nil {
+		return "", err
+	}
+	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
+	if err != nil {
+		return "", err
+	}
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	config := docker.Config{
+		Image:  "myimg",
+		Cmd:    []string{"mycmd"},
+		Labels: labels,
+	}
+	opts := docker.CreateContainerOptions{Name: name, Config: &config}
+	cont, err := dockerClient.CreateContainer(opts)
+	if err != nil {
+		return "", err
+	}
+	return cont.ID, nil
+}
+
 func (s *S) SetUpTest(c *check.C) {
 	var err error
 	s.dockerServer, s.id, err = serverWithContainer()
@@ -685,6 +710,68 @@ func (s *S) TestLogForwarderStress(c *check.C) {
 		expected[i] = fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg %05d", s.idShort, i)
 	}
 	c.Assert(messages, check.DeepEquals, expected)
+}
+
+func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
+	contID, err := s.addGenericContainer("big-sibling", nil)
+	c.Assert(err, check.IsNil)
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	udpConn, err := net.ListenUDP("udp", addr)
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	cont, err := lf.infoClient.GetContainer(contID, false, nil)
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", contID))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+	buffer := make([]byte, 1024)
+	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	n, err := udpConn.Read(buffer)
+	c.Assert(err, check.IsNil)
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s big-sibling[%s]: mymsg\n", cont.ShortHostName(), contID))
+}
+
+func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
+	contID, err := s.addGenericContainer("big-sibling", map[string]string{"io.kubernetes.pod.name": "my-pod", "io.kubernetes.container.name": "my-cont"})
+	c.Assert(err, check.IsNil)
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	udpConn, err := net.ListenUDP("udp", addr)
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"syslog"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	cont, err := lf.infoClient.GetContainer(contID, false, nil)
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", contID))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+	buffer := make([]byte, 1024)
+	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	n, err := udpConn.Read(buffer)
+	c.Assert(err, check.IsNil)
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s my-cont[my-pod]: mymsg\n", cont.ShortHostName()))
 }
 
 func startReceiver(expected int, ch chan struct{}, data ...chan string) net.Listener {

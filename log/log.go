@@ -22,7 +22,6 @@ const (
 	forwardConnDialTimeout  = time.Second
 	forwardConnWriteTimeout = time.Second
 	noneBackend             = "none"
-	containerIDTrimSize     = 12
 )
 
 var (
@@ -217,12 +216,38 @@ func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
 		return
 	}
 	contStr := string(parts.container)
-	contData, err := l.infoClient.GetAppContainer(contStr, true)
+	contData, err := l.infoClient.GetContainer(contStr, true, nil)
 	if err != nil {
-		bslog.Debugf("[log forwarder] ignored msg %v error to get appname: %s", parts, err)
+		bslog.Debugf("[log forwarder] error getting container %v for msg %v", contStr, parts)
+		return
+	}
+	contID := contData.ShortHostName()
+	if contData.AppName == "" {
+		l.handleGeneral(parts, contData, contID)
 		return
 	}
 	for _, backend := range l.backends {
-		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contStr)
+		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contID)
+	}
+}
+
+var processNameLabels = []string{"bs.tsuru.io/log-app-name", "log-name", "io.kubernetes.pod.name"}
+var appNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.container.name"}
+
+// handleGeneral handles logging for non tsuru app containers
+func (l *LogForwarder) handleGeneral(logParts *rawLogParts, cont *container.Container, contStr string) {
+	name, ok := cont.GetLabelAny(appNameLabels...)
+	if !ok {
+		name = cont.Name
+	}
+	process, ok := cont.GetLabelAny(processNameLabels...)
+	if !ok {
+		process = cont.ID
+	}
+	for _, backend := range l.backends {
+		if _, ok := backend.(*tsuruBackend); ok {
+			continue
+		}
+		backend.sendMessage(logParts, name, process, cont.Config.Hostname)
 	}
 }
