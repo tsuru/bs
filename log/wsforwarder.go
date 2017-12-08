@@ -91,9 +91,6 @@ func (b *tsuruBackend) initialize() error {
 }
 
 func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
-	if len(container) > containerIDTrimSize {
-		container = container[:containerIDTrimSize]
-	}
 	msg := &app.Applog{
 		Date:    parts.ts,
 		AppName: appName,

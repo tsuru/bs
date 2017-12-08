@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +17,10 @@ import (
 )
 
 var ErrTsuruVariablesNotFound = errors.New("could not find wanted envs")
+
+var hexRegex = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
+
+const containerIDTrimSize = 12
 
 type InfoClient struct {
 	endpoint       string
@@ -28,6 +33,13 @@ type Container struct {
 	client      *InfoClient
 	AppName     string
 	ProcessName string
+}
+
+func (c *Container) ShortHostName() string {
+	if hexRegex.MatchString(c.Config.Hostname) && len(c.Config.Hostname) > containerIDTrimSize {
+		return c.Config.Hostname[:containerIDTrimSize]
+	}
+	return c.Config.Hostname
 }
 
 const (
@@ -160,4 +172,14 @@ func (c *Container) HasEnvs(requiredEnvs []string) bool {
 		}
 	}
 	return true
+}
+
+// GetLabelAny returns the first label value that exists with given names
+func (c *Container) GetLabelAny(names ...string) (string, bool) {
+	for _, n := range names {
+		if label, ok := c.Config.Labels[n]; ok {
+			return label, true
+		}
+	}
+	return "", false
 }

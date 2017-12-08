@@ -55,9 +55,6 @@ func (b *gelfBackend) initialize() error {
 }
 
 func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
-	if len(container) > containerIDTrimSize {
-		container = container[:containerIDTrimSize]
-	}
 	level := gelf.LOG_INFO
 	if s, err := strconv.Atoi(string(parts.priority)); err == nil {
 		if int32(s)&gelf.LOG_ERR == gelf.LOG_ERR {

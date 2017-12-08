@@ -112,17 +112,13 @@ func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, co
 	if lenSyslogs == 0 {
 		return
 	}
-	contID := parts.container
-	if len(contID) > containerIDTrimSize {
-		contID = contID[:containerIDTrimSize]
-	}
 	buffer := b.bufferPool.Get().([]byte)[:0]
 	buffer = append(buffer, '<')
 	buffer = append(buffer, parts.priority...)
 	buffer = append(buffer, '>')
 	buffer = append(buffer, parts.ts.In(b.syslogLocation).Format(time.Stamp)...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, contID...)
+	buffer = append(buffer, container...)
 	buffer = append(buffer, ' ')
 	buffer = append(buffer, appName...)
 	buffer = append(buffer, '[')
