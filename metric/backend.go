@@ -24,14 +24,17 @@ func NewContainerInfo(container *container.Container) ContainerInfo {
 	if container.Name != "" {
 		name = container.Name[1:]
 	}
-	return ContainerInfo{
+	info := ContainerInfo{
 		Name:     name,
 		Image:    container.Config.Image,
-		Hostname: container.Config.Hostname,
-		Process:  container.ProcessName,
-		App:      container.AppName,
+		Hostname: container.ShortHostname,
 		Labels:   container.Config.Labels,
 	}
+	if container.TsuruApp {
+		info.Process = container.ProcessName
+		info.App = container.AppName
+	}
+	return info
 }
 
 type HostInfo struct {
