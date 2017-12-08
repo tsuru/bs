@@ -19,10 +19,10 @@ check-format:
 run:
 	go run main.go
 
-_build:
+build:
 	go build -ldflags "-linkmode external -extldflags -static"
 
-publish-local: _build
+publish-local:
 	docker build -t 127.0.0.1:5000/tsuru/bs .
 	docker push 127.0.0.1:5000/tsuru/bs
 
