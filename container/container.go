@@ -30,16 +30,10 @@ type InfoClient struct {
 
 type Container struct {
 	docker.Container
-	client      *InfoClient
-	AppName     string
-	ProcessName string
-}
-
-func (c *Container) ShortHostName() string {
-	if hexRegex.MatchString(c.Config.Hostname) && len(c.Config.Hostname) > containerIDTrimSize {
-		return c.Config.Hostname[:containerIDTrimSize]
-	}
-	return c.Config.Hostname
+	client        *InfoClient
+	AppName       string
+	ProcessName   string
+	ShortHostname string
 }
 
 const (
@@ -129,6 +123,10 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 				*v = env[len(k):]
 			}
 		}
+	}
+	contData.ShortHostname = contData.Config.Hostname
+	if hexRegex.MatchString(contData.Config.Hostname) && len(contData.Config.Hostname) > containerIDTrimSize {
+		contData.ShortHostname = contData.Config.Hostname[:containerIDTrimSize]
 	}
 	c.containerCache.Add(containerId, &contData)
 	return &contData, nil

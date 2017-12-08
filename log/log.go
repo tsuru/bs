@@ -221,13 +221,12 @@ func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
 		bslog.Debugf("[log forwarder] error getting container %v for msg %v", contStr, parts)
 		return
 	}
-	contID := contData.ShortHostName()
 	if contData.AppName == "" {
-		l.handleGeneral(parts, contData, contID)
+		l.handleGeneral(parts, contData)
 		return
 	}
 	for _, backend := range l.backends {
-		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contID)
+		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contData.ShortHostname)
 	}
 }
 
@@ -235,7 +234,7 @@ var processNameLabels = []string{"bs.tsuru.io/log-app-name", "log-name", "io.kub
 var appNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.container.name"}
 
 // handleGeneral handles logging for non tsuru app containers
-func (l *LogForwarder) handleGeneral(logParts *rawLogParts, cont *container.Container, contStr string) {
+func (l *LogForwarder) handleGeneral(logParts *rawLogParts, cont *container.Container) {
 	name, ok := cont.GetLabelAny(appNameLabels...)
 	if !ok {
 		name = cont.Name
@@ -248,6 +247,6 @@ func (l *LogForwarder) handleGeneral(logParts *rawLogParts, cont *container.Cont
 		if _, ok := backend.(*tsuruBackend); ok {
 			continue
 		}
-		backend.sendMessage(logParts, name, process, cont.Config.Hostname)
+		backend.sendMessage(logParts, name, process, cont.ShortHostname)
 	}
 }

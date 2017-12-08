@@ -740,7 +740,7 @@ func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s big-sibling[%s]: mymsg\n", cont.ShortHostName(), contID))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s big-sibling[%s]: mymsg\n", cont.ShortHostname, contID))
 }
 
 func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
@@ -774,7 +774,7 @@ func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
 	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
-	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s my-cont[my-pod]: mymsg\n", cont.ShortHostName()))
+	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s my-cont[my-pod]: mymsg\n", cont.ShortHostname))
 }
 
 func startReceiver(expected int, ch chan struct{}, data ...chan string) net.Listener {
