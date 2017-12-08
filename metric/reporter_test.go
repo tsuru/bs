@@ -29,11 +29,13 @@ func (s *S) SetUpTest(c *check.C) {
 func (s *S) createContainer() container.Container {
 	return container.Container{
 		Container: docker.Container{
-			Config:          &docker.Config{Hostname: "afdb3737ff"},
+			Config:          &docker.Config{},
 			NetworkSettings: &docker.NetworkSettings{IPAddress: "172.17.0.27"},
 		},
-		AppName:     "myapp",
-		ProcessName: "myprocess",
+		ShortHostname: "afdb3737ff",
+		AppName:       "myapp",
+		ProcessName:   "myprocess",
+		TsuruApp:      true,
 	}
 }
 

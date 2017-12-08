@@ -16,9 +16,13 @@ import (
 	"github.com/hashicorp/golang-lru"
 )
 
-var ErrTsuruVariablesNotFound = errors.New("could not find wanted envs")
+var (
+	ErrTsuruVariablesNotFound = errors.New("could not find wanted envs")
 
-var hexRegex = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
+	hexRegex          = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
+	processNameLabels = []string{"bs.tsuru.io/log-app-name", "log-name", "io.kubernetes.pod.name"}
+	appNameLabels     = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.container.name"}
+)
 
 const containerIDTrimSize = 12
 
@@ -31,6 +35,7 @@ type InfoClient struct {
 type Container struct {
 	docker.Container
 	client        *InfoClient
+	TsuruApp      bool
 	AppName       string
 	ProcessName   string
 	ShortHostname string
@@ -123,6 +128,20 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 				*v = env[len(k):]
 			}
 		}
+	}
+	if contData.AppName == "" {
+		name, ok := contData.GetLabelAny(appNameLabels...)
+		if !ok {
+			name = contData.Name
+		}
+		process, ok := contData.GetLabelAny(processNameLabels...)
+		if !ok {
+			process = contData.ID
+		}
+		contData.AppName = name
+		contData.ProcessName = process
+	} else {
+		contData.TsuruApp = true
 	}
 	contData.ShortHostname = contData.Config.Hostname
 	if hexRegex.MatchString(contData.Config.Hostname) && len(contData.Config.Hostname) > containerIDTrimSize {
