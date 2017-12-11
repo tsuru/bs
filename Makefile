@@ -19,9 +19,6 @@ check-format:
 run:
 	go run main.go
 
-build:
-	go build -ldflags "-linkmode external -extldflags -static"
-
 publish-local:
 	docker build -t 127.0.0.1:5000/tsuru/bs .
 	docker push 127.0.0.1:5000/tsuru/bs
