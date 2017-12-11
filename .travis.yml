@@ -1,12 +1,12 @@
 language: go
 sudo: required
 go:
-  - 1.7.1
-  - 1.8
+  - 1.8.x
+  - 1.9.x
   - tip
 env:
   global:
-    - GO_FOR_RELEASE=1.8
+    - GO_FOR_RELEASE=1.9
     - IMAGE_NAME=tsuru/bs
   matrix:
     - GOARCH=amd64
