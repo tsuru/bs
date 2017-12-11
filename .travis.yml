@@ -19,7 +19,6 @@ install:
 script:
   - go test -race ./...
   - make check-format
-  - go build -ldflags "-linkmode external -extldflags -static"
 after_success:
   - curl https://raw.githubusercontent.com/tsuru/push-to-docker/master/push.sh | bash
 matrix:
