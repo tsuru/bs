@@ -19,7 +19,7 @@ script:
 after_success:
   - curl https://raw.githubusercontent.com/tsuru/push-to-docker/master/push.sh | bash
 services:
-  - docker
+  - docker-ce
 matrix:
   allow_failures:
     - go: tip
