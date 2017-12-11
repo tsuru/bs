@@ -4,6 +4,10 @@ go:
   - 1.8.x
   - 1.9.x
   - tip
+addons:
+  apt:
+    packages:
+    - docker-ce
 env:
   global:
     - GO_FOR_RELEASE=1.9
@@ -18,8 +22,6 @@ script:
   - go build -ldflags "-linkmode external -extldflags -static"
 after_success:
   - curl https://raw.githubusercontent.com/tsuru/push-to-docker/master/push.sh | bash
-services:
-  - docker-ce
 matrix:
   allow_failures:
     - go: tip
