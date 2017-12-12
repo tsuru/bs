@@ -133,7 +133,7 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	if contData.AppName == "" {
 		name, ok := contData.GetLabelAny(appNameLabels...)
 		if !ok {
-			name = contData.Name
+			name = strings.TrimPrefix(contData.Name, "/")
 		}
 		process, ok := contData.GetLabelAny(processNameLabels...)
 		if !ok {

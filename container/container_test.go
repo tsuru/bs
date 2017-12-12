@@ -71,6 +71,25 @@ func (S) TestInfoClientGetContainer(c *check.C) {
 	c.Assert(cached.(*Container), check.DeepEquals, cont)
 }
 
+func (S) TestInfoClientGetContainerNonApp(c *check.C) {
+	dockerCalls := 0
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, func(req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/json") {
+			dockerCalls++
+		}
+	})
+	c.Assert(err, check.IsNil)
+	id := createContainer(c, dockerServer.URL(), nil, "myContName")
+	client, err := NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	cont, err := client.GetContainer(id, true, []string{})
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(cont.AppName, check.Equals, "myContName")
+	c.Assert(cont.ProcessName, check.Equals, id)
+	c.Assert(dockerCalls, check.Equals, 1)
+}
+
 func (S) TestInfoClientGetAppContainer(c *check.C) {
 	dockerCalls := 0
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, func(req *http.Request) {
