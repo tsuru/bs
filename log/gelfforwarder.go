@@ -159,11 +159,17 @@ func findFieldInMsg(msg, field string) string {
 	if idx == -1 {
 		return ""
 	}
+	if idx > 0 {
+		switch msg[idx-1] {
+		case ' ', '\t':
+		default:
+			return ""
+		}
+	}
 	idx += len(field) + 1
-	end := strings.Index(msg[idx:], " ")
+	end := strings.IndexAny(msg[idx:], " \t")
 	if end == -1 {
 		end = len(msg) - idx
 	}
-
 	return msg[idx : idx+end]
 }
