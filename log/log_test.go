@@ -1120,7 +1120,7 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	reader, err := gelf.NewReader("127.0.0.1:0")
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
-	os.Setenv("LOG_GELF_FIELDS_WHITELIST", "request_id,status")
+	os.Setenv("LOG_GELF_FIELDS_WHITELIST", "request_id,status,method,uri")
 	lf := LogForwarder{
 		BindAddress:     "udp://127.0.0.1:59317",
 		DockerEndpoint:  s.dockerServer.URL(),
@@ -1132,7 +1132,7 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
-	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg request_id=xdsakj invalid_field=sklsakl status=100\n", s.id))
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored\n", s.id))
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 
@@ -1141,13 +1141,14 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	c.Assert(gelfMsg, check.Not(check.IsNil))
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
-	c.Assert(gelfMsg.Short, check.Equals, "mymsg request_id=xdsakj invalid_field=sklsakl status=100")
+	c.Assert(gelfMsg.Short, check.Equals, "mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored")
 	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
 	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
 		"_app":        "coolappname",
 		"_pid":        "procx",
 		"_request_id": "xdsakj",
 		"_status":     "100",
+		"_method":     "get",
 	})
 }
 
