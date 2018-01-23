@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version = "v1.12-rc1"
+	version = "v1.12-rc3"
 )
 
 var printVersion bool
