@@ -14,37 +14,32 @@ import (
 
 func (s S) TestNewCheckCollection(c *check.C) {
 	checkColl := NewCheckCollection(nil)
-	c.Assert(checkColl.checks, check.HasLen, 2)
-	writableCheck := checkColl.checks["writableRoot"].(*writableCheck)
-	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
-	c.Assert(writableCheck.path, check.Equals, "/")
-	c.Assert(ccCheck.baseContID, check.Equals, "")
-	c.Assert(ccCheck.client, check.IsNil)
-	c.Assert(ccCheck.message, check.Equals, "ok")
+	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
+		&writableCheck{path: "/"},
+		&createContainerCheck{message: "ok"},
+	})
 }
 
 func (s S) TestNewCheckCollectionExtraPaths(c *check.C) {
 	os.Setenv("HOSTCHECK_EXTRA_PATHS", "/var/log, /var/lib/docker")
 	defer os.Unsetenv("HOSTCHECK_EXTRA_PATHS")
 	checkColl := NewCheckCollection(nil)
-	c.Assert(checkColl.checks, check.HasLen, 4)
-	writableCheck1, ok := checkColl.checks["writableCustomPath1"].(*writableCheck)
-	c.Assert(ok, check.Equals, true)
-	c.Assert(writableCheck1.path, check.Equals, "/var/log")
-	writableCheck2, ok := checkColl.checks["writableCustomPath2"].(*writableCheck)
-	c.Assert(ok, check.Equals, true)
-	c.Assert(writableCheck2.path, check.Equals, "/var/lib/docker")
+	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
+		&writableCheck{path: "/"},
+		&createContainerCheck{message: "ok"},
+		&writableCheck{path: "/var/log"},
+		&writableCheck{path: "/var/lib/docker"},
+	})
 }
 
 func (s S) TestNewCheckCollectionBaseContainerName(c *check.C) {
 	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "big-sibling")
 	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
 	checkColl := NewCheckCollection(nil)
-	c.Assert(checkColl.checks, check.HasLen, 2)
-	ccCheck := checkColl.checks["createContainer"].(*createContainerCheck)
-	c.Assert(ccCheck.baseContID, check.Equals, "big-sibling")
-	c.Assert(ccCheck.client, check.IsNil)
-	c.Assert(ccCheck.message, check.Equals, "ok")
+	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
+		&writableCheck{path: "/"},
+		&createContainerCheck{message: "ok", baseContID: "big-sibling"},
+	})
 }
 
 func (s S) TestWritableCheckRun(c *check.C) {
@@ -98,11 +93,60 @@ func (s S) TestCheckCollectionRun(c *check.C) {
 	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
 	checkColl := NewCheckCollection(client)
 	results := checkColl.Run()
-	for _, result := range results {
-		c.Assert(result.Err, check.Equals, "")
-		c.Assert(result.Successful, check.Equals, true)
-	}
+	c.Assert(results, check.DeepEquals, []hostCheckResult{
+		{Name: "writablePath-" + tmpdir, Successful: true},
+		{Name: "createContainer", Successful: true},
+	})
 	<-done
+}
+
+func (s S) TestCheckCollectionRunFilterAll(c *check.C) {
+	baseConts := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python"}, state: docker.State{Running: true}},
+	}
+	dockerServer, conts := s.startDockerServer(baseConts, nil, c)
+	client, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	done := stopContainer(client, conts[0].ID, c)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_KIND_FILTER", "writablePath, createContainer")
+	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
+	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
+	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
+	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
+	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	checkColl := NewCheckCollection(client)
+	results := checkColl.Run()
+	c.Assert(results, check.DeepEquals, []hostCheckResult{
+		{Name: "writablePath-" + tmpdir, Successful: true},
+		{Name: "createContainer", Successful: true},
+	})
+	<-done
+}
+
+func (s S) TestCheckCollectionRunFilterSingle(c *check.C) {
+	dockerServer, _ := s.startDockerServer(nil, nil, c)
+	client, err := docker.NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_KIND_FILTER", "writablePath")
+	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
+	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
+	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
+	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
+	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	defer os.Unsetenv("HOSTCHECK_KIND_FILTER")
+	checkColl := NewCheckCollection(client)
+	results := checkColl.Run()
+	c.Assert(results, check.DeepEquals, []hostCheckResult{
+		{Name: "writablePath-" + tmpdir, Successful: true},
+	})
 }
 
 func (s S) TestCheckCollectionRunTimeout(c *check.C) {
@@ -130,8 +174,8 @@ func (s S) TestCheckCollectionRunTimeout(c *check.C) {
 		resultsMap[result.Name] = result
 	}
 	c.Assert(resultsMap, check.DeepEquals, map[string]hostCheckResult{
-		"writableRoot":    {Name: "writableRoot", Err: "", Successful: true},
-		"createContainer": {Name: "createContainer", Err: "[host check] timeout running \"createContainer\" check", Successful: false},
+		"writablePath-" + tmpdir: {Name: "writablePath-" + tmpdir, Err: "", Successful: true},
+		"createContainer":        {Name: "createContainer", Err: "[host check] timeout running \"createContainer\" check", Successful: false},
 	})
 }
 

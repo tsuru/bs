@@ -21,12 +21,15 @@ import (
 
 type hostCheck interface {
 	Run() error
+	Name() string
+	Kind() string
 }
 
 type checkCollection struct {
-	checks      map[string]hostCheck
-	timeout     time.Duration
-	errChannels map[string]chan error
+	checks          []hostCheck
+	checksFilterSet map[string]struct{}
+	timeout         time.Duration
+	errChannels     map[string]chan error
 }
 
 type hostCheckResult struct {
@@ -42,25 +45,39 @@ func NewCheckCollection(client *docker.Client) *checkCollection {
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
 	rootPathOverride := config.StringEnvOrDefault("/", "HOSTCHECK_ROOT_PATH_OVERRIDE")
 	containerCheckMessage := config.StringEnvOrDefault("ok", "HOSTCHECK_CONTAINER_MESSAGE")
+	checksFilter := config.StringsEnvOrDefault(nil, "HOSTCHECK_KIND_FILTER")
+	var checksFilterSet map[string]struct{}
+	if len(checksFilter) > 0 {
+		checksFilterSet = make(map[string]struct{})
+		for _, kind := range checksFilter {
+			checksFilterSet[kind] = struct{}{}
+		}
+	}
 	checkColl := &checkCollection{
-		checks: map[string]hostCheck{
-			"writableRoot":    &writableCheck{path: rootPathOverride},
-			"createContainer": &createContainerCheck{client: client, baseContID: baseContainerName, message: containerCheckMessage},
+		checks: []hostCheck{
+			&writableCheck{path: rootPathOverride},
+			&createContainerCheck{client: client, baseContID: baseContainerName, message: containerCheckMessage},
 		},
-		timeout:     hostCheckTimeout,
-		errChannels: make(map[string]chan error),
+		checksFilterSet: checksFilterSet,
+		timeout:         hostCheckTimeout,
+		errChannels:     make(map[string]chan error),
 	}
 	extraPaths := config.StringsEnvOrDefault(nil, "HOSTCHECK_EXTRA_PATHS")
-	for i, p := range extraPaths {
-		checkColl.checks[fmt.Sprintf("writableCustomPath%d", i+1)] = &writableCheck{path: p}
+	for _, p := range extraPaths {
+		checkColl.checks = append(checkColl.checks, &writableCheck{path: p})
 	}
 	return checkColl
 }
 
 func (c *checkCollection) Run() []hostCheckResult {
-	result := make([]hostCheckResult, len(c.checks))
-	i := 0
-	for name, check := range c.checks {
+	result := make([]hostCheckResult, 0, len(c.checks))
+	for _, check := range c.checks {
+		if c.checksFilterSet != nil {
+			if _, inSet := c.checksFilterSet[check.Kind()]; !inSet {
+				continue
+			}
+		}
+		name := check.Name()
 		checkResult := hostCheckResult{Name: name}
 		if c.errChannels[name] == nil {
 			c.errChannels[name] = make(chan error)
@@ -86,14 +103,21 @@ func (c *checkCollection) Run() []hostCheckResult {
 			bslog.Errorf(errMsg)
 			checkResult.Err = errMsg
 		}
-		result[i] = checkResult
-		i++
+		result = append(result, checkResult)
 	}
 	return result
 }
 
 type writableCheck struct {
 	path string
+}
+
+func (c *writableCheck) Kind() string {
+	return "writablePath"
+}
+
+func (c *writableCheck) Name() string {
+	return fmt.Sprintf("writablePath-%s", c.path)
 }
 
 func (c *writableCheck) Run() error {
@@ -147,6 +171,14 @@ func (c *createContainerCheck) setBaseContainerID() error {
 		return err
 	}
 	return nil
+}
+
+func (c *createContainerCheck) Kind() string {
+	return "createContainer"
+}
+
+func (c *createContainerCheck) Name() string {
+	return "createContainer"
 }
 
 func (c *createContainerCheck) Run() error {
