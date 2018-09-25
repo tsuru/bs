@@ -6,8 +6,6 @@ package container
 
 import (
 	"errors"
-	"net"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -43,22 +41,7 @@ type Container struct {
 }
 
 const (
-	dialTimeout = 10 * time.Second
 	fullTimeout = 1 * time.Minute
-)
-
-var (
-	timeoutDialer = &net.Dialer{
-		Timeout:   dialTimeout,
-		KeepAlive: 30 * time.Second,
-	}
-	timeoutHttpClient = &http.Client{
-		Transport: &http.Transport{
-			Dial:                timeoutDialer.Dial,
-			TLSHandshakeTimeout: dialTimeout,
-		},
-		Timeout: fullTimeout,
-	}
 )
 
 func NewClient(endpoint string) (*InfoClient, error) {
@@ -72,9 +55,7 @@ func NewClient(endpoint string) (*InfoClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.client.HTTPClient = timeoutHttpClient
-	c.client.Dialer = timeoutDialer
-	c.client.SetTimeout(timeoutHttpClient.Timeout)
+	c.client.SetTimeout(fullTimeout)
 	return &c, nil
 }
 

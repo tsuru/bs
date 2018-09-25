@@ -91,6 +91,7 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 			KeepAlive: 30 * time.Second,
 		}).Dial,
 		TLSHandshakeTimeout: dialTimeout,
+		IdleConnTimeout:     30 * time.Second,
 	}
 	reporter := Reporter{
 		config:     config,
