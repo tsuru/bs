@@ -88,6 +88,9 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Assert(len(input.Addrs) > 0, check.Equals, true)
 	input.Checks = nil
 	input.Addrs = nil
+	sort.Slice(input.Units, func(i, j int) bool {
+		return input.Units[i].Name < input.Units[j].Name
+	})
 	c.Assert(input, check.DeepEquals, expected)
 	reporter.waitPendingRemovals()
 	dockerClient, err := docker.NewClient(dockerServer.URL())
@@ -163,6 +166,9 @@ func (s S) TestReportStatus404OnHostStatus(c *check.C) {
 	}
 	err = json.Unmarshal(req.body, &input)
 	c.Assert(err, check.IsNil)
+	sort.Slice(input, func(i, j int) bool {
+		return input[i].Name < input[j].Name
+	})
 	c.Assert(input, check.DeepEquals, expected)
 	reporter.waitPendingRemovals()
 	dockerClient, err := docker.NewClient(dockerServer.URL())
