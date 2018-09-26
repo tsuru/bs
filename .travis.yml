@@ -1,8 +1,8 @@
 language: go
 sudo: required
 go:
-  - 1.8.x
-  - 1.9.x
+  - 1.10.x
+  - 1.11.x
   - tip
 addons:
   apt:
@@ -10,7 +10,7 @@ addons:
     - docker-ce
 env:
   global:
-    - GO_FOR_RELEASE=1.9
+    - GO_FOR_RELEASE=1.11
     - IMAGE_NAME=tsuru/bs
   matrix:
     - GOARCH=amd64
