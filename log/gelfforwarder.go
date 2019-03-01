@@ -71,6 +71,7 @@ func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, cont
 			"_pid": processName,
 		},
 		RawExtra: b.extra,
+		TimeUnix: float64(time.Now().UnixNano()) / float64(time.Second),
 	}
 	select {
 	case b.msgCh <- msg:
