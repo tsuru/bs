@@ -62,6 +62,19 @@ func (S) TestLoadConfigDefaultLogBackends(c *check.C) {
 	c.Check(Config.LogBackends, check.DeepEquals, []string{"tsuru", "syslog"})
 }
 
+func (S) TestBoolEnvOrDefault(c *check.C) {
+	v := BoolEnvOrDefault(true, "BOOL_ENV")
+	c.Assert(v, check.Equals, true)
+	v = BoolEnvOrDefault(false, "BOOL_ENV")
+	c.Assert(v, check.Equals, false)
+	os.Setenv("BOOL_ENV", "1")
+	v = BoolEnvOrDefault(false, "BOOL_ENV")
+	c.Assert(v, check.Equals, true)
+	os.Setenv("BOOL_ENV", "0")
+	v = BoolEnvOrDefault(true, "BOOL_ENV")
+	c.Assert(v, check.Equals, false)
+}
+
 func (S) TestStringsEnvOrDefault(c *check.C) {
 	var buf bytes.Buffer
 	bslog.Logger = log.New(&buf, "", 0)

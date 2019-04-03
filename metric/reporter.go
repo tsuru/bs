@@ -7,7 +7,7 @@ package metric
 import (
 	"sync"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	"github.com/tsuru/bs/node"
@@ -18,6 +18,9 @@ type Reporter struct {
 	infoClient            *container.InfoClient
 	containerSelectionEnv string
 	hostClient            *HostClient
+	enableBasicMetrics    bool
+	enableConnMetrics     bool
+	enableHostMetrics     bool
 }
 
 func (r *Reporter) Do() {
@@ -30,9 +33,11 @@ func (r *Reporter) Do() {
 		selectionEnvs = []string{r.containerSelectionEnv}
 	}
 	r.getMetrics(containers, selectionEnvs)
-	err = r.getHostMetrics()
-	if err != nil {
-		bslog.Errorf("failed to get host metrics: %s", err)
+	if r.enableHostMetrics {
+		err = r.getHostMetrics()
+		if err != nil {
+			bslog.Errorf("failed to get host metrics: %s", err)
+		}
 	}
 }
 
@@ -56,23 +61,27 @@ func (r *Reporter) getMetrics(containers []docker.APIContainers, selectionEnvs [
 				}
 				return
 			}
-			stats, err := cont.Stats()
-			if err != nil || stats == nil {
-				bslog.Errorf("cannot get stats for container %#v: %s", cont, err)
-				return
+			if r.enableBasicMetrics {
+				stats, err := cont.Stats()
+				if err != nil || stats == nil {
+					bslog.Errorf("cannot get stats for container %#v: %s", cont, err)
+					return
+				}
+				metrics, err := statsToMetricsMap(stats)
+				if err != nil {
+					bslog.Errorf("failed to get metrics for container %#v: %s", cont, err)
+					return
+				}
+				err = r.sendMetrics(cont, metrics)
+				if err != nil {
+					bslog.Errorf("failed to send metrics for container %#v: %s", cont, err)
+				}
 			}
-			metrics, err := statsToMetricsMap(stats)
-			if err != nil {
-				bslog.Errorf("failed to get metrics for container %#v: %s", cont, err)
-				return
-			}
-			err = r.sendMetrics(cont, metrics)
-			if err != nil {
-				bslog.Errorf("failed to send metrics for container %#v: %s", cont, err)
-			}
-			err = r.sendConnMetrics(cont, conns)
-			if err != nil {
-				bslog.Errorf("failed to send conn metrics for container %#v: %s", cont, err)
+			if r.enableConnMetrics {
+				err = r.sendConnMetrics(cont, conns)
+				if err != nil {
+					bslog.Errorf("failed to send conn metrics for container %#v: %s", cont, err)
+				}
 			}
 		}(cont.ID)
 	}

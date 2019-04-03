@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 )
@@ -115,6 +115,7 @@ func (s *S) TestGetMetrics(c *check.C) {
 	containers[0] = docker.APIContainers{ID: conts[0].ID}
 	containers[1] = docker.APIContainers{ID: conts[1].ID, State: "restarting"}
 	containers[2] = docker.APIContainers{ID: conts[2].ID, State: "running"}
+	r.enableBasicMetrics = true
 	r.getMetrics(containers, []string{})
 	id0 := conts[0].ID[:12]
 	id1 := conts[2].ID[:12]

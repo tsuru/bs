@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/fsouza/go-dockerclient/testing"
 	"gopkg.in/check.v1"
 )
@@ -27,6 +27,7 @@ func (s *S) TestRunner(c *check.C) {
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
 	r := NewRunner(dockerServer.URL(), time.Second, "fake")
+	r.EnableBasicMetrics = true
 	err := r.Start()
 	c.Assert(err, check.IsNil)
 	r.Stop()
@@ -71,6 +72,7 @@ func (s *S) TestRunnerSelectionEnv(c *check.C) {
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
 	r := NewRunner(dockerServer.URL(), time.Second, "fake")
+	r.EnableBasicMetrics = true
 	err := r.Start()
 	c.Assert(err, check.IsNil)
 	r.Stop()
