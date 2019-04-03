@@ -69,6 +69,9 @@ func main() {
 	}
 	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval,
 		config.Config.MetricsBackend)
+	mRunner.EnableBasicMetrics = config.Config.MetricsEnableBasic
+	mRunner.EnableConnMetrics = config.Config.MetricsEnableConn
+	mRunner.EnableHostMetrics = config.Config.MetricsEnableHost
 	err = mRunner.Start()
 	if err != nil {
 		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)

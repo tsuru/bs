@@ -14,11 +14,14 @@ import (
 )
 
 type runner struct {
-	dockerEndpoint string
-	interval       time.Duration
-	metricsBackend string
-	abort          chan struct{}
-	exit           chan struct{}
+	dockerEndpoint     string
+	interval           time.Duration
+	metricsBackend     string
+	abort              chan struct{}
+	exit               chan struct{}
+	EnableBasicMetrics bool
+	EnableConnMetrics  bool
+	EnableHostMetrics  bool
 }
 
 func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend string) *runner {
@@ -64,6 +67,9 @@ func (r *runner) Start() (err error) {
 		infoClient:            client,
 		containerSelectionEnv: containerSelectionEnv,
 		hostClient:            hostClient,
+		enableBasicMetrics:    r.EnableBasicMetrics,
+		enableConnMetrics:     r.EnableConnMetrics,
+		enableHostMetrics:     r.EnableHostMetrics,
 	}
 	go func() {
 		for {

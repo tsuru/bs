@@ -27,6 +27,9 @@ var Config struct {
 	TsuruToken          string
 	MetricsInterval     time.Duration
 	MetricsBackend      string
+	MetricsEnableBasic  bool
+	MetricsEnableConn   bool
+	MetricsEnableHost   bool
 	StatusInterval      time.Duration
 	SyslogListenAddress string
 	LogBackends         []string
@@ -46,6 +49,9 @@ func LoadConfig() {
 	Config.MetricsInterval = SecondsEnvOrDefault(DefaultInterval, "METRICS_INTERVAL")
 	Config.MetricsBackend = os.Getenv("METRICS_BACKEND")
 	Config.LogBackends = StringsEnvOrDefault([]string{"tsuru", "syslog"}, "LOG_BACKENDS")
+	Config.MetricsEnableBasic = BoolEnvOrDefault(true, "METRICS_ENABLE_BASIC")
+	Config.MetricsEnableConn = BoolEnvOrDefault(true, "METRICS_ENABLE_CONN")
+	Config.MetricsEnableHost = BoolEnvOrDefault(true, "METRICS_ENABLE_HOST")
 }
 
 func envOrDefault(convert func(string) interface{}, defaultValue interface{}, envs ...string) interface{} {
@@ -72,6 +78,16 @@ func StringEnvOrDefault(defaultValue string, envs ...string) string {
 		}
 		return v
 	}, defaultValue, envs...).(string)
+}
+
+func BoolEnvOrDefault(defaultValue bool, envs ...string) bool {
+	return envOrDefault(func(v string) interface{} {
+		val, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil
+		}
+		return val
+	}, defaultValue, envs...).(bool)
 }
 
 func StringsEnvOrDefault(defaultValue []string, envs ...string) []string {
