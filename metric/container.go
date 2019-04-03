@@ -4,7 +4,7 @@
 
 package metric
 
-import "github.com/fsouza/go-dockerclient"
+import docker "github.com/fsouza/go-dockerclient"
 
 func statsToMetricsMap(s *docker.Stats) (map[string]float, error) {
 	previousCPU := s.PreCPUStats.CPUUsage.TotalUsage

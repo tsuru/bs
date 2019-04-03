@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsouza/go-dockerclient"
-	"github.com/hashicorp/golang-lru"
+	docker "github.com/fsouza/go-dockerclient"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 var (

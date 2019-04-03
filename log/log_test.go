@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/tsuru/app"

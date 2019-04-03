@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/ajg/form"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	dtesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
 	"gopkg.in/check.v1"

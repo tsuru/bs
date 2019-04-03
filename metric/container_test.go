@@ -7,7 +7,7 @@ package metric
 import (
 	"encoding/json"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/check.v1"
 )
 

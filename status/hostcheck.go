@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
 )

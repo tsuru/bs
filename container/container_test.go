@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
 	"gopkg.in/check.v1"
 )

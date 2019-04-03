@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/ajg/form"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/container"
 	node "github.com/tsuru/bs/node"
