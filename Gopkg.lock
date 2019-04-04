@@ -13,11 +13,13 @@
   revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
 
 [[projects]]
-  digest = "1:b560f07ed5fb2e89f5e888bf2b610fa89781e77afbfcb8692ad0ec2cdc40ce0b"
+  branch = "chunkingconfig"
+  digest = "1:24ce163d7cc836300b9dc61d876eaeecdd77066f0a4863379a960af673a11aba"
   name = "github.com/Graylog2/go-gelf"
   packages = ["gelf"]
   pruneopts = "NUT"
-  revision = "7029da823dad4ef3a876df61065156acb703b2ea"
+  revision = "1ff80b6cbc530ca2274dcda2b9ca227196919886"
+  source = "github.com/cezarsa/go-gelf"
 
 [[projects]]
   digest = "1:2be791e7b333ff7c06f8fb3dc18a7d70580e9399dbdffd352621d067ff260b6e"

@@ -19,6 +19,7 @@ import (
 type gelfBackend struct {
 	extra           json.RawMessage
 	host            string
+	chunkSize       int
 	fieldsWhitelist []string
 	msgCh           chan<- LogMessage
 	quitCh          chan<- bool
@@ -26,6 +27,7 @@ type gelfBackend struct {
 }
 
 func (b *gelfBackend) initialize() error {
+	b.chunkSize = config.IntEnvOrDefault(gelf.ChunkSize, "LOG_GELF_CHUNK_SIZE")
 	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_GELF_BUFFER_SIZE", "LOG_BUFFER_SIZE")
 	b.host = config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
@@ -55,7 +57,7 @@ func (b *gelfBackend) initialize() error {
 }
 
 func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
-	level := gelf.LOG_INFO
+	var level int32 = gelf.LOG_INFO
 	if s, err := strconv.Atoi(string(parts.priority)); err == nil {
 		if int32(s)&gelf.LOG_ERR == gelf.LOG_ERR {
 			level = gelf.LOG_ERR
@@ -90,11 +92,11 @@ func (b *gelfBackend) stop() {
 
 type gelfConnWrapper struct {
 	net.Conn
-	*gelf.Writer
+	*gelf.UDPWriter
 }
 
 func (w *gelfConnWrapper) Close() error {
-	return w.Writer.Close()
+	return w.UDPWriter.Close()
 }
 
 func (w *gelfConnWrapper) Write(msg []byte) (int, error) {
@@ -102,12 +104,13 @@ func (w *gelfConnWrapper) Write(msg []byte) (int, error) {
 }
 
 func (b *gelfBackend) connect() (net.Conn, error) {
-	writer, err := gelf.NewWriter(b.host)
+	writer, err := gelf.NewUDPWriter(b.host)
 	if err != nil {
 		return nil, err
 	}
 	writer.CompressionType = gelf.CompressNone
-	return &gelfConnWrapper{Writer: writer}, nil
+	writer.ChunkSize = b.chunkSize
+	return &gelfConnWrapper{UDPWriter: writer}, nil
 }
 
 func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {

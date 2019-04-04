@@ -35,6 +35,11 @@
   source = "https://github.com/ijc25/Gotty.git"
   revision = "a8b993ba6abdb0e0c12b0125c603323a71c7790c"
 
+[[constraint]]
+  name = "github.com/Graylog2/go-gelf"
+  source = "github.com/cezarsa/go-gelf"
+  branch = "chunkingconfig"
+
 [prune]
   non-go = true
   go-tests = true
