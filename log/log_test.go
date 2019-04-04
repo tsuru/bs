@@ -1074,7 +1074,7 @@ func (s *S) TestGelfForwarder(c *check.C) {
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
 	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
-	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
 	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
 	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
 }
@@ -1108,7 +1108,7 @@ func (s *S) TestGelfForwarderExtraTags(c *check.C) {
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
 	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
-	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
 	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
 	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
 	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU")
@@ -1142,7 +1142,7 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
 	c.Assert(gelfMsg.Short, check.Equals, "mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored")
-	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_INFO)
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
 	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
 		"_app":        "coolappname",
 		"_pid":        "procx",
@@ -1180,7 +1180,7 @@ func (s *S) TestGelfForwarderParseLevel(c *check.C) {
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
 	c.Assert(gelfMsg.Short, check.Equals, "level=critical mymsg")
-	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_CRIT)
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_CRIT))
 	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
 		"_app": "coolappname",
 		"_pid": "procx",
@@ -1214,7 +1214,7 @@ func (s *S) TestGelfForwarderStdErr(c *check.C) {
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
 	c.Assert(gelfMsg.Short, check.Equals, "myerr")
-	c.Assert(gelfMsg.Level, check.Equals, gelf.LOG_ERR)
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_ERR))
 	c.Assert(gelfMsg.Extra["_app"], check.Equals, "coolappname")
 	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "procx")
 }
