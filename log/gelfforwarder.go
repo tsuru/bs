@@ -16,14 +16,17 @@ import (
 	"github.com/tsuru/bs/config"
 )
 
+const fieldSeparators = " \t"
+
 type gelfBackend struct {
-	extra           json.RawMessage
-	host            string
-	chunkSize       int
-	fieldsWhitelist []string
-	msgCh           chan<- LogMessage
-	quitCh          chan<- bool
-	nextNotify      *time.Timer
+	extra            json.RawMessage
+	host             string
+	chunkSize        int
+	fieldsWhitelist  []string
+	whitelistToField map[string]string
+	msgCh            chan<- LogMessage
+	quitCh           chan<- bool
+	nextNotify       *time.Timer
 }
 
 func (b *gelfBackend) setup() {
@@ -46,6 +49,11 @@ func (b *gelfBackend) setup() {
 		"method",
 		"uri",
 	}, "LOG_GELF_FIELDS_WHITELIST")
+	b.whitelistToField = map[string]string{}
+	for _, f := range b.fieldsWhitelist {
+		b.whitelistToField[f] = "_" + f
+	}
+	b.whitelistToField["level"] = ""
 	b.nextNotify = time.NewTimer(0)
 }
 
@@ -118,38 +126,61 @@ func (b *gelfBackend) connect() (net.Conn, error) {
 }
 
 func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
-	shortMsg := gelfMsg.Short
-	if !strings.Contains(shortMsg, "=") {
-		return
-	}
-	for _, field := range b.fieldsWhitelist {
-		value := findFieldInMsg(shortMsg, field)
-		if value == "" {
+	msg := gelfMsg.Short
+	for {
+		idx := strings.IndexByte(msg, '=')
+		if idx == -1 {
+			break
+		}
+
+		start := strings.LastIndexAny(msg[:idx], fieldSeparators)
+		key := msg[start+1 : idx]
+		msg = msg[idx+1:]
+
+		underKey, allowed := b.whitelistToField[key]
+		if !allowed {
 			continue
 		}
-		gelfMsg.Extra["_"+field] = value
+
+		end := strings.IndexAny(msg, fieldSeparators)
+		if end == -1 {
+			end = len(msg)
+		}
+		value := msg[:end]
+		msg = msg[end:]
+
+		if key == "level" {
+			level := parseMsgLevel(value)
+			if level > 0 {
+				gelfMsg.Level = level
+			}
+		} else {
+			gelfMsg.Extra[underKey] = value
+		}
 	}
+}
 
-	level := strings.ToUpper(findFieldInMsg(shortMsg, "level"))
-
+func parseMsgLevel(level string) int32 {
+	level = strings.ToUpper(level)
 	switch level {
 	case "EMERG", "PANIC":
-		gelfMsg.Level = gelf.LOG_EMERG
+		return gelf.LOG_EMERG
 	case "ALERT":
-		gelfMsg.Level = gelf.LOG_ALERT
+		return gelf.LOG_ALERT
 	case "CRIT", "CRITICAL", "FATAL":
-		gelfMsg.Level = gelf.LOG_CRIT
+		return gelf.LOG_CRIT
 	case "ERR", "ERROR":
-		gelfMsg.Level = gelf.LOG_ERR
+		return gelf.LOG_ERR
 	case "WARN", "WARNING":
-		gelfMsg.Level = gelf.LOG_WARNING
+		return gelf.LOG_WARNING
 	case "NOTICE":
-		gelfMsg.Level = gelf.LOG_NOTICE
+		return gelf.LOG_NOTICE
 	case "INFO":
-		gelfMsg.Level = gelf.LOG_INFO
+		return gelf.LOG_INFO
 	case "DEBUG":
-		gelfMsg.Level = gelf.LOG_DEBUG
+		return gelf.LOG_DEBUG
 	}
+	return -1
 }
 
 func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
@@ -160,24 +191,4 @@ func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
 
 func (b *gelfBackend) close(conn net.Conn) {
 	conn.Close()
-}
-
-func findFieldInMsg(msg, field string) string {
-	idx := strings.Index(msg, field+"=")
-	if idx == -1 {
-		return ""
-	}
-	if idx > 0 {
-		switch msg[idx-1] {
-		case ' ', '\t':
-		default:
-			return ""
-		}
-	}
-	idx += len(field) + 1
-	end := strings.IndexAny(msg[idx:], " \t")
-	if end == -1 {
-		end = len(msg) - idx
-	}
-	return msg[idx : idx+end]
 }
