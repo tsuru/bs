@@ -26,9 +26,8 @@ type gelfBackend struct {
 	nextNotify      *time.Timer
 }
 
-func (b *gelfBackend) initialize() error {
+func (b *gelfBackend) setup() {
 	b.chunkSize = config.IntEnvOrDefault(gelf.ChunkSize, "LOG_GELF_CHUNK_SIZE")
-	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_GELF_BUFFER_SIZE", "LOG_BUFFER_SIZE")
 	b.host = config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
 	if extra != "" {
@@ -48,6 +47,11 @@ func (b *gelfBackend) initialize() error {
 		"uri",
 	}, "LOG_GELF_FIELDS_WHITELIST")
 	b.nextNotify = time.NewTimer(0)
+}
+
+func (b *gelfBackend) initialize() error {
+	b.setup()
+	bufferSize := config.IntEnvOrDefault(config.DefaultBufferSize, "LOG_GELF_BUFFER_SIZE", "LOG_BUFFER_SIZE")
 	var err error
 	b.msgCh, b.quitCh, err = processMessages(b, bufferSize)
 	if err != nil {

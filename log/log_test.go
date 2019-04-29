@@ -840,7 +840,7 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	<-done[0]
 	b.StopTimer()
 	lf.server.Kill()
-	lf.Wait()
+	lf.stopWait()
 }
 
 func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
@@ -880,7 +880,7 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	<-done[1]
 	b.StopTimer()
 	lf.server.Kill()
-	lf.Wait()
+	lf.stopWait()
 }
 
 func BenchmarkMessagesBroadcastNonAppContainer(b *testing.B) {
@@ -1132,7 +1132,7 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	conn, err := net.Dial("udp", "127.0.0.1:59317")
 	c.Assert(err, check.IsNil)
 	defer conn.Close()
-	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored\n", s.id))
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: foo mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored\n", s.id))
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 
@@ -1141,7 +1141,7 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	c.Assert(gelfMsg, check.Not(check.IsNil))
 	c.Assert(gelfMsg.Version, check.Equals, "1.1")
 	c.Assert(gelfMsg.Host, check.Equals, s.idShort)
-	c.Assert(gelfMsg.Short, check.Equals, "mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored")
+	c.Assert(gelfMsg.Short, check.Equals, "foo mymsg request_id=xdsakj invalid_field=sklsakl status=100\tmethod=get myurl.com?uri=ignored")
 	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
 	c.Assert(gelfMsg.Extra, check.DeepEquals, map[string]interface{}{
 		"_app":        "coolappname",
