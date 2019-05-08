@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
+	"github.com/cezarsa/fastgelf"
 	docker "github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
@@ -1249,7 +1250,7 @@ func BenchmarkMessagesGelfBackendProcess(b *testing.B) {
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		err = be.process(gelfConn, &gelf.Message{
+		err = be.process(gelfConn, &fastgelf.Message{
 			Version: "1.1",
 			Host:    "mycont",
 			Short:   "mymsg",

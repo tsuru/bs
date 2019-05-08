@@ -53,6 +53,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:8e1826b902a6df2efec773444c2cf68a3677fcfa60af12ec3bdf60f5af194293"
+  name = "github.com/cezarsa/fastgelf"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "ffe429a2bec3225b9c3900d544673cb98d4d2025"
+
+[[projects]]
+  branch = "master"
   digest = "1:4a029051269e04c040c092eb4ddd92732f8f3a3921a8b43b82b30804e00f3357"
   name = "github.com/containerd/continuity"
   packages = ["pathdriver"]
@@ -112,6 +120,14 @@
   packages = ["ipamutils"]
   pruneopts = "NUT"
   revision = "19279f0492417475b6bfbd0aa529f73e8f178fb5"
+
+[[projects]]
+  digest = "1:a1c45f53e462aa18cbde10bb1481927b804448893ea6ede0b1de967d98e96d68"
+  name = "github.com/francoispqt/gojay"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "eb6e5994c712d1e934f6bdd99188ac48317ef3c5"
+  version = "v1.2.10"
 
 [[projects]]
   digest = "1:c43ab1889faa119a6c1d52e55849e6939afae44356c31adc6d20687e76d01a34"
@@ -336,11 +352,18 @@
   revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
 [[projects]]
-  digest = "1:8959a2cd5070bada5f8b88f77cb5a49e5d094e9aae220debeedddbad05810d14"
+  branch = "master"
+  digest = "1:1530c6c87987f0564ee0d8fc402d1beafb827a373c9d16d5d07240586374506d"
   name = "golang.org/x/net"
-  packages = ["websocket"]
+  packages = [
+    "bpf",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
+    "websocket",
+  ]
   pruneopts = "NUT"
-  revision = "2a35e686583654a1b89ca79c4ac78cb3d6529ca3"
+  revision = "f4e77d36d62c17c2336347bb2670ddbd02d092b7"
 
 [[projects]]
   branch = "master"
@@ -400,6 +423,7 @@
   input-imports = [
     "github.com/Graylog2/go-gelf/gelf",
     "github.com/ajg/form",
+    "github.com/cezarsa/fastgelf",
     "github.com/fsouza/go-dockerclient",
     "github.com/fsouza/go-dockerclient/testing",
     "github.com/google/gops/agent",

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Graylog2/go-gelf/gelf"
+	"github.com/cezarsa/fastgelf"
 	"github.com/tsuru/bs/bslog"
 )
 
@@ -20,7 +20,7 @@ func newBackend(t testing.TB) *gelfBackend {
 func BenchmarkGelfBackendParseFieldsNoFields(b *testing.B) {
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "no field to parse with a modest size log message half full of stuff in it",
 		Extra: map[string]interface{}{},
 	}
@@ -34,7 +34,7 @@ func BenchmarkGelfBackendParseFieldsNoFields(b *testing.B) {
 func BenchmarkGelfBackendInvalidFields(b *testing.B) {
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "invalid fields to parse invalid1=a invalid2=b invalid3=c in4=d inva=EMERG",
 		Extra: map[string]interface{}{},
 	}
@@ -48,7 +48,7 @@ func BenchmarkGelfBackendInvalidFields(b *testing.B) {
 func BenchmarkGelfBackendValidFields(b *testing.B) {
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "w fields request_id=a request_time=1 request_uri=/ status=200 level=EMERG",
 		Extra: map[string]interface{}{},
 	}
@@ -62,7 +62,7 @@ func BenchmarkGelfBackendValidFields(b *testing.B) {
 func BenchmarkGelfBackendHugeValidFields(b *testing.B) {
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "my big message with many fields my big message with many fields my big message with many fields " +
 			"my big message with many fields my big message with many fields my big message with many fields " +
 			"my big message with many fields my big message with many fields my big message with many fields " +
@@ -84,7 +84,7 @@ func BenchmarkGelfBackendHugeValidFieldsBigWhitelist(b *testing.B) {
 	defer os.Unsetenv("LOG_GELF_FIELDS_WHITELIST")
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "my big message with many fields my big message with many fields my big message with many fields " +
 			"my big message with many fields my big message with many fields my big message with many fields " +
 			"my big message with many fields my big message with many fields my big message with many fields " +
@@ -106,7 +106,7 @@ func BenchmarkGelfBackendHugeInvalid(b *testing.B) {
 	defer os.Unsetenv("LOG_GELF_FIELDS_WHITELIST")
 	b.StopTimer()
 	backend := newBackend(b)
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Short: "mybigmessagewithmanyfieldsmybigmessagewithmanyfieldsmybigmessagewithmanyfields" +
 			"mybigmessagewithmanyfieldsmybigmessagewithmanyfieldsmybigmessagewithmanyfields" +
 			"mybigmessagewithmanyfieldsmybigmessagewithmanyfieldsmybigmessagewithmanyfields" +

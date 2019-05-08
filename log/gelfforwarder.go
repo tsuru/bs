@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Graylog2/go-gelf/gelf"
+	"github.com/cezarsa/fastgelf"
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
 )
@@ -21,7 +22,6 @@ const fieldSeparators = " \t"
 type gelfBackend struct {
 	extra            json.RawMessage
 	host             string
-	chunkSize        int
 	fieldsWhitelist  []string
 	whitelistToField map[string]string
 	msgCh            chan<- LogMessage
@@ -30,7 +30,6 @@ type gelfBackend struct {
 }
 
 func (b *gelfBackend) setup() {
-	b.chunkSize = config.IntEnvOrDefault(gelf.ChunkSize, "LOG_GELF_CHUNK_SIZE")
 	b.host = config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
 	if extra != "" {
@@ -75,7 +74,7 @@ func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, cont
 			level = gelf.LOG_ERR
 		}
 	}
-	msg := &gelf.Message{
+	msg := &fastgelf.Message{
 		Version: "1.1",
 		Host:    container,
 		Short:   string(parts.content),
@@ -104,7 +103,7 @@ func (b *gelfBackend) stop() {
 
 type gelfConnWrapper struct {
 	net.Conn
-	*gelf.UDPWriter
+	*fastgelf.UDPWriter
 }
 
 func (w *gelfConnWrapper) Close() error {
@@ -116,16 +115,14 @@ func (w *gelfConnWrapper) Write(msg []byte) (int, error) {
 }
 
 func (b *gelfBackend) connect() (net.Conn, error) {
-	writer, err := gelf.NewUDPWriter(b.host)
+	writer, err := fastgelf.NewUDPWriter(b.host)
 	if err != nil {
 		return nil, err
 	}
-	writer.CompressionType = gelf.CompressNone
-	writer.ChunkSize = b.chunkSize
 	return &gelfConnWrapper{UDPWriter: writer}, nil
 }
 
-func (b *gelfBackend) parseFields(gelfMsg *gelf.Message) {
+func (b *gelfBackend) parseFields(gelfMsg *fastgelf.Message) {
 	msg := gelfMsg.Short
 	for {
 		idx := strings.IndexByte(msg, '=')
@@ -184,7 +181,7 @@ func parseMsgLevel(level string) int32 {
 }
 
 func (b *gelfBackend) process(conn net.Conn, msg LogMessage) error {
-	gelfMsg := msg.(*gelf.Message)
+	gelfMsg := msg.(*fastgelf.Message)
 	b.parseFields(gelfMsg)
 	return conn.(*gelfConnWrapper).WriteMessage(gelfMsg)
 }
