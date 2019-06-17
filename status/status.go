@@ -164,30 +164,29 @@ func (r *Reporter) reportStatus() {
 func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) []containerStatus {
 	statuses := make([]containerStatus, 0, len(containers))
 	for _, c := range containers {
+		var name string
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
 		var status provision.Status
 		cont, err := r.infoClient.GetAppContainer(c.ID, false)
 		if err == container.ErrTsuruVariablesNotFound {
 			continue
 		}
 		if err != nil {
-			bslog.Errorf("[status reporter] failed to inspect container %q: %s", c.ID, err)
-			status = provision.StatusError
-		} else {
-			if cont.Container.State.Restarting ||
-				cont.Container.State.Dead ||
-				cont.Container.State.RemovalInProgress {
-				status = provision.StatusError
-			} else if cont.Container.State.Running {
-				status = provision.StatusStarted
-			} else if cont.Container.State.StartedAt.IsZero() {
-				status = provision.StatusCreated
-			} else {
-				status = provision.StatusStopped
-			}
+			bslog.Errorf("[status reporter] failed to inspect container %q (%s): %s", c.ID, name, err)
+			continue
 		}
-		var name string
-		if len(c.Names) > 0 {
-			name = strings.TrimPrefix(c.Names[0], "/")
+		if cont.Container.State.Restarting ||
+			cont.Container.State.Dead ||
+			cont.Container.State.RemovalInProgress {
+			status = provision.StatusError
+		} else if cont.Container.State.Running {
+			status = provision.StatusStarted
+		} else if cont.Container.State.StartedAt.IsZero() {
+			status = provision.StatusCreated
+		} else {
+			status = provision.StatusStopped
 		}
 		statuses = append(statuses, containerStatus{ID: c.ID, Name: name, Status: status.String()})
 	}
@@ -252,6 +251,7 @@ func (r *Reporter) tryRemoveContainer(id string) {
 			delete(r.removeMap, id)
 			r.mu.Unlock()
 		}()
+		bslog.Warnf("[status reporter] removing container %q not found in tsuru response")
 		client := r.infoClient.GetClient()
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
 		err := client.RemoveContainer(opts)
