@@ -1264,4 +1264,56 @@ func BenchmarkMessagesGelfBackendProcess(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+	close(be.quitCh)
+	stopWg.Wait()
+}
+
+func BenchmarkMessagesWaitOneGelfBackend(b *testing.B) {
+	b.StopTimer()
+	disableLog()
+	dockerServer, contID, err := serverWithContainer()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dockerServer.Stop()
+	startReceiver := func() net.Conn {
+		addr, recErr := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		udpConn, recErr := net.ListenUDP("udp", addr)
+		if recErr != nil {
+			b.Fatal(recErr)
+		}
+		go func() {
+			io.Copy(ioutil.Discard, udpConn)
+		}()
+		return udpConn
+	}
+	conn := startReceiver()
+	os.Setenv("LOG_GELF_HOST", conn.LocalAddr().String())
+	lf := LogForwarder{
+		BindAddress:     "tcp://127.0.0.1:59317",
+		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	if err != nil {
+		b.Fatal(err)
+	}
+	rPart := &rawLogParts{
+		ts:        time.Now(),
+		priority:  []byte("30"),
+		content:   []byte("mymsg"),
+		container: []byte(contID),
+	}
+	parts := format.LogParts{"parts": rPart}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		lf.Handle(parts, 1, nil)
+	}
+	close(lf.backends[0].(*gelfBackend).msgCh)
+	stopWg.Wait()
+	b.StopTimer()
+	lf.stopWait()
 }

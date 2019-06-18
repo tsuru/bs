@@ -106,7 +106,7 @@ func processMessages(forwarder forwarderBackend, bufferSize int) (chan<- LogMess
 			forwarder.close(conn)
 			switch err {
 			case nil:
-				break
+				return
 			case errConnMaxAgeExceeded:
 				bslog.Warnf("[log forwarder] connection max age exceeded, forcing reconnection")
 			default:
