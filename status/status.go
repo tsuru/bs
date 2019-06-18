@@ -251,7 +251,7 @@ func (r *Reporter) tryRemoveContainer(id string) {
 			delete(r.removeMap, id)
 			r.mu.Unlock()
 		}()
-		bslog.Warnf("[status reporter] removing container %q not found in tsuru response")
+		bslog.Warnf("[status reporter] removing container %q not found in tsuru response", id)
 		client := r.infoClient.GetClient()
 		opts := docker.RemoveContainerOptions{ID: id, Force: true}
 		err := client.RemoveContainer(opts)
