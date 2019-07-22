@@ -257,10 +257,8 @@ func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 }
 
 func (f *wsForwarder) close(conn net.Conn) {
-	// Reset deadline, if we don't do this the connection remains open
-	// on the other end (causing tests to fail) for some weird reason.
 	f.connMutex.Lock()
 	defer f.connMutex.Unlock()
-	conn.SetWriteDeadline(time.Time{})
+	conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
 	conn.Close()
 }
