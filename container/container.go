@@ -23,7 +23,10 @@ var (
 	processNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.pod.name"}
 )
 
-const containerIDTrimSize = 12
+const (
+	containerIDTrimSize = 12
+	labelIsIsolated     = "is-isolated-run"
+)
 
 type InfoClient struct {
 	endpoint       string
@@ -171,6 +174,11 @@ func (c *Container) HasEnvs(requiredEnvs []string) bool {
 		}
 	}
 	return true
+}
+
+func (c *Container) IsIsolated() bool {
+	_, isIsolated := c.GetLabelAny(labelIsIsolated)
+	return isIsolated
 }
 
 // GetLabelAny returns the first label value that exists with given names

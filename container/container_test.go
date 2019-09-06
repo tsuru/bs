@@ -22,15 +22,16 @@ func Test(t *testing.T) {
 
 type S struct{}
 
-func createContainer(c *check.C, url string, envs []string, name string) string {
+func createContainer(c *check.C, url string, envs []string, labels map[string]string, name string) string {
 	dockerClient, err := docker.NewClient(url)
 	c.Assert(err, check.IsNil)
 	err = dockerClient.PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
 	c.Assert(err, check.IsNil)
 	config := docker.Config{
-		Image: "myimg",
-		Cmd:   []string{"mycmd"},
-		Env:   envs,
+		Image:  "myimg",
+		Cmd:    []string{"mycmd"},
+		Env:    envs,
+		Labels: labels,
 	}
 	opts := docker.CreateContainerOptions{Name: name, Config: &config}
 	cont, err := dockerClient.CreateContainer(opts)
@@ -46,7 +47,7 @@ func (S) TestInfoClientGetContainer(c *check.C) {
 		}
 	})
 	c.Assert(err, check.IsNil)
-	id := createContainer(c, dockerServer.URL(), []string{"TSURU_PROCESSNAME=procx", "TSURU_APPNAME=coolappname"}, "myContName")
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_PROCESSNAME=procx", "TSURU_APPNAME=coolappname"}, nil, "myContName")
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	cont, err := client.GetContainer(id, true, []string{})
@@ -79,7 +80,7 @@ func (S) TestInfoClientGetContainerNonApp(c *check.C) {
 		}
 	})
 	c.Assert(err, check.IsNil)
-	id := createContainer(c, dockerServer.URL(), nil, "myContName")
+	id := createContainer(c, dockerServer.URL(), nil, nil, "myContName")
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	cont, err := client.GetContainer(id, true, []string{})
@@ -98,7 +99,7 @@ func (S) TestInfoClientGetAppContainer(c *check.C) {
 		}
 	})
 	c.Assert(err, check.IsNil)
-	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, "myContName")
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, nil, "myContName")
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	cont, err := client.GetAppContainer(id, true)
@@ -116,7 +117,7 @@ func (S) TestInfoClientGetAppContainer(c *check.C) {
 	cont, _ = client.GetAppContainer(id, true)
 	c.Assert(cont.ID, check.Equals, id)
 	c.Assert(dockerCalls, check.Equals, 2)
-	id = createContainer(c, dockerServer.URL(), []string{""}, "notAnApp")
+	id = createContainer(c, dockerServer.URL(), []string{""}, nil, "notAnApp")
 	cont, err = client.GetAppContainer(id, true)
 	c.Assert(err, check.Equals, ErrTsuruVariablesNotFound)
 	c.Assert(cont, check.IsNil)
@@ -125,7 +126,7 @@ func (S) TestInfoClientGetAppContainer(c *check.C) {
 func (S) TestInfoClientGetContainerRequiredEnv(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
-	id := createContainer(c, dockerServer.URL(), []string{"MONITORED=1"}, "myContName")
+	id := createContainer(c, dockerServer.URL(), []string{"MONITORED=1"}, nil, "myContName")
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	_, err = client.GetContainer(id, true, []string{"NOTMONITORED"})
@@ -146,7 +147,7 @@ func (S) TestInfoClientGetContainerNotFound(c *check.C) {
 
 func (S) TestContainerHasEnvs(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
-	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, "myContName")
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, nil, "myContName")
 	c.Assert(err, check.IsNil)
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
@@ -155,4 +156,18 @@ func (S) TestContainerHasEnvs(c *check.C) {
 	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME"}), check.Equals, true)
 	c.Assert(cont.HasEnvs([]string{"ENV"}), check.Equals, false)
 	c.Assert(cont.HasEnvs([]string{"TSURU_APPNAME", "ENV"}), check.Equals, false)
+}
+
+func (S) TestContainerIsIsolated(c *check.C) {
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
+	id1 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, map[string]string{"is-isolated-run": "true"}, "withLabels")
+	id2 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, nil, "withoutLabels")
+	c.Assert(err, check.IsNil)
+	client, err := NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	cont1, err := client.GetAppContainer(id1, false)
+	cont2, err := client.GetAppContainer(id2, false)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont1.IsIsolated(), check.Equals, true)
+	c.Assert(cont2.IsIsolated(), check.Equals, false)
 }
