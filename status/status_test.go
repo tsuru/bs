@@ -45,6 +45,8 @@ func (s S) TestReportStatus(c *check.C) {
 		{name: "x4", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
 		{name: "x5", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/"}}, state: docker.State{Running: false, ExitCode: 2}},
 		{name: "x6", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false}},
+		{name: "x7", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}, Labels: map[string]string{"is-isolated-run": "true"}}, state: docker.State{Running: true}},
+		{name: "x8", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}, Labels: map[string]string{"is-isolated-run": "true"}}, state: docker.State{Running: false}},
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
@@ -99,9 +101,10 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Assert(err, check.IsNil)
 	ids := make([]string, len(apiContainers))
 	for i, cont := range apiContainers {
+		println(cont.ID)
 		ids[i] = cont.ID
 	}
-	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID}
+	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID, containers[6].ID, containers[7].ID}
 	sort.Strings(ids)
 	sort.Strings(expectedIDs)
 	c.Assert(ids, check.DeepEquals, expectedIDs)

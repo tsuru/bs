@@ -177,6 +177,9 @@ func (r *Reporter) retrieveContainerStatuses(containers []docker.APIContainers) 
 			bslog.Errorf("[status reporter] failed to inspect container %q (%s): %s", c.ID, name, err)
 			continue
 		}
+		if cont != nil && cont.IsIsolated() {
+			continue
+		}
 		if cont.Container.State.Restarting ||
 			cont.Container.State.Dead ||
 			cont.Container.State.RemovalInProgress {
