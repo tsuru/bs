@@ -160,14 +160,17 @@ func (S) TestContainerHasEnvs(c *check.C) {
 
 func (S) TestContainerIsIsolated(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
-	id1 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, map[string]string{"is-isolated-run": "true"}, "withLabels")
-	id2 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, nil, "withoutLabels")
+	id1 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, map[string]string{"is-isolated-run": "true"}, "withTrueLabel")
+	id2 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, map[string]string{"is-isolated-run": "false"}, "withFalseLabel")
+	id3 := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, nil, "withoutLabel")
 	c.Assert(err, check.IsNil)
 	client, err := NewClient(dockerServer.URL())
 	c.Assert(err, check.IsNil)
 	cont1, err := client.GetAppContainer(id1, false)
 	cont2, err := client.GetAppContainer(id2, false)
+	cont3, err := client.GetAppContainer(id3, false)
 	c.Assert(err, check.IsNil)
 	c.Assert(cont1.IsIsolated(), check.Equals, true)
 	c.Assert(cont2.IsIsolated(), check.Equals, false)
+	c.Assert(cont3.IsIsolated(), check.Equals, false)
 }

@@ -47,11 +47,12 @@ func (s S) TestReportStatus(c *check.C) {
 		{name: "x6", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: false}},
 		{name: "x7", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}, Labels: map[string]string{"is-isolated-run": "true"}}, state: docker.State{Running: true}},
 		{name: "x8", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}, Labels: map[string]string{"is-isolated-run": "true"}}, state: docker.State{Running: false}},
+		{name: "x9", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}, Labels: map[string]string{"is-isolated-run": "false"}}, state: docker.State{Running: true}},
 	}
 	dockerServer, containers := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
-	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":true}]`
-	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[5].ID))
+	result := `[{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":true},{"id":"%s","found":false},{"id":"%s","found":true},{"id":"%s","found":true}]`
+	buf := bytes.NewBufferString(fmt.Sprintf(result, containers[0].ID, containers[1].ID, containers[2].ID, containers[3].ID, containers[5].ID, containers[8].ID))
 	var resp http.Response
 	resp.StatusCode = http.StatusOK
 	resp.Body = ioutil.NopCloser(buf)
@@ -81,6 +82,7 @@ func (s S) TestReportStatus(c *check.C) {
 			{ID: containers[2].ID, Status: "error", Name: "x3"},
 			{ID: containers[3].ID, Status: "started", Name: "x4"},
 			{ID: containers[5].ID, Status: "created", Name: "x6"},
+			{ID: containers[8].ID, Status: "started", Name: "x9"},
 		},
 	}
 	var input hostStatus
@@ -104,7 +106,7 @@ func (s S) TestReportStatus(c *check.C) {
 		println(cont.ID)
 		ids[i] = cont.ID
 	}
-	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID, containers[6].ID, containers[7].ID}
+	expectedIDs := []string{containers[0].ID, containers[1].ID, containers[2].ID, containers[4].ID, containers[5].ID, containers[6].ID, containers[7].ID, containers[8].ID}
 	sort.Strings(ids)
 	sort.Strings(expectedIDs)
 	c.Assert(ids, check.DeepEquals, expectedIDs)

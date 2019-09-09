@@ -177,8 +177,8 @@ func (c *Container) HasEnvs(requiredEnvs []string) bool {
 }
 
 func (c *Container) IsIsolated() bool {
-	_, isIsolated := c.GetLabelAny(labelIsIsolated)
-	return isIsolated
+	isIsolated, ok := c.GetLabelAny(labelIsIsolated)
+	return ok && isIsolated == "true"
 }
 
 // GetLabelAny returns the first label value that exists with given names
