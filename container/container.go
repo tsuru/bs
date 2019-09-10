@@ -21,12 +21,10 @@ var (
 
 	appNameLabels     = []string{"bs.tsuru.io/log-app-name", "log-app-name", "io.kubernetes.container.name"}
 	processNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.pod.name"}
+	labelIsIsolated   = []string{"is-isolated-run", "tsuru.io/is-isolated-run"}
 )
 
-const (
-	containerIDTrimSize = 12
-	labelIsIsolated     = "is-isolated-run"
-)
+const containerIDTrimSize = 12
 
 type InfoClient struct {
 	endpoint       string
@@ -177,7 +175,7 @@ func (c *Container) HasEnvs(requiredEnvs []string) bool {
 }
 
 func (c *Container) IsIsolated() bool {
-	isIsolated, ok := c.GetLabelAny(labelIsIsolated)
+	isIsolated, ok := c.GetLabelAny(labelIsIsolated...)
 	return ok && isIsolated == "true"
 }
 
