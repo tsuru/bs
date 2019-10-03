@@ -121,11 +121,11 @@ github.com/tsuru/tsuru/repository
 github.com/tsuru/tsuru/router
 github.com/tsuru/tsuru/service
 github.com/tsuru/tsuru/validation
-# golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b
+# golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20180826012351-8a410e7b638d
+# golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 golang.org/x/net/websocket
-# golang.org/x/sys v0.0.0-20180925112736-b09afc3d579e
+# golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # gopkg.in/check.v1 v1.0.0-20141024133853-64131543e789

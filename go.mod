@@ -24,9 +24,8 @@ require (
 	github.com/tsuru/config v0.0.0-20151207200950-a4028d4efbb9 // indirect
 	github.com/tsuru/monsterqueue v0.0.0-20150730191847-c2240c7d35e4 // indirect
 	github.com/tsuru/tsuru v0.0.0-20160106221702-f0bfa8e74731
-	golang.org/x/crypto v0.0.0-20180910181607-0e37d006457b // indirect
-	golang.org/x/net v0.0.0-20180826012351-8a410e7b638d
-	golang.org/x/sys v0.0.0-20180925112736-b09afc3d579e // indirect
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+	golang.org/x/tools v0.0.0-20191003162220-c56b4b191e2d // indirect
 	gopkg.in/check.v1 v1.0.0-20141024133853-64131543e789
 	gopkg.in/mcuadros/go-syslog.v2 v2.2.1
 	gopkg.in/mgo.v2 v2.0.0-20151207021513-e30de8ac9ae3 // indirect
