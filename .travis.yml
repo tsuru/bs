@@ -1,16 +1,17 @@
 language: go
 sudo: required
 go:
-  - 1.10.x
-  - 1.11.x
-  - tip
+  - 1.13.x
+  - master
 addons:
   apt:
     packages:
     - docker-ce
 env:
   global:
-    - GO_FOR_RELEASE=1.11
+    - GOPROXY=https://proxy.golang.org
+    - GO111MODULE=on
+    - GO_FOR_RELEASE=1.13
     - IMAGE_NAME=tsuru/bs
   matrix:
     - GOARCH=amd64
@@ -23,7 +24,7 @@ after_success:
   - curl https://raw.githubusercontent.com/tsuru/push-to-docker/master/push.sh | bash
 matrix:
   allow_failures:
-    - go: tip
+    - go: master
 notifications:
   email:
     on_success: change

@@ -2,9 +2,13 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
+verify-vendor:
+	go mod verify
+	go mod vendor
+
 test:
 	go clean ./...
-	go test  ./... -check.vv
+	go test -mod vendor  ./... -check.vv
 
 dirs = `go list -f '{{.Dir}}/*.go' ./... | grep -v vendor`
 format:
