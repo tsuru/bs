@@ -44,6 +44,7 @@ func NewCheckCollection(client *docker.Client) *checkCollection {
 	hostCheckTimeout := config.SecondsEnvOrDefault(0, "HOSTCHECK_TIMEOUT")
 	baseContainerName := config.StringEnvOrDefault("", "HOSTCHECK_BASE_CONTAINER_NAME")
 	rootPathOverride := config.StringEnvOrDefault("/", "HOSTCHECK_ROOT_PATH_OVERRIDE")
+	failPathOverride := config.StringEnvOrDefault("/", "HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
 	containerCheckMessage := config.StringEnvOrDefault("ok", "HOSTCHECK_CONTAINER_MESSAGE")
 	checksFilter := config.StringsEnvOrDefault(nil, "HOSTCHECK_KIND_FILTER")
 	var checksFilterSet map[string]struct{}
@@ -56,6 +57,7 @@ func NewCheckCollection(client *docker.Client) *checkCollection {
 	checkColl := &checkCollection{
 		checks: []hostCheck{
 			&writableCheck{path: rootPathOverride},
+			&forceErrorCheck{path: failPathOverride},
 			&createContainerCheck{client: client, baseContID: baseContainerName, message: containerCheckMessage},
 		},
 		checksFilterSet: checksFilterSet,
@@ -140,6 +142,30 @@ func (c *writableCheck) Run() error {
 		return io.ErrShortWrite
 	}
 
+	return nil
+}
+
+type forceErrorCheck struct {
+	path string
+}
+
+func (c *forceErrorCheck) Kind() string {
+	return "forceError"
+}
+
+func (c *forceErrorCheck) Name() string {
+	return fmt.Sprintf("forceError-%s", c.path)
+}
+
+func (c *forceErrorCheck) Run() error {
+	fileName := strings.Join([]string{
+		strings.TrimRight(c.path, string(os.PathSeparator)),
+		"tsuru-bs-host-fail.check",
+	}, string(os.PathSeparator))
+	info, err := os.Stat(fileName)
+	if err == nil && !info.IsDir() {
+		return fmt.Errorf("path \"%s\" to force host fail found", fileName)
+	}
 	return nil
 }
 

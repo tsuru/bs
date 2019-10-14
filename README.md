@@ -244,6 +244,11 @@ host. If the check takes more than the time specified in this environment
 variable, the check will be considered a failure. The default value is `0`,
 which means no timeout.
 
+### HOSTCHECK_KIND_FILTER
+
+`HOSTCHECK_KIND_FILTER` is a comma separated list of checks which BS will attempt
+before declare host as failure. Default values set to `"writablePath, forceError, createContainer`
+
 ## Injected Environment Variables
 
 Tsuru will inject some environment variables when starting the bs container.
