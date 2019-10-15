@@ -88,7 +88,7 @@ func (s S) TestReportStatus(c *check.C) {
 	var input hostStatus
 	err = form.DecodeString(&input, string(req.body))
 	c.Assert(err, check.IsNil)
-	c.Assert(input.Checks, check.HasLen, 2)
+	c.Assert(input.Checks, check.HasLen, 3)
 	c.Assert(len(input.Addrs) > 0, check.Equals, true)
 	input.Checks = nil
 	input.Addrs = nil

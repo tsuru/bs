@@ -5,6 +5,7 @@
 package status
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -16,6 +17,7 @@ func (s S) TestNewCheckCollection(c *check.C) {
 	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
 		&writableCheck{path: "/"},
+		&forceErrorCheck{path: "/"},
 		&createContainerCheck{message: "ok"},
 	})
 }
@@ -26,6 +28,7 @@ func (s S) TestNewCheckCollectionExtraPaths(c *check.C) {
 	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
 		&writableCheck{path: "/"},
+		&forceErrorCheck{path: "/"},
 		&createContainerCheck{message: "ok"},
 		&writableCheck{path: "/var/log"},
 		&writableCheck{path: "/var/lib/docker"},
@@ -38,8 +41,47 @@ func (s S) TestNewCheckCollectionBaseContainerName(c *check.C) {
 	checkColl := NewCheckCollection(nil)
 	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
 		&writableCheck{path: "/"},
+		&forceErrorCheck{path: "/"},
 		&createContainerCheck{message: "ok", baseContID: "big-sibling"},
 	})
+}
+
+func (s S) TestNewCheckCollectionForceErrorAltPath(c *check.C) {
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", "/new_path_force_error")
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
+	checkColl := NewCheckCollection(nil)
+	c.Assert(checkColl.checks, check.DeepEquals, []hostCheck{
+		&writableCheck{path: "/"},
+		&forceErrorCheck{path: "/new_path_force_error"},
+		&createContainerCheck{message: "ok"},
+	})
+}
+
+func (s S) TestForceErrorWithAltPathAndDirCheck(c *check.C) {
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", tmpdir)
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
+	err = os.Mkdir(tmpdir+"/tsuru-bs-host-fail.check", 0755)
+	c.Assert(err, check.IsNil)
+	wCheck := forceErrorCheck{path: tmpdir}
+	err = wCheck.Run()
+	c.Assert(err, check.IsNil)
+}
+
+func (s S) TestForceErrorWithAltPathAndFail(c *check.C) {
+	tmpdir, err := ioutil.TempDir("", "hostcheck")
+	c.Assert(err, check.IsNil)
+	defer os.RemoveAll(tmpdir)
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", tmpdir)
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
+	fd, err := os.OpenFile(tmpdir+"/tsuru-bs-host-fail.check", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	c.Assert(err, check.IsNil)
+	defer fd.Close()
+	wCheck := forceErrorCheck{path: tmpdir}
+	err = wCheck.Run()
+	c.Assert(err, check.ErrorMatches, fmt.Sprintf("path \"%s/tsuru-bs-host-fail.check\" to force host fail found", tmpdir))
 }
 
 func (s S) TestWritableCheckRun(c *check.C) {
@@ -86,15 +128,18 @@ func (s S) TestCheckCollectionRun(c *check.C) {
 	done := stopContainer(client, conts[0].ID, c)
 	defer os.RemoveAll(tmpdir)
 	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", tmpdir)
 	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
 	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
 	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
 	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
 	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
 	checkColl := NewCheckCollection(client)
 	results := checkColl.Run()
 	c.Assert(results, check.DeepEquals, []hostCheckResult{
 		{Name: "writablePath-" + tmpdir, Successful: true},
+		{Name: "forceError-" + tmpdir, Successful: true},
 		{Name: "createContainer", Successful: true},
 	})
 	<-done
@@ -112,16 +157,19 @@ func (s S) TestCheckCollectionRunFilterAll(c *check.C) {
 	done := stopContainer(client, conts[0].ID, c)
 	defer os.RemoveAll(tmpdir)
 	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
-	os.Setenv("HOSTCHECK_KIND_FILTER", "writablePath, createContainer")
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_KIND_FILTER", "writablePath, forceError, createContainer")
 	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
 	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
 	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
 	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
 	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
 	checkColl := NewCheckCollection(client)
 	results := checkColl.Run()
 	c.Assert(results, check.DeepEquals, []hostCheckResult{
 		{Name: "writablePath-" + tmpdir, Successful: true},
+		{Name: "forceError-" + tmpdir, Successful: true},
 		{Name: "createContainer", Successful: true},
 	})
 	<-done
@@ -161,12 +209,14 @@ func (s S) TestCheckCollectionRunTimeout(c *check.C) {
 	defer os.RemoveAll(tmpdir)
 	os.Setenv("HOSTCHECK_TIMEOUT", "1")
 	os.Setenv("HOSTCHECK_ROOT_PATH_OVERRIDE", tmpdir)
+	os.Setenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE", tmpdir)
 	os.Setenv("HOSTCHECK_BASE_CONTAINER_NAME", "x1")
 	os.Setenv("HOSTCHECK_CONTAINER_MESSAGE", "Container is not running\nWhat happened?\nSomething happened\n")
 	defer os.Unsetenv("HOSTCHECK_TIMEOUT")
 	defer os.Unsetenv("HOSTCHECK_ROOT_PATH_OVERRIDE")
 	defer os.Unsetenv("HOSTCHECK_BASE_CONTAINER_NAME")
 	defer os.Unsetenv("HOSTCHECK_CONTAINER_MESSAGE")
+	defer os.Unsetenv("HOSTCHECK_FORCE_ERROR_PATH_OVERRIDE")
 	checkColl := NewCheckCollection(client)
 	results := checkColl.Run()
 	resultsMap := map[string]hostCheckResult{}
@@ -175,6 +225,7 @@ func (s S) TestCheckCollectionRunTimeout(c *check.C) {
 	}
 	c.Assert(resultsMap, check.DeepEquals, map[string]hostCheckResult{
 		"writablePath-" + tmpdir: {Name: "writablePath-" + tmpdir, Err: "", Successful: true},
+		"forceError-" + tmpdir:   {Name: "forceError-" + tmpdir, Err: "", Successful: true},
 		"createContainer":        {Name: "createContainer", Err: "[host check] timeout running \"createContainer\" check", Successful: false},
 	})
 }
