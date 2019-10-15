@@ -10,8 +10,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
@@ -123,10 +123,7 @@ func (c *writableCheck) Name() string {
 }
 
 func (c *writableCheck) Run() error {
-	fileName := strings.Join([]string{
-		strings.TrimRight(c.path, string(os.PathSeparator)),
-		"tsuru-bs-ro.check",
-	}, string(os.PathSeparator))
+	fileName := filepath.Join(c.path, "tsuru-bs-ro.check")
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
 		return err
@@ -158,10 +155,7 @@ func (c *forceErrorCheck) Name() string {
 }
 
 func (c *forceErrorCheck) Run() error {
-	fileName := strings.Join([]string{
-		strings.TrimRight(c.path, string(os.PathSeparator)),
-		"tsuru-bs-host-fail.check",
-	}, string(os.PathSeparator))
+	fileName := filepath.Join(c.path, "tsuru-bs-host-fail.check")
 	info, err := os.Stat(fileName)
 	if err == nil && !info.IsDir() {
 		return fmt.Errorf("path \"%s\" to force host fail found", fileName)
