@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tsuru/bs/config"
+
 	docker "github.com/fsouza/go-dockerclient"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -27,7 +29,7 @@ var (
 const containerIDTrimSize = 12
 
 type InfoClient struct {
-	endpoint       string
+	dockerInfo     *config.DockerConfig
 	client         *docker.Client
 	containerCache *lru.Cache
 }
@@ -45,14 +47,19 @@ const (
 	fullTimeout = 1 * time.Minute
 )
 
-func NewClient(endpoint string) (*InfoClient, error) {
-	c := InfoClient{endpoint: endpoint}
+func NewClient(dockerInfo *config.DockerConfig) (*InfoClient, error) {
+	c := InfoClient{dockerInfo: dockerInfo}
 	var err error
 	c.containerCache, err = lru.New(100)
 	if err != nil {
 		return nil, err
 	}
-	c.client, err = docker.NewClient(endpoint)
+	if dockerInfo.UseTLS {
+		c.client, err = docker.NewTLSClient(dockerInfo.Endpoint, dockerInfo.CertFile,
+			dockerInfo.KeyFile, dockerInfo.CaFile)
+	} else {
+		c.client, err = docker.NewClient(dockerInfo.Endpoint)
+	}
 	if err != nil {
 		return nil, err
 	}

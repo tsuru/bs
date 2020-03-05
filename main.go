@@ -59,15 +59,15 @@ func main() {
 		return
 	}
 	lf := log.LogForwarder{
-		BindAddress:     config.Config.SyslogListenAddress,
-		DockerEndpoint:  config.Config.DockerEndpoint,
-		EnabledBackends: config.Config.LogBackends,
+		BindAddress:      config.Config.SyslogListenAddress,
+		DockerClientInfo: config.Config.DockerClientInfo,
+		EnabledBackends:  config.Config.LogBackends,
 	}
 	err = lf.Start()
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
-	mRunner := metric.NewRunner(config.Config.DockerEndpoint, config.Config.MetricsInterval,
+	mRunner := metric.NewRunner(config.Config.DockerClientInfo, config.Config.MetricsInterval,
 		config.Config.MetricsBackend)
 	mRunner.EnableBasicMetrics = config.Config.MetricsEnableBasic
 	mRunner.EnableConnMetrics = config.Config.MetricsEnableConn
@@ -77,10 +77,10 @@ func main() {
 		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
-		TsuruEndpoint:  config.Config.TsuruEndpoint,
-		TsuruToken:     config.Config.TsuruToken,
-		DockerEndpoint: config.Config.DockerEndpoint,
-		Interval:       config.Config.StatusInterval,
+		TsuruEndpoint:    config.Config.TsuruEndpoint,
+		TsuruToken:       config.Config.TsuruToken,
+		DockerClientInfo: config.Config.DockerClientInfo,
+		Interval:         config.Config.StatusInterval,
 	})
 	if err != nil {
 		bslog.Warnf("Unable to initialize status reporter: %s\n", err)

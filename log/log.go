@@ -36,14 +36,14 @@ var (
 type LogMessage interface{}
 
 type LogForwarder struct {
-	BindAddress     string
-	DockerEndpoint  string
-	EnabledBackends []string
-	infoClient      *container.InfoClient
-	server          *syslog.Server
-	backends        []logBackend
-	formatter       *LenientFormat
-	kubeStreamer    *kubernetesLogStreamer
+	BindAddress      string
+	DockerClientInfo *config.DockerConfig
+	EnabledBackends  []string
+	infoClient       *container.InfoClient
+	server           *syslog.Server
+	backends         []logBackend
+	formatter        *LenientFormat
+	kubeStreamer     *kubernetesLogStreamer
 }
 
 type forwarderBackend interface {
@@ -142,9 +142,9 @@ func (l *LogForwarder) Start() (err error) {
 	if len(l.backends) == 0 {
 		bslog.Warnf("no log backend enabled, discarding all received log messages.")
 	}
-	l.infoClient, err = container.NewClient(l.DockerEndpoint)
+	l.infoClient, err = container.NewClient(l.DockerClientInfo)
 	if err != nil {
-		err = fmt.Errorf("unable to initialize docker client %s: %s", l.DockerEndpoint, err)
+		err = fmt.Errorf("unable to initialize docker client %s: %s", l.DockerClientInfo.Endpoint, err)
 		return
 	}
 	l.formatter = &LenientFormat{}

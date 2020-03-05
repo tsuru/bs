@@ -21,8 +21,17 @@ const (
 	DefaultDockerEndpoint = "unix:///var/run/docker.sock"
 )
 
+// DockerConfig is container for Endpoint and tls config
+type DockerConfig struct {
+	Endpoint string
+	UseTLS   bool
+	CertFile string
+	KeyFile  string
+	CaFile   string
+}
+
 var Config struct {
-	DockerEndpoint      string
+	DockerClientInfo    *DockerConfig
 	TsuruEndpoint       string
 	TsuruToken          string
 	MetricsInterval     time.Duration
@@ -41,7 +50,13 @@ func init() {
 
 func LoadConfig() {
 	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
-	Config.DockerEndpoint = StringEnvOrDefault(DefaultDockerEndpoint, "DOCKER_ENDPOINT")
+	Config.DockerClientInfo = &DockerConfig{
+		Endpoint: StringEnvOrDefault(DefaultDockerEndpoint, "DOCKER_ENDPOINT"),
+		UseTLS:   false,
+		CertFile: "",
+		KeyFile:  "",
+		CaFile:   "",
+	}
 	Config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	Config.TsuruToken = os.Getenv("TSURU_TOKEN")
 	Config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
