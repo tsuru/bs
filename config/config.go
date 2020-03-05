@@ -5,6 +5,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -50,13 +51,8 @@ func init() {
 
 func LoadConfig() {
 	bslog.Debug, _ = strconv.ParseBool(os.Getenv("BS_DEBUG"))
-	Config.DockerClientInfo = &DockerConfig{
-		Endpoint: StringEnvOrDefault(DefaultDockerEndpoint, "DOCKER_ENDPOINT"),
-		UseTLS:   false,
-		CertFile: "",
-		KeyFile:  "",
-		CaFile:   "",
-	}
+	var dockerEndpoint = StringEnvOrDefault(DefaultDockerEndpoint, "DOCKER_ENDPOINT")
+	Config.DockerClientInfo = loadDockerConfig(dockerEndpoint)
 	Config.TsuruEndpoint = os.Getenv("TSURU_ENDPOINT")
 	Config.TsuruToken = os.Getenv("TSURU_TOKEN")
 	Config.SyslogListenAddress = os.Getenv("SYSLOG_LISTEN_ADDRESS")
@@ -67,6 +63,25 @@ func LoadConfig() {
 	Config.MetricsEnableBasic = BoolEnvOrDefault(true, "METRICS_ENABLE_BASIC")
 	Config.MetricsEnableConn = BoolEnvOrDefault(true, "METRICS_ENABLE_CONN")
 	Config.MetricsEnableHost = BoolEnvOrDefault(true, "METRICS_ENABLE_HOST")
+}
+
+func loadDockerConfig(dockerEndpoint string) *DockerConfig {
+	var config = &DockerConfig{
+		Endpoint: dockerEndpoint,
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	}
+	if strings.HasPrefix(dockerEndpoint, "https:") {
+		if fileAvailable(config.CertFile) && fileAvailable(config.KeyFile) && fileAvailable(config.CaFile) {
+			bslog.Debugf("Docker cert files found. Configuring TLS support.")
+			config.UseTLS = true
+		} else {
+			bslog.Warnf("A valid certificate is required for using https schema without cert files.")
+		}
+	}
+	return config
 }
 
 func envOrDefault(convert func(string) interface{}, defaultValue interface{}, envs ...string) interface{} {
@@ -140,4 +155,11 @@ func SecondsEnvOrDefault(defaultValue float64, envs ...string) time.Duration {
 		}
 		return val
 	}, defaultValue, envs...).(float64) * float64(time.Second))
+}
+
+func fileAvailable(name string) bool {
+	if _, err := os.Stat(name); err == nil {
+		return true
+	}
+	return false
 }
