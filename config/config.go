@@ -5,7 +5,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 	"strconv"
