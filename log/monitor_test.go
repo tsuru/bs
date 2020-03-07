@@ -13,6 +13,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 	"gopkg.in/mcuadros/go-syslog.v2/format"
@@ -277,7 +278,13 @@ func (s *S) TestLogEntryFromName(c *check.C) {
 func serverWithClient(c *check.C) (*dTesting.DockerServer, *container.InfoClient) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
-	cli, err := container.NewClient(dockerServer.URL())
+	cli, err := container.NewClient(&config.DockerConfig{
+		Endpoint: dockerServer.URL(),
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	})
 	c.Assert(err, check.IsNil)
 	err = cli.GetClient().PullImage(docker.PullImageOptions{Repository: "myimg"}, docker.AuthConfiguration{})
 	c.Assert(err, check.IsNil)
