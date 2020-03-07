@@ -23,6 +23,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	dtesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"gopkg.in/check.v1"
 )
 
@@ -61,10 +62,16 @@ func (s S) TestReportStatus(c *check.C) {
 	tsuruServer, requests := s.startTsuruServer(&resp)
 	defer tsuruServer.Close()
 	reporter, err := NewReporter(&ReporterConfig{
-		Interval:       10 * time.Minute,
-		DockerEndpoint: dockerServer.URL(),
-		TsuruEndpoint:  tsuruServer.URL,
-		TsuruToken:     "some-token",
+		Interval: 10 * time.Minute,
+		DockerClientInfo: &config.DockerConfig{
+			Endpoint: dockerServer.URL(),
+			UseTLS:   false,
+			CertFile: "/docker-certs/cert.pem",
+			KeyFile:  "/docker-certs/key.pem",
+			CaFile:   "/docker-certs/ca.pem",
+		},
+		TsuruEndpoint: tsuruServer.URL,
+		TsuruToken:    "some-token",
 	})
 	c.Assert(err, check.IsNil)
 	reporter.Stop()
@@ -145,10 +152,16 @@ func (s S) TestReportStatus404OnHostStatus(c *check.C) {
 	})
 	defer tsuruServer.Close()
 	reporter, err := NewReporter(&ReporterConfig{
-		Interval:       10 * time.Minute,
-		DockerEndpoint: dockerServer.URL(),
-		TsuruEndpoint:  tsuruServer.URL,
-		TsuruToken:     "some-token",
+		Interval: 10 * time.Minute,
+		DockerClientInfo: &config.DockerConfig{
+			Endpoint: dockerServer.URL(),
+			UseTLS:   false,
+			CertFile: "/docker-certs/cert.pem",
+			KeyFile:  "/docker-certs/key.pem",
+			CaFile:   "/docker-certs/ca.pem",
+		},
+		TsuruEndpoint: tsuruServer.URL,
+		TsuruToken:    "some-token",
 	})
 	c.Assert(err, check.IsNil)
 	reporter.Stop()
@@ -220,7 +233,13 @@ func (s S) TestReportStatusMultipleRemovals(c *check.C) {
 	defer tsuruServer.Close()
 	reporter, err := NewReporter(&ReporterConfig{
 		Interval:       10 * time.Minute,
-		DockerEndpoint: dockerServer.URL(),
+		DockerClientInfo: &config.DockerConfig{
+			Endpoint: dockerServer.URL(),
+			UseTLS:   false,
+			CertFile: "/docker-certs/cert.pem",
+			KeyFile:  "/docker-certs/key.pem",
+			CaFile:   "/docker-certs/ca.pem",
+		},
 		TsuruEndpoint:  tsuruServer.URL,
 		TsuruToken:     "some-token",
 	})

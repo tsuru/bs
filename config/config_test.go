@@ -31,7 +31,13 @@ func (S) TestLoadConfig(c *check.C) {
 	os.Setenv("SYSLOG_LISTEN_ADDRESS", "udp://0.0.0.0:1514")
 	os.Setenv("LOG_BACKENDS", "b1, b2 ")
 	LoadConfig()
-	c.Check(Config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
+	c.Check(Config.DockerClientInfo, check.DeepEquals, &DockerConfig{
+		Endpoint: "http://192.168.50.4:2375",
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	})
 	c.Check(Config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
 	c.Check(Config.TsuruToken, check.Equals, "sometoken")
 	c.Check(Config.StatusInterval, check.Equals, time.Duration(45e9))
@@ -49,7 +55,13 @@ func (S) TestLoadConfigInvalidDuration(c *check.C) {
 	os.Setenv("STATUS_INTERVAL", "four")
 	os.Setenv("HOST_PROC", "/prochost")
 	LoadConfig()
-	c.Check(Config.DockerEndpoint, check.Equals, "http://192.168.50.4:2375")
+	c.Check(Config.DockerClientInfo, check.DeepEquals, &DockerConfig{
+		Endpoint: "http://192.168.50.4:2375",
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	})
 	c.Check(Config.TsuruEndpoint, check.Equals, "http://192.168.50.4:8080")
 	c.Check(Config.TsuruToken, check.Equals, "sometoken")
 	c.Check(Config.StatusInterval, check.Equals, time.Duration(60e9))

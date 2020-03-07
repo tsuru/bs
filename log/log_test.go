@@ -30,6 +30,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	dTesting "github.com/fsouza/go-dockerclient/testing"
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 	"gopkg.in/check.v1"
@@ -52,6 +53,16 @@ func (s *S) SetUpSuite(c *check.C) {
 	var err error
 	time.Local, err = time.LoadLocation("America/Fortaleza")
 	c.Assert(err, check.IsNil)
+}
+
+func createDockerConfig(url string) *config.DockerConfig {
+	return &config.DockerConfig{
+		Endpoint: url,
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	}
 }
 
 func serverWithContainer() (*dTesting.DockerServer, string, error) {
@@ -128,9 +139,9 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -150,9 +161,9 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 
 func (s *S) TestLogForwarderStartNoneBackend(c *check.C) {
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"none"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"none"},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -173,9 +184,9 @@ func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -241,9 +252,9 @@ func testLogForwarderWSForwarder(
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	testTlsConfig = &tls.Config{RootCAs: srvCerts}
 	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends:  []string{"tsuru"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -288,8 +299,8 @@ func testLogForwarderWSForwarder(
 
 func (s *S) TestLogForwarderStartBindError(c *check.C) {
 	lf := LogForwarder{
-		BindAddress:    "xudp://127.0.0.1:59317",
-		DockerEndpoint: s.dockerServer.URL(),
+		BindAddress:      "xudp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err := lf.Start()
 	c.Assert(err, check.ErrorMatches, `invalid protocol "xudp", expected tcp or udp`)
@@ -297,15 +308,15 @@ func (s *S) TestLogForwarderStartBindError(c *check.C) {
 
 func (s *S) TestLogForwarderStartAlreadyBound(c *check.C) {
 	lf := LogForwarder{
-		BindAddress:    "udp://127.0.0.1:59317",
-		DockerEndpoint: s.dockerServer.URL(),
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
 	defer lf.stopWait()
 	lf2 := LogForwarder{
-		BindAddress:    "udp://127.0.0.1:59317",
-		DockerEndpoint: s.dockerServer.URL(),
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err = lf2.Start()
 	c.Assert(err, check.ErrorMatches, `.*address already in use.*`)
@@ -346,9 +357,9 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends:  []string{"tsuru"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -424,9 +435,9 @@ func (s *S) TestLogForwarderHandleIgnoredInvalid(c *check.C) {
 	var err error
 	for i, p := range parts {
 		lf := LogForwarder{
-			EnabledBackends: []string{"tsuru"},
-			BindAddress:     "udp://127.0.0.1:59317",
-			DockerEndpoint:  s.dockerServer.URL(),
+			EnabledBackends:  []string{"tsuru"},
+			BindAddress:      "udp://127.0.0.1:59317",
+			DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 		}
 		err = lf.Start()
 		c.Assert(err, check.IsNil)
@@ -453,9 +464,9 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.6")
 	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends:  []string{"tsuru"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -505,9 +516,9 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "0.8")
 	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends:  []string{"tsuru"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -532,9 +543,9 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -564,9 +575,9 @@ func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -653,9 +664,9 @@ func (s *S) TestLogForwarderStartFromFile(c *check.C) {
 	defer os.Unsetenv("LOG_KUBERNETES_LOG_DIR")
 	defer os.Unsetenv("LOG_KUBERNETES_LOG_POS_DIR")
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -677,9 +688,9 @@ func (s *S) TestLogForwarderStress(c *check.C) {
 	tcpConn := startReceiver(n, done, data)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+tcpConn.Addr().String())
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err := lf.Start()
 	c.Assert(err, check.IsNil)
@@ -721,9 +732,9 @@ func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -755,9 +766,9 @@ func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "udp://"+udpConn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -817,9 +828,9 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	forwardedConns := []net.Listener{startReceiver(b.N, done[0])}
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String())
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	if err != nil {
@@ -855,9 +866,9 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	forwardedConns := []net.Listener{startReceiver(b.N, done[0]), startReceiver(b.N, done[1])}
 	os.Setenv("LOG_SYSLOG_FORWARD_ADDRESSES", "tcp://"+forwardedConns[0].Addr().String()+",tcp://"+forwardedConns[1].Addr().String())
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
-		EnabledBackends: []string{"syslog"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
+		EnabledBackends:  []string{"syslog"},
 	}
 	err = lf.Start()
 	if err != nil {
@@ -920,9 +931,9 @@ func BenchmarkMessagesBroadcastNonAppContainer(b *testing.B) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
-		EnabledBackends: []string{"tsuru", "syslog"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
+		EnabledBackends:  []string{"tsuru", "syslog"},
 	}
 	err = lf.Start()
 	if err != nil {
@@ -973,9 +984,9 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
-		EnabledBackends: []string{"tsuru", "syslog"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
+		EnabledBackends:  []string{"tsuru", "syslog"},
 	}
 	err = lf.Start()
 	if err != nil {
@@ -1022,9 +1033,9 @@ func BenchmarkMessagesBroadcastWaitTsuru(b *testing.B) {
 	os.Setenv("LOG_TSURU_PING_INTERVAL", "0.1")
 	os.Setenv("LOG_TSURU_PONG_INTERVAL", "2.0")
 	lf := LogForwarder{
-		EnabledBackends: []string{"tsuru"},
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
+		EnabledBackends:  []string{"tsuru"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
 	}
 	err = lf.Start()
 	if err != nil {
@@ -1053,9 +1064,9 @@ func (s *S) TestGelfForwarder(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -1087,9 +1098,9 @@ func (s *S) TestGelfForwarderExtraTags(c *check.C) {
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
 	os.Setenv("LOG_GELF_EXTRA_TAGS", `{"_tags": "TSURU"}`)
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -1122,9 +1133,9 @@ func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
 	os.Setenv("LOG_GELF_FIELDS_WHITELIST", "request_id,status,method,uri")
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -1160,9 +1171,9 @@ func (s *S) TestGelfForwarderParseLevel(c *check.C) {
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
 	os.Setenv("LOG_GELF_FIELDS_WHITELIST", "request_id,status")
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -1193,9 +1204,9 @@ func (s *S) TestGelfForwarderStdErr(c *check.C) {
 	c.Assert(err, check.IsNil)
 	os.Setenv("LOG_GELF_HOST", reader.Addr())
 	lf := LogForwarder{
-		BindAddress:     "udp://127.0.0.1:59317",
-		DockerEndpoint:  s.dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "udp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(s.dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	c.Assert(err, check.IsNil)
@@ -1293,9 +1304,9 @@ func BenchmarkMessagesWaitOneGelfBackend(b *testing.B) {
 	conn := startReceiver()
 	os.Setenv("LOG_GELF_HOST", conn.LocalAddr().String())
 	lf := LogForwarder{
-		BindAddress:     "tcp://127.0.0.1:59317",
-		DockerEndpoint:  dockerServer.URL(),
-		EnabledBackends: []string{"gelf"},
+		BindAddress:      "tcp://127.0.0.1:59317",
+		DockerClientInfo: createDockerConfig(dockerServer.URL()),
+		EnabledBackends:  []string{"gelf"},
 	}
 	err = lf.Start()
 	if err != nil {
