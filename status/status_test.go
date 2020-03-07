@@ -232,7 +232,7 @@ func (s S) TestReportStatusMultipleRemovals(c *check.C) {
 	tsuruServer, _ := s.startTsuruServer(&resp)
 	defer tsuruServer.Close()
 	reporter, err := NewReporter(&ReporterConfig{
-		Interval:       10 * time.Minute,
+		Interval: 10 * time.Minute,
 		DockerClientInfo: &config.DockerConfig{
 			Endpoint: dockerServer.URL(),
 			UseTLS:   false,
@@ -240,8 +240,8 @@ func (s S) TestReportStatusMultipleRemovals(c *check.C) {
 			KeyFile:  "/docker-certs/key.pem",
 			CaFile:   "/docker-certs/ca.pem",
 		},
-		TsuruEndpoint:  tsuruServer.URL,
-		TsuruToken:     "some-token",
+		TsuruEndpoint: tsuruServer.URL,
+		TsuruToken:    "some-token",
 	})
 	c.Assert(err, check.IsNil)
 	reporter.Stop()
