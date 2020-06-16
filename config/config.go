@@ -27,6 +27,7 @@ var Config struct {
 	TsuruToken          string
 	MetricsInterval     time.Duration
 	MetricsBackend      string
+	MetricsEnable       bool
 	MetricsEnableBasic  bool
 	MetricsEnableConn   bool
 	MetricsEnableHost   bool
@@ -49,6 +50,7 @@ func LoadConfig() {
 	Config.MetricsInterval = SecondsEnvOrDefault(DefaultInterval, "METRICS_INTERVAL")
 	Config.MetricsBackend = os.Getenv("METRICS_BACKEND")
 	Config.LogBackends = StringsEnvOrDefault([]string{"tsuru", "syslog"}, "LOG_BACKENDS")
+	Config.MetricsEnable = BoolEnvOrDefault(true, "METRICS_ENABLE")
 	Config.MetricsEnableBasic = BoolEnvOrDefault(true, "METRICS_ENABLE_BASIC")
 	Config.MetricsEnableConn = BoolEnvOrDefault(true, "METRICS_ENABLE_CONN")
 	Config.MetricsEnableHost = BoolEnvOrDefault(true, "METRICS_ENABLE_HOST")
