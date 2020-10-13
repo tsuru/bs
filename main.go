@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version = "v1.13"
+	version = "v1.14"
 )
 
 var printVersion bool
@@ -76,6 +76,7 @@ func main() {
 		TsuruToken:     config.Config.TsuruToken,
 		DockerEndpoint: config.Config.DockerEndpoint,
 		Interval:       config.Config.StatusInterval,
+		Kubernetes:     isKubernetes(),
 	})
 	if err != nil {
 		bslog.Warnf("Unable to initialize status reporter: %s\n", err)
@@ -121,4 +122,9 @@ func initializeMetricsReporter() (StopWaiter, error) {
 	}
 
 	return metricsRunner, nil
+}
+
+func isKubernetes() bool {
+	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	return len(host) > 1 && len(port) > 1
 }

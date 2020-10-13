@@ -112,6 +112,49 @@ func (s S) TestReportStatus(c *check.C) {
 	c.Assert(ids, check.DeepEquals, expectedIDs)
 }
 
+func (s S) TestReportStatusOnKubernetes(c *check.C) {
+	var logOutput bytes.Buffer
+	bslog.Logger = log.New(&logOutput, "", 0)
+	var resp http.Response
+	resp.StatusCode = http.StatusOK
+	resp.Body = ioutil.NopCloser(bytes.NewBufferString("[]"))
+	resp.Header = make(http.Header)
+	resp.Header.Set("Content-Type", "application/json")
+	tsuruServer, requests := s.startTsuruServer(&resp)
+	defer tsuruServer.Close()
+	bogusContainers := []bogusContainer{
+		{name: "x1", config: docker.Config{Image: "tsuru/python", Env: []string{"HOME=/", "TSURU_APPNAME=someapp"}}, state: docker.State{Running: true}},
+	}
+	dockerServer, _ := s.startDockerServer(bogusContainers, nil, c)
+	defer dockerServer.Stop()
+	reporter, err := NewReporter(&ReporterConfig{
+		Interval:       10 * time.Minute,
+		TsuruEndpoint:  tsuruServer.URL,
+		DockerEndpoint: dockerServer.URL(),
+		TsuruToken:     "some-token",
+		Kubernetes:     true,
+	})
+
+	c.Assert(err, check.IsNil)
+	reporter.Stop()
+	reporter.reportStatus()
+	c.Log(logOutput.String())
+	req := <-requests
+	c.Assert(req.request.Header.Get("Authorization"), check.Equals, "bearer some-token")
+	c.Assert(req.request.Header.Get("Content-Type"), check.Equals, "application/x-www-form-urlencoded")
+	c.Assert(req.request.URL.Path, check.Equals, "/node/status")
+	c.Assert(req.request.Method, check.Equals, "POST")
+	expected := hostStatus{}
+	var input hostStatus
+	err = form.DecodeString(&input, string(req.body))
+	c.Assert(err, check.IsNil)
+	c.Assert(input.Checks, check.HasLen, 3)
+	c.Assert(len(input.Addrs) > 0, check.Equals, true)
+	input.Checks = nil
+	input.Addrs = nil
+	c.Assert(input, check.DeepEquals, expected)
+}
+
 func (s S) TestReportStatus404OnHostStatus(c *check.C) {
 	var logOutput bytes.Buffer
 	bslog.Logger = log.New(&logOutput, "", 0)
