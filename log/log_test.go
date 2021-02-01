@@ -1125,6 +1125,49 @@ func (s *S) TestGelfForwarderExtraTags(c *check.C) {
 	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU")
 }
 
+func (s *S) TestGelfForwarderExtraTagsWithAppTags(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	defer os.Unsetenv("LOG_GELF_EXTRA_TAGS")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	os.Setenv("LOG_GELF_EXTRA_TAGS", `{"_tags": "TSURU"}`)
+
+	contID, err := addGenericContainer("big-sibling", map[string]string{
+		"io.kubernetes.pod.name":       "web",
+		"io.kubernetes.container.name": "my-gelf",
+		"bs.tsuru.io/log-tags":         "BACKUP,OTHER",
+	}, s.dockerServer.URL())
+	c.Assert(err, check.IsNil)
+
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", contID))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, contID[:12])
+	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
+	c.Assert(gelfMsg.Extra["_app"], check.Equals, "my-gelf")
+	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "web")
+	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU,BACKUP,OTHER")
+}
+
 func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	defer os.Unsetenv("LOG_GELF_HOST")
 	defer os.Unsetenv("LOG_GELF_FIELDS_WHITELIST")

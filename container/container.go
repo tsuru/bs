@@ -21,6 +21,7 @@ var (
 
 	appNameLabels     = []string{"bs.tsuru.io/log-app-name", "log-app-name", "io.kubernetes.container.name"}
 	processNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.pod.name"}
+	logTagLabels      = []string{"bs.tsuru.io/log-tags", "log-tags"}
 	labelIsIsolated   = []string{"is-isolated-run", "tsuru.io/is-isolated-run"}
 )
 
@@ -39,6 +40,7 @@ type Container struct {
 	AppName       string
 	ProcessName   string
 	ShortHostname string
+	Tags          []string
 }
 
 const (
@@ -96,11 +98,14 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 			return val.(*Container), nil
 		}
 	}
+
 	cont, err := c.client.InspectContainer(containerId)
 	if err != nil {
 		return nil, err
 	}
-	contData := Container{Container: *cont, client: c}
+
+	contData := Container{Container: *cont, client: c, Tags: []string{}}
+
 	toFill := map[string]*string{
 		"TSURU_APPNAME=":     &contData.AppName,
 		"TSURU_PROCESSNAME=": &contData.ProcessName,
@@ -112,6 +117,7 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 			}
 		}
 	}
+
 	if contData.AppName == "" {
 		name, ok := contData.GetLabelAny(appNameLabels...)
 		if !ok {
@@ -126,10 +132,16 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	} else {
 		contData.TsuruApp = true
 	}
+
+	if tags, ok := contData.GetLabelAny(logTagLabels...); ok {
+		contData.Tags = strings.Split(tags, ",")
+	}
+
 	contData.ShortHostname = contData.Config.Hostname
 	if hexRegex.MatchString(contData.Config.Hostname) && len(contData.Config.Hostname) > containerIDTrimSize {
 		contData.ShortHostname = contData.Config.Hostname[:containerIDTrimSize]
 	}
+
 	c.containerCache.Add(containerId, &contData)
 	return &contData, nil
 }

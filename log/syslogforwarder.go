@@ -107,7 +107,7 @@ type bufferWithIdx struct {
 	contentIdx int
 }
 
-func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
+func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, container string, tags []string) {
 	lenSyslogs := len(b.msgChans)
 	if lenSyslogs == 0 {
 		return

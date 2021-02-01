@@ -123,6 +123,40 @@ func (S) TestInfoClientGetAppContainer(c *check.C) {
 	c.Assert(cont, check.IsNil)
 }
 
+func (S) TestInfoClientGetAppContainerWithTags(c *check.C) {
+	dockerCalls := 0
+	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, func(req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/json") {
+			dockerCalls++
+		}
+	})
+	c.Assert(err, check.IsNil)
+	id := createContainer(c, dockerServer.URL(), []string{"TSURU_APPNAME=coolappname"}, map[string]string{"bs.tsuru.io/log-tags": "BACKUP,OTHER"}, "myContName")
+	client, err := NewClient(dockerServer.URL())
+	c.Assert(err, check.IsNil)
+	cont, err := client.GetAppContainer(id, true)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(cont.AppName, check.Equals, "coolappname")
+	c.Assert(cont.Tags[0], check.Equals, "BACKUP")
+	c.Assert(cont.Tags[1], check.Equals, "OTHER")
+	c.Assert(dockerCalls, check.Equals, 1)
+	cont, err = client.GetAppContainer(id, false)
+	c.Assert(err, check.IsNil)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(dockerCalls, check.Equals, 2)
+	cached, ok := client.containerCache.Get(id)
+	c.Assert(ok, check.Equals, true)
+	c.Assert(cached.(*Container), check.DeepEquals, cont)
+	cont, _ = client.GetAppContainer(id, true)
+	c.Assert(cont.ID, check.Equals, id)
+	c.Assert(dockerCalls, check.Equals, 2)
+	id = createContainer(c, dockerServer.URL(), []string{""}, nil, "notAnApp")
+	cont, err = client.GetAppContainer(id, true)
+	c.Assert(err, check.Equals, ErrTsuruVariablesNotFound)
+	c.Assert(cont, check.IsNil)
+}
+
 func (S) TestInfoClientGetContainerRequiredEnv(c *check.C) {
 	dockerServer, err := dTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
