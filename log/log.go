@@ -185,7 +185,9 @@ func (l *LogForwarder) Wait() {
 
 func (l *LogForwarder) Stop() {
 	if l.server != nil {
-		l.server.Kill()
+		if err := l.server.Kill(); err != nil {
+			bslog.Errorf("[log forwarder] unable to kill server: %v", err)
+		}
 	}
 	for _, backend := range l.backends {
 		backend.stop()

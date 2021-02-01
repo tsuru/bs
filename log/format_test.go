@@ -30,7 +30,7 @@ func BenchmarkLenientParserParse(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
-		lp.Parse()
+		_ = lp.Parse()
 	}
 }
 
@@ -39,7 +39,7 @@ func BenchmarkLenientParserParseNewFormat(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
-		lp.Parse()
+		_ = lp.Parse()
 	}
 }
 
@@ -48,7 +48,7 @@ func BenchmarkLenientParserParseUnixFormat(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lp := LenientParser{line: logLine}
-		lp.Parse()
+		_ = lp.Parse()
 	}
 }
 

@@ -312,7 +312,7 @@ func (S) startTsuruServer(respOrFunc interface{}) (*httptest.Server, <-chan tsur
 			}
 		}
 		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
+		_, _ = io.Copy(w, resp.Body)
 	}))
 	return server, reqchan
 }
