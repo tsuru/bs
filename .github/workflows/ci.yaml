@@ -32,7 +32,6 @@ jobs:
   docker-image:
     needs:
     - test
-    - lint
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
