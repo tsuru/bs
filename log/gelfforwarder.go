@@ -20,6 +20,7 @@ const fieldSeparators = " \t"
 
 type gelfBackend struct {
 	extra            json.RawMessage
+	decodedExtra     map[string]interface{}
 	host             string
 	chunkSize        int
 	fieldsWhitelist  []string
@@ -34,8 +35,8 @@ func (b *gelfBackend) setup() {
 	b.host = config.StringEnvOrDefault("localhost:12201", "LOG_GELF_HOST")
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
 	if extra != "" {
-		data := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(extra), &data); err != nil {
+		b.decodedExtra = map[string]interface{}{}
+		if err := json.Unmarshal([]byte(extra), &b.decodedExtra); err != nil {
 			bslog.Warnf("unable to parse gelf extra tags: %s", err)
 		} else {
 			b.extra = json.RawMessage(extra)
@@ -68,11 +69,20 @@ func (b *gelfBackend) initialize() error {
 	return nil
 }
 
-func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
+func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, container string, tags []string) {
 	var level int32 = gelf.LOG_INFO
 	if s, err := strconv.Atoi(string(parts.priority)); err == nil {
 		if int32(s)&gelf.LOG_ERR == gelf.LOG_ERR {
 			level = gelf.LOG_ERR
+		}
+	}
+	extra := b.extra
+	if _tags, ok := b.decodedExtra["_tags"]; ok && len(tags) > 0 {
+		newExtra, err := json.Marshal(map[string]interface{}{"_tags": _tags.(string) + "," + strings.Join(tags, ",")})
+		if err != nil {
+			bslog.Errorf("Unable to join tags: %v", err)
+		} else {
+			extra = json.RawMessage(newExtra)
 		}
 	}
 	msg := &gelf.Message{
@@ -84,7 +94,7 @@ func (b *gelfBackend) sendMessage(parts *rawLogParts, appName, processName, cont
 			"_app": appName,
 			"_pid": processName,
 		},
-		RawExtra: b.extra,
+		RawExtra: extra,
 		TimeUnix: float64(time.Now().UnixNano()) / float64(time.Second),
 	}
 	select {

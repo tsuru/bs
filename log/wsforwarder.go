@@ -90,7 +90,7 @@ func (b *tsuruBackend) initialize() error {
 	return nil
 }
 
-func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
+func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string, tags []string) {
 	msg := &app.Applog{
 		Date:    parts.ts,
 		AppName: appName,
