@@ -230,7 +230,11 @@ func (c *createContainerCheck) Run() error {
 		return err
 	}
 	output := bytes.NewBuffer(nil)
-	defer c.client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true})
+	defer func() {
+		if err := c.client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true}); err != nil {
+			bslog.Errorf("[host check] failure removing container id {%s}: %v", cont.ID, err)
+		}
+	}()
 	attachOptions := docker.AttachToContainerOptions{
 		Container:    cont.ID,
 		OutputStream: output,
@@ -248,7 +252,9 @@ func (c *createContainerCheck) Run() error {
 	if err != nil {
 		return err
 	}
-	waiter.Wait()
+	if err := waiter.Wait(); err != nil {
+		return fmt.Errorf("waiting for container: %v", err)
+	}
 	if output.String() != c.message {
 		return fmt.Errorf("unexpected container response: %q", output.String())
 	}

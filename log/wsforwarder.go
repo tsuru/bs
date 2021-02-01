@@ -186,7 +186,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			if frame.PayloadType() == websocket.PongFrame {
 				atomic.StoreInt64(&lastPongTime, time.Now().UnixNano())
 			}
-			io.Copy(ioutil.Discard, frame)
+			_, _ = io.Copy(ioutil.Discard, frame)
 		}
 	}()
 	go func() {
@@ -259,6 +259,8 @@ func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 func (f *wsForwarder) close(conn net.Conn) {
 	f.connMutex.Lock()
 	defer f.connMutex.Unlock()
-	conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	if err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout)); err != nil {
+		bslog.Errorf("unable to set deadline: %v", err)
+	}
 	conn.Close()
 }

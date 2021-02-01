@@ -180,7 +180,7 @@ func (f *syslogForwarder) splitParts(conn net.Conn, bufIdx bufferWithIdx) error 
 	if f.messageLimit <= 0 || fullLen <= f.messageLimit {
 		// Fast path, message fit, no manipulation needed.
 		err := f.writePart(conn, bufIdx.buffer)
-		f.bufferPool.Put(bufIdx.buffer)
+		f.bufferPool.Put(bufIdx.buffer) // nolint
 		return err
 	}
 	headerBuf := bufIdx.buffer[:bufIdx.headerIdx]
@@ -209,7 +209,7 @@ func (f *syslogForwarder) splitParts(conn net.Conn, bufIdx bufferWithIdx) error 
 		buffer = append(buffer, partElement...)
 		buffer = append(buffer, trailerBuf...)
 		err := f.writePart(conn, buffer)
-		f.bufferPool.Put(buffer)
+		f.bufferPool.Put(buffer) // nolint
 		if err != nil {
 			return err
 		}
@@ -250,6 +250,8 @@ func (f *syslogForwarder) writePart(conn net.Conn, buf []byte) error {
 func (f *syslogForwarder) close(conn net.Conn) {
 	// Reset deadline, if we don't do this the connection remains open
 	// on the other end (causing tests to fail) for some weird reason.
-	conn.SetWriteDeadline(time.Time{})
+	if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+		bslog.Warnf("unable to reset deadline: %s", err)
+	}
 	conn.Close()
 }
