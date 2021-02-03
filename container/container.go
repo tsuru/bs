@@ -5,6 +5,7 @@
 package container
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -12,6 +13,8 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 )
 
 var (
@@ -31,6 +34,9 @@ type InfoClient struct {
 	endpoint       string
 	client         *docker.Client
 	containerCache *lru.Cache
+
+	extra        json.RawMessage
+	decodedExtra map[string]interface{}
 }
 
 type Container struct {
@@ -40,7 +46,9 @@ type Container struct {
 	AppName       string
 	ProcessName   string
 	ShortHostname string
-	Tags          []string
+
+	Tags     []string
+	RawExtra *json.RawMessage
 }
 
 const (
@@ -59,6 +67,7 @@ func NewClient(endpoint string) (*InfoClient, error) {
 		return nil, err
 	}
 	c.client.SetTimeout(fullTimeout)
+	c.configGelfExtraTags()
 	return &c, nil
 }
 
@@ -136,6 +145,7 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	if tags, ok := contData.GetLabelAny(logTagLabels...); ok {
 		contData.Tags = strings.Split(tags, ",")
 	}
+	contData.RawExtra = c.genRawExtra(contData.Tags)
 
 	contData.ShortHostname = contData.Config.Hostname
 	if hexRegex.MatchString(contData.Config.Hostname) && len(contData.Config.Hostname) > containerIDTrimSize {
@@ -144,6 +154,32 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 
 	c.containerCache.Add(containerId, &contData)
 	return &contData, nil
+}
+
+func (c *InfoClient) genRawExtra(tags []string) *json.RawMessage {
+	extra := &c.extra
+	if _tags, ok := c.decodedExtra["_tags"]; ok && len(tags) > 0 {
+		newExtra, err := json.Marshal(map[string]interface{}{"_tags": _tags.(string) + "," + strings.Join(tags, ",")})
+		if err != nil {
+			bslog.Errorf("Unable to join tags: %v", err)
+		} else {
+			raw := json.RawMessage(newExtra)
+			extra = &raw
+		}
+	}
+	return extra
+}
+
+func (c *InfoClient) configGelfExtraTags() {
+	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
+	if extra != "" {
+		c.decodedExtra = map[string]interface{}{}
+		if err := json.Unmarshal([]byte(extra), &c.decodedExtra); err != nil {
+			bslog.Warnf("unable to parse gelf extra tags: %s", err)
+		} else {
+			c.extra = json.RawMessage(extra)
+		}
+	}
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {

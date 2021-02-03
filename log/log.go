@@ -54,7 +54,7 @@ type forwarderBackend interface {
 
 type logBackend interface {
 	initialize() error
-	sendMessage(parts *rawLogParts, appName, processName, container string, tags []string)
+	sendMessage(parts *rawLogParts, c *container.Container)
 	stop()
 }
 
@@ -229,6 +229,6 @@ func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
 				continue
 			}
 		}
-		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contData.ShortHostname, contData.Tags)
+		backend.sendMessage(parts, contData)
 	}
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
+	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 )
@@ -90,13 +91,13 @@ func (b *tsuruBackend) initialize() error {
 	return nil
 }
 
-func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string, tags []string) {
+func (b *tsuruBackend) sendMessage(parts *rawLogParts, c *container.Container) {
 	msg := &app.Applog{
 		Date:    parts.ts,
-		AppName: appName,
+		AppName: c.AppName,
 		Message: string(parts.content),
-		Source:  processName,
-		Unit:    container,
+		Source:  c.ProcessName,
+		Unit:    c.ShortHostname,
 	}
 	select {
 	case b.msgCh <- msg:
