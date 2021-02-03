@@ -14,6 +14,7 @@ import (
 
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
+	"github.com/tsuru/bs/container"
 )
 
 const (
@@ -107,7 +108,7 @@ type bufferWithIdx struct {
 	contentIdx int
 }
 
-func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, container string, tags []string) {
+func (b *syslogBackend) sendMessage(parts *rawLogParts, c *container.Container) {
 	lenSyslogs := len(b.msgChans)
 	if lenSyslogs == 0 {
 		return
@@ -118,11 +119,11 @@ func (b *syslogBackend) sendMessage(parts *rawLogParts, appName, processName, co
 	buffer = append(buffer, '>')
 	buffer = append(buffer, parts.ts.In(b.syslogLocation).Format(time.Stamp)...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, container...)
+	buffer = append(buffer, c.ShortHostname...)
 	buffer = append(buffer, ' ')
-	buffer = append(buffer, appName...)
+	buffer = append(buffer, c.AppName...)
 	buffer = append(buffer, '[')
-	buffer = append(buffer, processName...)
+	buffer = append(buffer, c.ProcessName...)
 	buffer = append(buffer, ']', ':', ' ')
 	buffer = append(buffer, b.syslogExtraStart...)
 	headerIdx := len(buffer)
