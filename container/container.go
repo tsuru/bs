@@ -36,7 +36,7 @@ type InfoClient struct {
 	containerCache *lru.Cache
 
 	extra        json.RawMessage
-	decodedExtra map[string]interface{}
+	decodedExtra map[string]string
 }
 
 type Container struct {
@@ -143,7 +143,7 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	}
 
 	if tags, ok := contData.GetLabelAny(logTagLabels...); ok {
-		contData.Tags = strings.Split(tags, ",")
+		contData.Tags = pruneTags(strings.Split(tags, ","))
 	}
 	contData.RawExtra = c.genRawExtra(contData.Tags)
 
@@ -156,24 +156,52 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	return &contData, nil
 }
 
-func (c *InfoClient) genRawExtra(tags []string) *json.RawMessage {
+func (c *InfoClient) genRawExtra(newTags []string) *json.RawMessage {
 	extra := &c.extra
-	if _tags, ok := c.decodedExtra["_tags"]; ok && len(tags) > 0 {
-		newExtra, err := json.Marshal(map[string]interface{}{"_tags": _tags.(string) + "," + strings.Join(tags, ",")})
+	if _tags, ok := c.decodedExtra["_tags"]; ok && len(newTags) > 0 {
+		envTags := pruneTags(strings.Split(_tags, ","))
+		tags := append(envTags, newTags...)
+		newExtra, err := newExtraWithTags(c.extra, tags)
 		if err != nil {
 			bslog.Errorf("Unable to join tags: %v", err)
 		} else {
-			raw := json.RawMessage(newExtra)
-			extra = &raw
+			extra = &newExtra
 		}
 	}
 	return extra
 }
 
+func pruneTags(input []string) []string {
+	tags := []string{}
+	for _, t := range input {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		tags = append(tags, t)
+	}
+	return tags
+}
+
+func newExtraWithTags(orig json.RawMessage, tags []string) (json.RawMessage, error) {
+	decoded := map[string]string{}
+	if err := json.Unmarshal([]byte(orig), &decoded); err != nil {
+		return nil, err
+	}
+
+	decoded["_tags"] = strings.Join(tags, ",")
+	extra, err := json.Marshal(decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(extra), nil
+}
+
 func (c *InfoClient) configGelfExtraTags() {
 	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
 	if extra != "" {
-		c.decodedExtra = map[string]interface{}{}
+		c.decodedExtra = map[string]string{}
 		if err := json.Unmarshal([]byte(extra), &c.decodedExtra); err != nil {
 			bslog.Warnf("unable to parse gelf extra tags: %s", err)
 		} else {
