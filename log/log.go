@@ -54,7 +54,7 @@ type forwarderBackend interface {
 
 type logBackend interface {
 	initialize() error
-	sendMessage(*rawLogParts, string, string, string)
+	sendMessage(parts *rawLogParts, c *container.Container)
 	stop()
 }
 
@@ -185,7 +185,9 @@ func (l *LogForwarder) Wait() {
 
 func (l *LogForwarder) Stop() {
 	if l.server != nil {
-		l.server.Kill()
+		if err := l.server.Kill(); err != nil {
+			bslog.Errorf("[log forwarder] unable to kill server: %v", err)
+		}
 	}
 	for _, backend := range l.backends {
 		backend.stop()
@@ -227,6 +229,6 @@ func (l *LogForwarder) Handle(logParts format.LogParts, _ int64, err error) {
 				continue
 			}
 		}
-		backend.sendMessage(parts, contData.AppName, contData.ProcessName, contData.ShortHostname)
+		backend.sendMessage(parts, contData)
 	}
 }

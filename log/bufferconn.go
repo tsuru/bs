@@ -36,7 +36,9 @@ func (c *bufferedConn) Write(msg []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.to > 0 && len(msg) > c.w.Available() {
-		c.Conn.SetWriteDeadline(time.Now().Add(c.to))
+		if err := c.Conn.SetWriteDeadline(time.Now().Add(c.to)); err != nil {
+			return 0, err
+		}
 	}
 	return c.w.Write(msg)
 }
@@ -62,16 +64,18 @@ func (c *bufferedConn) SetWriteDeadline(deadline time.Time) error {
 	defer c.mu.Unlock()
 	if deadline.IsZero() {
 		c.to = 0
-		c.Conn.SetWriteDeadline(time.Time{})
+		return c.Conn.SetWriteDeadline(time.Time{})
 	} else {
-		c.to = deadline.Sub(time.Now())
+		c.to = time.Until(deadline)
 	}
 	return nil
 }
 
 func (c *bufferedConn) flush() error {
 	if c.to > 0 {
-		c.Conn.SetWriteDeadline(time.Now().Add(c.to))
+		if err := c.Conn.SetWriteDeadline(time.Now().Add(c.to)); err != nil {
+			return err
+		}
 	}
 	return c.w.Flush()
 }

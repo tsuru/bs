@@ -5,6 +5,7 @@
 package container
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -14,6 +15,8 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 )
 
 var (
@@ -23,6 +26,7 @@ var (
 
 	appNameLabels     = []string{"bs.tsuru.io/log-app-name", "log-app-name", "io.kubernetes.container.name"}
 	processNameLabels = []string{"bs.tsuru.io/log-process-name", "log-process-name", "io.kubernetes.pod.name"}
+	logTagLabels      = []string{"bs.tsuru.io/log-tags", "log-tags"}
 	labelIsIsolated   = []string{"is-isolated-run", "tsuru.io/is-isolated-run"}
 )
 
@@ -32,6 +36,9 @@ type InfoClient struct {
 	dockerInfo     *config.DockerConfig
 	client         *docker.Client
 	containerCache *lru.Cache
+
+	extra        json.RawMessage
+	decodedExtra map[string]string
 }
 
 type Container struct {
@@ -41,6 +48,9 @@ type Container struct {
 	AppName       string
 	ProcessName   string
 	ShortHostname string
+
+	Tags     []string
+	RawExtra *json.RawMessage
 }
 
 const (
@@ -64,6 +74,7 @@ func NewClient(dockerInfo *config.DockerConfig) (*InfoClient, error) {
 		return nil, err
 	}
 	c.client.SetTimeout(fullTimeout)
+	c.configGelfExtraTags()
 	return &c, nil
 }
 
@@ -103,11 +114,14 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 			return val.(*Container), nil
 		}
 	}
+
 	cont, err := c.client.InspectContainer(containerId)
 	if err != nil {
 		return nil, err
 	}
-	contData := Container{Container: *cont, client: c}
+
+	contData := Container{Container: *cont, client: c, Tags: []string{}}
+
 	toFill := map[string]*string{
 		"TSURU_APPNAME=":     &contData.AppName,
 		"TSURU_PROCESSNAME=": &contData.ProcessName,
@@ -119,6 +133,7 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 			}
 		}
 	}
+
 	if contData.AppName == "" {
 		name, ok := contData.GetLabelAny(appNameLabels...)
 		if !ok {
@@ -133,12 +148,73 @@ func (c *InfoClient) getContainer(containerId string, useCache bool) (*Container
 	} else {
 		contData.TsuruApp = true
 	}
+
+	if tags, ok := contData.GetLabelAny(logTagLabels...); ok {
+		contData.Tags = pruneTags(strings.Split(tags, ","))
+	}
+	contData.RawExtra = c.genRawExtra(contData.Tags)
+
 	contData.ShortHostname = contData.Config.Hostname
 	if hexRegex.MatchString(contData.Config.Hostname) && len(contData.Config.Hostname) > containerIDTrimSize {
 		contData.ShortHostname = contData.Config.Hostname[:containerIDTrimSize]
 	}
+
 	c.containerCache.Add(containerId, &contData)
 	return &contData, nil
+}
+
+func (c *InfoClient) genRawExtra(newTags []string) *json.RawMessage {
+	extra := &c.extra
+	if _tags, ok := c.decodedExtra["_tags"]; ok && len(newTags) > 0 {
+		envTags := pruneTags(strings.Split(_tags, ","))
+		tags := append(envTags, newTags...)
+		newExtra, err := newExtraWithTags(c.extra, tags)
+		if err != nil {
+			bslog.Errorf("Unable to join tags: %v", err)
+		} else {
+			extra = &newExtra
+		}
+	}
+	return extra
+}
+
+func pruneTags(input []string) []string {
+	tags := []string{}
+	for _, t := range input {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		tags = append(tags, t)
+	}
+	return tags
+}
+
+func newExtraWithTags(orig json.RawMessage, tags []string) (json.RawMessage, error) {
+	decoded := map[string]string{}
+	if err := json.Unmarshal([]byte(orig), &decoded); err != nil {
+		return nil, err
+	}
+
+	decoded["_tags"] = strings.Join(tags, ",")
+	extra, err := json.Marshal(decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(extra), nil
+}
+
+func (c *InfoClient) configGelfExtraTags() {
+	extra := config.StringEnvOrDefault("", "LOG_GELF_EXTRA_TAGS")
+	if extra != "" {
+		c.decodedExtra = map[string]string{}
+		if err := json.Unmarshal([]byte(extra), &c.decodedExtra); err != nil {
+			bslog.Warnf("unable to parse gelf extra tags: %s", err)
+		} else {
+			c.extra = json.RawMessage(extra)
+		}
+	}
 }
 
 func (c *Container) Stats() (*docker.Stats, error) {

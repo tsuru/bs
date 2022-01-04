@@ -160,7 +160,9 @@ func (m *fileMonitor) alive() bool {
 
 func (m *fileMonitor) stop() {
 	if m.cmd.Process != nil {
-		m.cmd.Process.Kill()
+		if err := m.cmd.Process.Kill(); err != nil {
+			bslog.Errorf("unable to stop process: %s", err)
+		}
 	}
 }
 
@@ -187,7 +189,9 @@ func (m *fileMonitor) run() {
 	m.updatePos()
 	go func() {
 		m.streamOutput()
-		m.wait()
+		if err := m.wait(); err != nil {
+			bslog.Errorf("error waiting: %s", err)
+		}
 	}()
 }
 
@@ -312,7 +316,9 @@ func (s *kubernetesLogStreamer) watch() {
 		case <-s.quit:
 			for _, m := range s.monitors {
 				m.stop()
-				m.wait()
+				if err := m.wait(); err != nil {
+					bslog.Errorf("error stoping: %v", err)
+				}
 			}
 			s.monitors = nil
 			return

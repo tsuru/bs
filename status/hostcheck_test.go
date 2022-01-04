@@ -296,7 +296,8 @@ func (s S) TestParseContainerID(c *check.C) {
 		f, err := ioutil.TempFile("", "tsurutests")
 		c.Assert(err, check.IsNil)
 		defer os.Remove(f.Name())
-		f.Write([]byte(tt.data))
+		_, err = f.Write([]byte(tt.data))
+		c.Assert(err, check.IsNil)
 		f.Close()
 		id, err := parseContainerID(f.Name())
 		if tt.err != "" {

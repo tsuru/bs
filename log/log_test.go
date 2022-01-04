@@ -153,7 +153,8 @@ func (s *S) TestLogForwarderStart(c *check.C) {
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: mymsg\n", s.idShort))
@@ -198,7 +199,8 @@ func (s *S) TestLogForwarderStartWithTimezone(c *check.C) {
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 12:13:47 %s coolappname[procx]: mymsg\n", s.idShort))
@@ -349,7 +351,7 @@ func (s *S) TestLogForwarderOverflow(c *check.C) {
 	}()
 	var err error
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		io.Copy(ioutil.Discard, ws)
+		_, _ = io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
@@ -456,7 +458,7 @@ func (s *S) TestLogForwarderTableTennis(c *check.C) {
 	}()
 	var err error
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		io.Copy(ioutil.Discard, ws)
+		_, _ = io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
@@ -498,13 +500,13 @@ func (s *S) TestLogForwarderTableTennisNoPong(c *check.C) {
 			if frame.PayloadType() != websocket.PingFrame &&
 				frame.PayloadType() != websocket.PongFrame {
 				frameReader, hErr := ws.HandleFrame(frame)
-				if frameReader == nil {
+				if frameReader == nil || hErr != nil {
 					continue
 				}
 				_, hErr = frameReader.Read(buf)
 				if hErr == io.EOF {
 					if trailer := frameReader.TrailerReader(); trailer != nil {
-						io.Copy(ioutil.Discard, trailer)
+						_, _ = io.Copy(ioutil.Discard, trailer)
 					}
 				}
 			}
@@ -557,7 +559,8 @@ func (s *S) TestLogForwarderStartWithMessageExtra(c *check.C) {
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s coolappname[procx]: #val1 mymsg #val2 #myvalue\n", s.idShort))
@@ -639,7 +642,8 @@ func (s *S) TestLogForwarderSyslogSplit(c *check.C) {
 		c.Assert(err, check.IsNil)
 		for i, content := range tt.expectedContents {
 			buffer := make([]byte, 4196)
-			udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			c.Assert(err, check.IsNil)
 			var n int
 			n, err = udpConn.Read(buffer)
 			c.Assert(err, check.IsNil)
@@ -675,7 +679,8 @@ func (s *S) TestLogForwarderStartFromFile(c *check.C) {
 	err = ioutil.WriteFile(name, []byte(singleEntry), 0600)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<27>Mar 21 18:28:52 %s coolappname[procx]: msg-single\n", s.idShort))
@@ -748,7 +753,8 @@ func (s *S) TestLogForwarderHandleNonTsuruApp(c *check.C) {
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s big-sibling[%s]: mymsg\n", cont.ShortHostname, contID))
@@ -782,7 +788,8 @@ func (s *S) TestLogForwarderHandleNonTsuruAppKubernetesLabels(c *check.C) {
 	_, err = conn.Write(msg)
 	c.Assert(err, check.IsNil)
 	buffer := make([]byte, 1024)
-	udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	err = udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	c.Assert(err, check.IsNil)
 	n, err := udpConn.Read(buffer)
 	c.Assert(err, check.IsNil)
 	c.Assert(string(buffer[:n]), check.Equals, fmt.Sprintf("<30>Jun  5 13:13:47 %s my-cont[my-pod]: mymsg\n", cont.ShortHostname))
@@ -850,7 +857,9 @@ func BenchmarkMessagesWaitOneSyslogAddress(b *testing.B) {
 	close(lf.backends[0].(*syslogBackend).msgChans[0])
 	<-done[0]
 	b.StopTimer()
-	lf.server.Kill()
+	if err = lf.server.Kill(); err != nil {
+		b.Fatal(err)
+	}
 	lf.stopWait()
 }
 
@@ -890,7 +899,9 @@ func BenchmarkMessagesWaitTwoSyslogAddresses(b *testing.B) {
 	<-done[0]
 	<-done[1]
 	b.StopTimer()
-	lf.server.Kill()
+	if err = lf.server.Kill(); err != nil {
+		b.Fatal(err)
+	}
 	lf.stopWait()
 }
 
@@ -922,7 +933,7 @@ func BenchmarkMessagesBroadcastNonAppContainer(b *testing.B) {
 	}
 	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		io.Copy(ioutil.Discard, ws)
+		_, _ = io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
@@ -975,7 +986,7 @@ func BenchmarkMessagesBroadcast(b *testing.B) {
 	}
 	forwardedConns := []net.Conn{startReceiver(), startReceiver()}
 	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		io.Copy(ioutil.Discard, ws)
+		_, _ = io.Copy(ioutil.Discard, ws)
 	}))
 	defer srv.Close()
 	os.Setenv("TSURU_ENDPOINT", srv.URL)
@@ -1125,6 +1136,49 @@ func (s *S) TestGelfForwarderExtraTags(c *check.C) {
 	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU")
 }
 
+func (s *S) TestGelfForwarderExtraTagsWithAppTags(c *check.C) {
+	defer os.Unsetenv("LOG_GELF_HOST")
+	defer os.Unsetenv("LOG_GELF_EXTRA_TAGS")
+	reader, err := gelf.NewReader("127.0.0.1:0")
+	c.Assert(err, check.IsNil)
+	os.Setenv("LOG_GELF_HOST", reader.Addr())
+	os.Setenv("LOG_GELF_EXTRA_TAGS", `{"_tags": "TSURU"}`)
+
+	contID, err := addGenericContainer("big-sibling", map[string]string{
+		"io.kubernetes.pod.name":       "web",
+		"io.kubernetes.container.name": "my-gelf",
+		"bs.tsuru.io/log-tags":         "BACKUP,OTHER",
+	}, s.dockerServer.URL())
+	c.Assert(err, check.IsNil)
+
+	lf := LogForwarder{
+		BindAddress:     "udp://127.0.0.1:59317",
+		DockerEndpoint:  s.dockerServer.URL(),
+		EnabledBackends: []string{"gelf"},
+	}
+	err = lf.Start()
+	c.Assert(err, check.IsNil)
+	defer lf.stopWait()
+	conn, err := net.Dial("udp", "127.0.0.1:59317")
+	c.Assert(err, check.IsNil)
+	defer conn.Close()
+	msg := []byte(fmt.Sprintf("<30>2015-06-05T16:13:47Z myhost docker/%s: mymsg\n", contID))
+	_, err = conn.Write(msg)
+	c.Assert(err, check.IsNil)
+
+	gelfMsg, err := reader.ReadMessage()
+	c.Assert(err, check.IsNil)
+	c.Assert(gelfMsg, check.Not(check.IsNil))
+
+	c.Assert(gelfMsg.Version, check.Equals, "1.1")
+	c.Assert(gelfMsg.Host, check.Equals, contID[:12])
+	c.Assert(gelfMsg.Short, check.Equals, "mymsg")
+	c.Assert(gelfMsg.Level, check.Equals, int32(gelf.LOG_INFO))
+	c.Assert(gelfMsg.Extra["_app"], check.Equals, "my-gelf")
+	c.Assert(gelfMsg.Extra["_pid"], check.Equals, "web")
+	c.Assert(gelfMsg.Extra["_tags"], check.Equals, "TSURU,BACKUP,OTHER")
+}
+
 func (s *S) TestGelfForwarderParseExtraTags(c *check.C) {
 	defer os.Unsetenv("LOG_GELF_HOST")
 	defer os.Unsetenv("LOG_GELF_FIELDS_WHITELIST")
@@ -1243,7 +1297,7 @@ func BenchmarkMessagesGelfBackendProcess(b *testing.B) {
 			b.Fatal(recErr)
 		}
 		go func() {
-			io.Copy(ioutil.Discard, udpConn)
+			_, _ = io.Copy(ioutil.Discard, udpConn)
 		}()
 		return udpConn
 	}
@@ -1297,7 +1351,7 @@ func BenchmarkMessagesWaitOneGelfBackend(b *testing.B) {
 			b.Fatal(recErr)
 		}
 		go func() {
-			io.Copy(ioutil.Discard, udpConn)
+			_, _ = io.Copy(ioutil.Discard, udpConn)
 		}()
 		return udpConn
 	}

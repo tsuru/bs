@@ -53,7 +53,7 @@ func stopWaitTimeout(c *check.C, m *fileMonitor) {
 	go func() {
 		defer close(done)
 		m.stop()
-		m.wait()
+		_ = m.wait()
 	}()
 	select {
 	case <-done:
@@ -196,7 +196,8 @@ func (s *S) TestFileMonitorAlive(c *check.C) {
 	c.Assert(err, check.IsNil)
 	m.run()
 	defer stopWaitTimeout(c, m)
-	m.cmd.Process.Kill()
+	err = m.cmd.Process.Kill()
+	c.Assert(err, check.IsNil)
 	for {
 		if !m.alive() {
 			break

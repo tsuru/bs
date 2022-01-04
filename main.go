@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version = "v1.13"
+	version = "v1.15"
 )
 
 var printVersion bool
@@ -67,39 +67,64 @@ func main() {
 	if err != nil {
 		bslog.Fatalf("Unable to initialize log forwarder: %s\n", err)
 	}
-	mRunner := metric.NewRunner(config.Config.DockerClientInfo, config.Config.MetricsInterval,
-		config.Config.MetricsBackend)
-	mRunner.EnableBasicMetrics = config.Config.MetricsEnableBasic
-	mRunner.EnableConnMetrics = config.Config.MetricsEnableConn
-	mRunner.EnableHostMetrics = config.Config.MetricsEnableHost
-	err = mRunner.Start()
+	metricsRunner, err := initializeMetricsReporter()
 	if err != nil {
 		bslog.Warnf("Unable to initialize metrics runner: %s\n", err)
 	}
 	reporter, err := status.NewReporter(&status.ReporterConfig{
-		TsuruEndpoint:    config.Config.TsuruEndpoint,
-		TsuruToken:       config.Config.TsuruToken,
+		TsuruEndpoint:  config.Config.TsuruEndpoint,
+		TsuruToken:     config.Config.TsuruToken,
 		DockerClientInfo: config.Config.DockerClientInfo,
-		Interval:         config.Config.StatusInterval,
+		Interval:       config.Config.StatusInterval,
+		Kubernetes:     isKubernetes(),
 	})
 	if err != nil {
 		bslog.Warnf("Unable to initialize status reporter: %s\n", err)
 	}
-	monitorEl := []StopWaiter{&lf, mRunner}
+	waiters := []StopWaiter{&lf}
+	if metricsRunner != nil {
+		waiters = append(waiters, metricsRunner)
+	}
 	if reporter != nil {
-		monitorEl = append(monitorEl, reporter)
+		waiters = append(waiters, reporter)
 	}
 	var signaled bool
 	startSignalHandler(func(signal os.Signal) {
 		signaled = true
-		for _, m := range monitorEl {
+		for _, m := range waiters {
 			go m.Stop()
 		}
 	}, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	for _, m := range monitorEl {
+	for _, m := range waiters {
 		m.Wait()
 	}
 	if !signaled {
 		bslog.Fatalf("Exiting bs because no service could be initialized.")
 	}
+}
+
+func initializeMetricsReporter() (StopWaiter, error) {
+	if !config.Config.MetricsEnable {
+		return nil, nil
+	}
+	metricsRunner := metric.NewRunner(
+		config.Config.DockerClientInfo,
+		config.Config.MetricsInterval,
+		config.Config.MetricsBackend,
+	)
+	metricsRunner.EnableBasicMetrics = config.Config.MetricsEnableBasic
+	metricsRunner.EnableConnMetrics = config.Config.MetricsEnableConn
+	metricsRunner.EnableHostMetrics = config.Config.MetricsEnableHost
+	err := metricsRunner.Start()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return metricsRunner, nil
+}
+
+func isKubernetes() bool {
+	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	return len(host) > 1 && len(port) > 1
 }

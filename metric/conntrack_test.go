@@ -12,7 +12,7 @@ import (
 func (*S) TestConntrack(c *check.C) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
 	c.Assert(err, check.IsNil)
-	defer commandmocker.Remove(dir)
+	defer commandmocker.Remove(dir) //nolint
 	conns, err := conntrack()
 	c.Assert(err, check.IsNil)
 	expected := []conn{
@@ -34,7 +34,7 @@ func (*S) TestConntrack(c *check.C) {
 func (*S) TestConntrackCommandFailure(c *check.C) {
 	dir, err := commandmocker.Error("conntrack", "something went wrong", 120)
 	c.Assert(err, check.IsNil)
-	defer commandmocker.Remove(dir)
+	defer commandmocker.Remove(dir) //nolint
 	conns, err := conntrack()
 	c.Assert(err, check.ErrorMatches, "conntrack failed: exit status 120. Output: something went wrong")
 	c.Assert(conns, check.IsNil)

@@ -41,6 +41,7 @@ type ReporterConfig struct {
 	DockerClientInfo *config.DockerConfig
 	TsuruEndpoint    string
 	TsuruToken       string
+	Kubernetes     	 bool
 }
 
 type Reporter struct {
@@ -134,21 +135,23 @@ func (r *Reporter) Wait() {
 }
 
 func (r *Reporter) reportStatus() {
-	client := r.infoClient.GetClient()
-	opts := docker.ListContainersOptions{All: true}
-	containers, err := client.ListContainers(opts)
-	if err != nil {
-		bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s",
-			r.config.DockerClientInfo.Endpoint, err)
-		return
-	}
-	containerStatuses := r.retrieveContainerStatuses(containers)
 	hostChecks := r.checks.Run()
 	hostData := &hostStatus{
 		Addrs:  r.addrs,
-		Units:  containerStatuses,
 		Checks: hostChecks,
 	}
+
+	if !r.config.Kubernetes {
+		client := r.infoClient.GetClient()
+		opts := docker.ListContainersOptions{All: true}
+		containers, err := client.ListContainers(opts)
+		if err != nil {
+			bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s", r.config.DockerClientInfo.Endpoint, err)
+			return
+		}
+		hostData.Units = r.retrieveContainerStatuses(containers)
+	}
+
 	resp, err := r.updateNode(hostData)
 	if err == errRouteNotFound {
 		resp, err = r.updateUnits(hostData.Units)
@@ -280,6 +283,9 @@ func (r *Reporter) handleTsuruResponse(resp *http.Response) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected response from tsuru %d: %s", resp.StatusCode, string(body))
+	}
+	if r.config.Kubernetes {
+		return nil
 	}
 	err := json.NewDecoder(resp.Body).Decode(&statusResp)
 	if err != nil {

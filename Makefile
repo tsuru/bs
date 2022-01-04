@@ -19,6 +19,9 @@ check-format:
 run:
 	go run main.go
 
+lint:
+	golangci-lint run
+
 publish-local:
 	docker build -t 127.0.0.1:5000/tsuru/bs .
 	docker push 127.0.0.1:5000/tsuru/bs

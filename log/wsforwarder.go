@@ -19,6 +19,7 @@ import (
 
 	"github.com/tsuru/bs/bslog"
 	"github.com/tsuru/bs/config"
+	"github.com/tsuru/bs/container"
 	"github.com/tsuru/tsuru/app"
 	"golang.org/x/net/websocket"
 )
@@ -90,13 +91,13 @@ func (b *tsuruBackend) initialize() error {
 	return nil
 }
 
-func (b *tsuruBackend) sendMessage(parts *rawLogParts, appName, processName, container string) {
+func (b *tsuruBackend) sendMessage(parts *rawLogParts, c *container.Container) {
 	msg := &app.Applog{
 		Date:    parts.ts,
-		AppName: appName,
+		AppName: c.AppName,
 		Message: string(parts.content),
-		Source:  processName,
-		Unit:    container,
+		Source:  c.ProcessName,
+		Unit:    c.ShortHostname,
 	}
 	select {
 	case b.msgCh <- msg:
@@ -186,7 +187,7 @@ func (f *wsForwarder) connect() (net.Conn, error) {
 			if frame.PayloadType() == websocket.PongFrame {
 				atomic.StoreInt64(&lastPongTime, time.Now().UnixNano())
 			}
-			io.Copy(ioutil.Discard, frame)
+			_, _ = io.Copy(ioutil.Discard, frame)
 		}
 	}()
 	go func() {
@@ -259,6 +260,8 @@ func (f *wsForwarder) process(conn net.Conn, msg LogMessage) error {
 func (f *wsForwarder) close(conn net.Conn) {
 	f.connMutex.Lock()
 	defer f.connMutex.Unlock()
-	conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout))
+	if err := conn.SetWriteDeadline(time.Now().Add(forwardConnWriteTimeout)); err != nil {
+		bslog.Errorf("unable to set deadline: %v", err)
+	}
 	conn.Close()
 }
