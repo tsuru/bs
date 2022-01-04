@@ -59,9 +59,9 @@ func main() {
 		return
 	}
 	lf := log.LogForwarder{
-		BindAddress:     config.Config.SyslogListenAddress,
-		DockerEndpoint:  config.Config.DockerEndpoint,
-		EnabledBackends: config.Config.LogBackends,
+		BindAddress:      config.Config.SyslogListenAddress,
+		DockerClientInfo: config.Config.DockerClientInfo,
+		EnabledBackends:  config.Config.LogBackends,
 	}
 	err = lf.Start()
 	if err != nil {
@@ -74,7 +74,7 @@ func main() {
 	reporter, err := status.NewReporter(&status.ReporterConfig{
 		TsuruEndpoint:  config.Config.TsuruEndpoint,
 		TsuruToken:     config.Config.TsuruToken,
-		DockerEndpoint: config.Config.DockerEndpoint,
+		DockerClientInfo: config.Config.DockerClientInfo,
 		Interval:       config.Config.StatusInterval,
 		Kubernetes:     isKubernetes(),
 	})
@@ -108,7 +108,7 @@ func initializeMetricsReporter() (StopWaiter, error) {
 		return nil, nil
 	}
 	metricsRunner := metric.NewRunner(
-		config.Config.DockerEndpoint,
+		config.Config.DockerClientInfo,
 		config.Config.MetricsInterval,
 		config.Config.MetricsBackend,
 	)

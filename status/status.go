@@ -19,6 +19,7 @@ import (
 	"github.com/ajg/form"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/container"
 	node "github.com/tsuru/bs/node"
 	"github.com/tsuru/tsuru/provision"
@@ -36,11 +37,11 @@ type respUnit struct {
 }
 
 type ReporterConfig struct {
-	Interval       time.Duration
-	DockerEndpoint string
-	TsuruEndpoint  string
-	TsuruToken     string
-	Kubernetes     bool
+	Interval         time.Duration
+	DockerClientInfo *config.DockerConfig
+	TsuruEndpoint    string
+	TsuruToken       string
+	Kubernetes     	 bool
 }
 
 type Reporter struct {
@@ -77,7 +78,7 @@ func NewReporter(config *ReporterConfig) (*Reporter, error) {
 	}
 	abort := make(chan struct{})
 	exit := make(chan struct{})
-	infoClient, err := container.NewClient(config.DockerEndpoint)
+	infoClient, err := container.NewClient(config.DockerClientInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (r *Reporter) reportStatus() {
 		opts := docker.ListContainersOptions{All: true}
 		containers, err := client.ListContainers(opts)
 		if err != nil {
-			bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s", r.config.DockerEndpoint, err)
+			bslog.Errorf("[status reporter] failed to list containers in the Docker server at %q: %s", r.config.DockerClientInfo.Endpoint, err)
 			return
 		}
 		hostData.Units = r.retrieveContainerStatuses(containers)

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/container"
 	"gopkg.in/check.v1"
 )
@@ -107,7 +108,13 @@ func (s *S) TestGetMetrics(c *check.C) {
 	bogusContainers := s.buildContainers()
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	s.prepareStats(dockerServer, conts)
-	client, err := container.NewClient(dockerServer.URL())
+	client, err := container.NewClient(&config.DockerConfig{
+		Endpoint: dockerServer.URL(),
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	})
 	c.Assert(err, check.IsNil)
 	defer dockerServer.Stop()
 	r := Reporter{backend: &fakeBackend, infoClient: client}

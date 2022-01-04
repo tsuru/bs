@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/tsuru/bs/bslog"
+	"github.com/tsuru/bs/config"
 	"github.com/tsuru/bs/container"
 )
 
 type runner struct {
-	dockerEndpoint     string
+	dockerClientInfo   *config.DockerConfig
 	interval           time.Duration
 	metricsBackend     string
 	abort              chan struct{}
@@ -24,13 +25,13 @@ type runner struct {
 	EnableHostMetrics  bool
 }
 
-func NewRunner(dockerEndpoint string, interval time.Duration, metricsBackend string) *runner {
+func NewRunner(dockerClientInfo *config.DockerConfig, interval time.Duration, metricsBackend string) *runner {
 	return &runner{
-		abort:          make(chan struct{}),
-		exit:           make(chan struct{}),
-		dockerEndpoint: dockerEndpoint,
-		interval:       interval,
-		metricsBackend: metricsBackend,
+		abort:            make(chan struct{}),
+		exit:             make(chan struct{}),
+		dockerClientInfo: dockerClientInfo,
+		interval:         interval,
+		metricsBackend:   metricsBackend,
 	}
 }
 
@@ -43,7 +44,7 @@ func (r *runner) Start() (err error) {
 			close(r.exit)
 		}
 	}()
-	client, err := container.NewClient(r.dockerEndpoint)
+	client, err := container.NewClient(r.dockerClientInfo)
 	if err != nil {
 		return
 	}

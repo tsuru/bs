@@ -11,6 +11,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/fsouza/go-dockerclient/testing"
+	"github.com/tsuru/bs/config"
 	"gopkg.in/check.v1"
 )
 
@@ -26,7 +27,13 @@ func (s *S) TestRunner(c *check.C) {
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
-	r := NewRunner(dockerServer.URL(), time.Second, "fake")
+	r := NewRunner(&config.DockerConfig{
+		Endpoint: dockerServer.URL(),
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	}, time.Second, "fake")
 	r.EnableBasicMetrics = true
 	err := r.Start()
 	c.Assert(err, check.IsNil)
@@ -71,7 +78,13 @@ func (s *S) TestRunnerSelectionEnv(c *check.C) {
 	dockerServer, conts := s.startDockerServer(bogusContainers, nil, c)
 	defer dockerServer.Stop()
 	s.prepareStats(dockerServer, conts)
-	r := NewRunner(dockerServer.URL(), time.Second, "fake")
+	r := NewRunner(&config.DockerConfig{
+		Endpoint: dockerServer.URL(),
+		UseTLS:   false,
+		CertFile: "/docker-certs/cert.pem",
+		KeyFile:  "/docker-certs/key.pem",
+		CaFile:   "/docker-certs/ca.pem",
+	}, time.Second, "fake")
 	r.EnableBasicMetrics = true
 	err := r.Start()
 	c.Assert(err, check.IsNil)
